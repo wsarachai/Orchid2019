@@ -14,8 +14,8 @@ if __name__ == '__main__':
     print(tf.version.VERSION)
 
     train_ds, val_ds, test_ds, num_classes = lib_utils.create_dataset()
-    model = lib_utils.create_orchid_mobilenet_v2_14_cus(num_classes=num_classes,
-                                                        freeze_base_model=True)
+    model = lib_utils.create_orchid_mobilenet_v2_14(num_classes=num_classes,
+                                                    freeze_base_model=True)
 
     exp_decay = False
     if exp_decay:
