@@ -13,9 +13,12 @@ import lib_utils
 if __name__ == '__main__':
     print(tf.version.VERSION)
 
-    train_ds, val_ds, test_ds, num_classes = lib_utils.create_dataset()
+    train_ds, val_ds, test_ds, num_classes = lib_utils.create_dataset(2)
     model = lib_utils.create_orchid_mobilenet_v2_14_cus(num_classes=num_classes,
-                                                        freeze_base_model=True)
+                                                        freeze_base_model=True,
+                                                        is_training=True,
+                                                        ds=train_ds,
+                                                        step='pretrain1')
 
     exp_decay = False
     if exp_decay:
@@ -43,7 +46,7 @@ if __name__ == '__main__':
     latest, step = lib_utils.latest_checkpoint(checkpoint_dir)
     if latest:
         epochs = step
-        model.load_weights(latest, by_name=True)
+        model.load_weights(str(latest), by_name=True)
     else:
         # Save the weights using the `checkpoint_path` format
         model.save_weights(checkpoint_path.format(epoch=0))

@@ -10,15 +10,17 @@ import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
 from tensorflow.python.keras import backend
+from tensorflow.python.keras import layers
+from tensorflow.python.keras import initializers
 from tensorflow.python.keras.engine import training
 from tensorflow.python.keras.utils import data_utils
 from tensorflow.python.keras.utils import layer_utils
 from tensorflow.python.keras.applications import imagenet_utils
-from tensorflow.python.keras.layers import VersionAwareLayers
-from tensorflow.python.lib.io import file_io
 from tensorflow.python.platform import tf_logging as logging
+from stn import pre_spatial_transformer_network
 
-IMG_SIZE_224 = (224, 224)
+default_image_size = 224
+IMG_SIZE_224 = (default_image_size, default_image_size)
 IMG_SHAPE_224 = IMG_SIZE_224 + (3,)
 BASE_WEIGHT_PATH = ('https://storage.googleapis.com/tensorflow/'
                     'keras-applications/mobilenet_v2/')
@@ -80,7 +82,7 @@ def latest_checkpoint(checkpoint_path):
     return None, 0
 
 
-def create_dataset():
+def create_dataset(batch_size):
     train_data_dir = pathlib.Path("/Volumes/Data/_dataset/_orchids_dataset/orchids52_data/train-en")
     test_data_dir = pathlib.Path("/Volumes/Data/_dataset/_orchids_dataset/orchids52_data/test-en")
 
@@ -110,16 +112,16 @@ def create_dataset():
     val_ds = val_ds.map(_process_path, num_parallel_calls=tf.data.experimental.AUTOTUNE)
     test_ds = test_ds.map(_process_path, num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
-    train_ds = configure_for_performance(train_ds)
-    val_ds = configure_for_performance(val_ds)
-    test_ds = configure_for_performance(test_ds)
+    train_ds = configure_for_performance(train_ds, batch_size=batch_size)
+    val_ds = configure_for_performance(val_ds, batch_size=batch_size)
+    test_ds = configure_for_performance(test_ds, batch_size=batch_size)
 
     num_classes = len(class_names)
 
     return train_ds, val_ds, test_ds, num_classes
 
 
-def _inverted_res_block(inputs, expansion, stride, alpha, filters, block_id):
+def _inverted_res_block(name, inputs, expansion, stride, alpha, filters, block_id):
   """Inverted ResNet block."""
   channel_axis = 1 if backend.image_data_format() == 'channels_first' else -1
 
@@ -127,7 +129,7 @@ def _inverted_res_block(inputs, expansion, stride, alpha, filters, block_id):
   pointwise_conv_filters = int(filters * alpha)
   pointwise_filters = _make_divisible(pointwise_conv_filters, 8)
   x = inputs
-  prefix = 'block_{}_'.format(block_id)
+  prefix = '{}_block_{}_'.format(name, block_id)
 
   if block_id:
     # Expand
@@ -147,7 +149,7 @@ def _inverted_res_block(inputs, expansion, stride, alpha, filters, block_id):
             x)
     x = layers.ReLU(6., name=prefix + 'expand_relu')(x)
   else:
-    prefix = 'expanded_conv_'
+    prefix = '{}_expanded_conv_'.format(name)
 
   # Depthwise
   if stride == 2:
@@ -211,84 +213,13 @@ def create_mobilenet_v2(input_shape=None,
                         classes=1000,
                         classifier_activation='softmax',
                         **kwargs):
-    """Instantiates the MobileNetV2 architecture.
-
-    Reference:
-    - [MobileNetV2: Inverted Residuals and Linear Bottlenecks](
-        https://arxiv.org/abs/1801.04381) (CVPR 2018)
-
-    Optionally loads weights pre-trained on ImageNet.
-
-    Caution: Be sure to properly pre-process your inputs to the application.
-    Please see `applications.mobilenet_v2.preprocess_input` for an example.
-
-    Arguments:
-      input_shape: Optional shape tuple, to be specified if you would
-        like to use a model with an input image resolution that is not
-        (224, 224, 3).
-        It should have exactly 3 inputs channels (224, 224, 3).
-        You can also omit this option if you would like
-        to infer input_shape from an input_tensor.
-        If you choose to include both input_tensor and input_shape then
-        input_shape will be used if they match, if the shapes
-        do not match then we will throw an error.
-        E.g. `(160, 160, 3)` would be one valid value.
-      alpha: Float between 0 and 1. controls the width of the network.
-        This is known as the width multiplier in the MobileNetV2 paper,
-        but the name is kept for consistency with `applications.MobileNetV1`
-        model in Keras.
-        - If `alpha` < 1.0, proportionally decreases the number
-            of filters in each layer.
-        - If `alpha` > 1.0, proportionally increases the number
-            of filters in each layer.
-        - If `alpha` = 1, default number of filters from the paper
-            are used at each layer.
-      include_top: Boolean, whether to include the fully-connected
-        layer at the top of the network. Defaults to `True`.
-      weights: String, one of `None` (random initialization),
-        'imagenet' (pre-training on ImageNet),
-        or the path to the weights file to be loaded.
-      input_tensor: Optional Keras tensor (i.e. output of
-        `layers.Input()`)
-        to use as image input for the model.
-      pooling: String, optional pooling mode for feature extraction
-        when `include_top` is `False`.
-        - `None` means that the output of the model
-            will be the 4D tensor output of the
-            last convolutional block.
-        - `avg` means that global average pooling
-            will be applied to the output of the
-            last convolutional block, and thus
-            the output of the model will be a
-            2D tensor.
-        - `max` means that global max pooling will
-            be applied.
-      classes: Integer, optional number of classes to classify images
-        into, only to be specified if `include_top` is True, and
-        if no `weights` argument is specified.
-      classifier_activation: A `str` or callable. The activation function to use
-        on the "top" layer. Ignored unless `include_top=True`. Set
-        `classifier_activation=None` to return the logits of the "top" layer.
-      **kwargs: For backwards compatibility only.
-
-    Returns:
-      A `keras.Model` instance.
-
-    Raises:
-      ValueError: in case of invalid argument for `weights`,
-        or invalid input shape or invalid alpha, rows when
-        weights='imagenet'
-      ValueError: if `classifier_activation` is not `softmax` or `None` when
-        using a pretrained top layer.
-    """
-    global layers
     if 'layers' in kwargs:
+        global layers
         layers = kwargs.pop('layers')
-    else:
-        layers = VersionAwareLayers()
-    #if kwargs:
-    #    raise ValueError('Unknown argument(s): %s' % (kwargs,))
-    if not (weights in {'imagenet', None} or file_io.file_exists(weights)):
+
+    # if kwargs:
+    #     raise ValueError('Unknown argument(s): %s' % (kwargs,))
+    if not (weights in {'imagenet', None} or os.path.exists(weights)):
         raise ValueError('The `weights` argument should be either '
                          '`None` (random initialization), `imagenet` '
                          '(pre-training on ImageNet), '
@@ -395,8 +326,14 @@ def create_mobilenet_v2(input_shape=None,
                             ' Weights for input shape (224, 224) will be'
                             ' loaded as the default.')
 
+    if 'sub_name' in kwargs:
+        sub_name = kwargs.pop('sub_name')
+        model_name = 'mobilenetv2_%s_%0.2f_%s' % (sub_name, alpha, rows)
+    else:
+        model_name = 'mobilenetv2_%0.2f_%s' % (alpha, rows)
+
     if input_tensor is None:
-        img_input = layers.Input(shape=input_shape)
+        img_input = layers.Input(name='%s_input' % model_name, shape=input_shape)
     else:
         if not backend.is_keras_tensor(input_tensor):
             img_input = layers.Input(tensor=input_tensor, shape=input_shape)
@@ -408,59 +345,57 @@ def create_mobilenet_v2(input_shape=None,
     first_block_filters = _make_divisible(32 * alpha, 8)
     x = layers.ZeroPadding2D(
         padding=imagenet_utils.correct_pad(img_input, 3),
-        name='Conv1_pad')(img_input)
+        name='%s_Conv1_pad' % model_name)(img_input)
     x = layers.Conv2D(
         first_block_filters,
         kernel_size=3,
         strides=(2, 2),
         padding='valid',
         use_bias=False,
-        name='Conv1')(
-        x)
+        name='%s_Conv1' % model_name)(x)
     x = layers.BatchNormalization(
-        axis=channel_axis, epsilon=1e-3, momentum=0.999, name='bn_Conv1')(
-        x)
-    x = layers.ReLU(6., name='Conv1_relu')(x)
+        axis=channel_axis, epsilon=1e-3, momentum=0.999, name='%s_bn_Conv1' % model_name)(x)
+    x = layers.ReLU(6., name='%s_Conv1_relu' % model_name)(x)
 
-    x = _inverted_res_block(
+    x = _inverted_res_block(model_name,
         x, filters=16, alpha=alpha, stride=1, expansion=1, block_id=0)
 
-    x = _inverted_res_block(
+    x = _inverted_res_block(model_name,
         x, filters=24, alpha=alpha, stride=2, expansion=6, block_id=1)
-    x = _inverted_res_block(
+    x = _inverted_res_block(model_name,
         x, filters=24, alpha=alpha, stride=1, expansion=6, block_id=2)
 
-    x = _inverted_res_block(
+    x = _inverted_res_block(model_name,
         x, filters=32, alpha=alpha, stride=2, expansion=6, block_id=3)
-    x = _inverted_res_block(
+    x = _inverted_res_block(model_name,
         x, filters=32, alpha=alpha, stride=1, expansion=6, block_id=4)
-    x = _inverted_res_block(
+    x = _inverted_res_block(model_name,
         x, filters=32, alpha=alpha, stride=1, expansion=6, block_id=5)
 
-    x = _inverted_res_block(
+    x = _inverted_res_block(model_name,
         x, filters=64, alpha=alpha, stride=2, expansion=6, block_id=6)
-    x = _inverted_res_block(
+    x = _inverted_res_block(model_name,
         x, filters=64, alpha=alpha, stride=1, expansion=6, block_id=7)
-    x = _inverted_res_block(
+    x = _inverted_res_block(model_name,
         x, filters=64, alpha=alpha, stride=1, expansion=6, block_id=8)
-    x = _inverted_res_block(
+    x = _inverted_res_block(model_name,
         x, filters=64, alpha=alpha, stride=1, expansion=6, block_id=9)
 
-    x = _inverted_res_block(
+    x = _inverted_res_block(model_name,
         x, filters=96, alpha=alpha, stride=1, expansion=6, block_id=10)
-    x = _inverted_res_block(
+    x = _inverted_res_block(model_name,
         x, filters=96, alpha=alpha, stride=1, expansion=6, block_id=11)
-    x = _inverted_res_block(
+    x = _inverted_res_block(model_name,
         x, filters=96, alpha=alpha, stride=1, expansion=6, block_id=12)
 
-    x = _inverted_res_block(
+    x = _inverted_res_block(model_name,
         x, filters=160, alpha=alpha, stride=2, expansion=6, block_id=13)
-    x = _inverted_res_block(
+    x = _inverted_res_block(model_name,
         x, filters=160, alpha=alpha, stride=1, expansion=6, block_id=14)
-    x = _inverted_res_block(
+    x = _inverted_res_block(model_name,
         x, filters=160, alpha=alpha, stride=1, expansion=6, block_id=15)
 
-    x = _inverted_res_block(
+    x = _inverted_res_block(model_name,
         x, filters=320, alpha=alpha, stride=1, expansion=6, block_id=16)
 
     # no alpha applied to last conv as stated in the paper:
@@ -472,18 +407,16 @@ def create_mobilenet_v2(input_shape=None,
         last_block_filters = 1280
 
     x = layers.Conv2D(
-        last_block_filters, kernel_size=1, use_bias=False, name='Conv_1')(
-        x)
+        last_block_filters, kernel_size=1, use_bias=False, name='%s_Conv_1' % model_name)(x)
     x = layers.BatchNormalization(
-        axis=channel_axis, epsilon=1e-3, momentum=0.999, name='Conv_1_bn')(
-        x)
-    x = layers.ReLU(6., name='out_relu')(x)
+        axis=channel_axis, epsilon=1e-3, momentum=0.999, name='%s_Conv_1_bn' % model_name)(x)
+    x = layers.ReLU(6., name='%s_out_relu' % model_name)(x)
 
     if include_top:
         x = layers.GlobalAveragePooling2D()(x)
         imagenet_utils.validate_activation(classifier_activation, weights)
         x = layers.Dense(classes, activation=classifier_activation,
-                         name='predictions')(x)
+                         name='%s_predictions' % model_name)(x)
 
     else:
         if pooling == 'avg':
@@ -499,11 +432,7 @@ def create_mobilenet_v2(input_shape=None,
         inputs = img_input
 
     # Create model.
-    if 'sub_name' in kwargs:
-        sub_name = kwargs.pop('sub_name')
-        model = training.Model(inputs, x, name='mobilenetv2_%s_%0.2f_%s' % (sub_name, alpha, rows))
-    else:
-        model = training.Model(inputs, x, name='mobilenetv2_%0.2f_%s' % (alpha, rows))
+    model = training.Model(inputs, x, name=model_name)
 
     # Load weights.
     if weights == 'imagenet':
@@ -524,6 +453,7 @@ def create_mobilenet_v2(input_shape=None,
         model.load_weights(weights)
 
     return model
+
 
 
 def create_orchid_mobilenet_v2_14(num_classes, freeze_base_model=False):
@@ -561,10 +491,30 @@ def create_orchid_mobilenet_v2_14(num_classes, freeze_base_model=False):
     return model
 
 
-def create_orchid_mobilenet_v2_14_cus(num_classes, freeze_base_model=False):
-    # Create the base model from the pre-trained model MobileNet V2
+def create_orchid_mobilenet_v2_14_cus(num_classes,
+                                      freeze_base_model=False,
+                                      is_training=False,
+                                      **kwargs):
+    ds = kwargs.pop('ds')
+    batch, _ = next(iter(ds))
 
-    base_model1 = create_mobilenet_v2(input_shape=IMG_SHAPE_224,
+    global_average_layer = keras.layers.GlobalAveragePooling2D()
+
+    data_augmentation = keras.Sequential([
+        keras.layers.experimental.preprocessing.RandomFlip('horizontal'),
+        keras.layers.experimental.preprocessing.RandomRotation(0.2),
+    ])
+
+    preprocess_input = keras.applications.mobilenet_v2.preprocess_input
+
+    scales = [0.8, 0.6]
+
+    inputs = keras.Input(batch_input_shape=batch.shape)
+    inputs = data_augmentation(inputs)
+    inputs = preprocess_input(inputs)
+
+    # Create the base model from the pre-trained model MobileNet V2
+    base_model1 = create_mobilenet_v2(input_tensor=inputs,
                                       alpha=1.4,
                                       include_top=False,
                                       weights='imagenet',
@@ -575,25 +525,67 @@ def create_orchid_mobilenet_v2_14_cus(num_classes, freeze_base_model=False):
                                       weights='imagenet',
                                       sub_name='02')
 
-    global_average_layer = keras.layers.GlobalAveragePooling2D()
-    prediction_layer = keras.layers.Dense(num_classes)
-
-    data_augmentation = keras.Sequential([
-        keras.layers.experimental.preprocessing.RandomFlip('horizontal'),
-        keras.layers.experimental.preprocessing.RandomRotation(0.2),
-    ])
-
-    preprocess_input = keras.applications.mobilenet_v2.preprocess_input
-
-    inputs = keras.Input(shape=IMG_SHAPE_224)
-    x = data_augmentation(inputs)
-    x = preprocess_input(x)
-    x1 = base_model1(x, training=False)
-    x2 = base_model2(x, training=False)
-    x = x1 + x2 / 2.
-    x = global_average_layer(x)
+    x = base_model1(inputs, training=False)
+    x = layers.Conv2D(128, [1, 1], activation='relu', name="conv2d_resize_128")(x)
+    x = layers.Flatten()(x)
     x = keras.layers.Dropout(0.2)(x)
-    outputs = prediction_layer(x)
+    x = layers.Dense(128, activation='relu')(x)
+
+    element_size = 3  # [x, y, scale]
+    fc_num = element_size * len(scales)
+    h_fc1 = layers.Dense(fc_num, activation='tanh', activity_regularizer='l2')(x)
+
+    stn_inputs, bound_err = pre_spatial_transformer_network(inputs,
+                                                            h_fc1,
+                                                            width=default_image_size,
+                                                            height=default_image_size,
+                                                            scales=scales)
+
+    if is_training:
+        _len = bound_err.get_shape().as_list()[0]
+        bound_std = tf.constant(np.full(_len, 0.00, dtype=np.float32))
+        tf.losses.mean_squared_error(bound_err, bound_std)
+
+    all_images = []
+    for img in stn_inputs:
+        all_images.append(img)
+
+    all_logits = []
+    x = base_model2(inputs, training=False)
+    all_logits.append(x)
+    for i, input_image in enumerate(all_images):
+        x = base_model2(input_image, training=False)
+        all_logits.append(x)
+
+    all_predicts = []
+    for i, net in enumerate(all_logits):
+        x = global_average_layer(net)
+        x = layers.Dropout(0.2)(x)
+        x = layers.Dense(num_classes)(x)
+        all_predicts.append(x)
+
+    if 'step' in kwargs:
+        step = kwargs.pop('step')
+    else:
+        step = ''
+
+    if step == 'pretrain1':
+        outputs = tf.add_n(all_predicts)
+        outputs = tf.divide(outputs, len(all_predicts))
+    else:
+        c_t = None
+        main_net = None
+        for i, net in enumerate(all_predicts):
+            if i > 0:
+                input_and_hstate_concatenated = tf.concat(axis=1, values=[c_t, net])
+                c_t = layers.Dense(num_classes,
+                                   kernel_initializer=initializers.truncated_normal(mean=0.5)
+                                   )(input_and_hstate_concatenated)
+                main_net = main_net + c_t
+            else:
+                main_net = net
+                c_t = net
+        outputs = main_net
     model = keras.Model(inputs, outputs)
 
     if freeze_base_model:
