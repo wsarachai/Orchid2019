@@ -6,19 +6,18 @@ from __future__ import print_function
 import os
 import tensorflow as tf
 from tensorflow import keras
-
-import lib_utils
+from data.orchids import create_dataset
+from lib_utils import latest_checkpoint, create_orchid_mobilenet_v2_14_cus
 
 
 if __name__ == '__main__':
     print(tf.version.VERSION)
 
-    train_ds, val_ds, test_ds, num_classes = lib_utils.create_dataset(2)
-    model = lib_utils.create_orchid_mobilenet_v2_14_cus(num_classes=num_classes,
-                                                        freeze_base_model=True,
-                                                        is_training=True,
-                                                        ds=train_ds,
-                                                        step='pretrain1')
+    train_ds, val_ds, test_ds, num_classes = create_dataset(2)
+    model = create_orchid_mobilenet_v2_14_cus(num_classes=num_classes,
+                                              freeze_base_model=True,
+                                              is_training=True,
+                                              step='pretrain1')
 
     exp_decay = False
     if exp_decay:
@@ -41,9 +40,9 @@ if __name__ == '__main__':
     checkpoint_dir = os.path.dirname(checkpoint_path)
 
     epochs = 0
-    total_epochs = 100
+    total_epochs = 101
 
-    latest, step = lib_utils.latest_checkpoint(checkpoint_dir)
+    latest, step = latest_checkpoint(checkpoint_dir)
     if latest:
         epochs = step
         model.load_weights(str(latest), by_name=True)

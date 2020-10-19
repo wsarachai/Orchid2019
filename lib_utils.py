@@ -4,13 +4,11 @@ from __future__ import print_function
 
 import os
 import pathlib
-import functools
 
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
 from tensorflow.python.keras import backend
-from tensorflow.python.keras import layers
 from tensorflow.python.keras import initializers
 from tensorflow.python.keras.engine import training
 from tensorflow.python.keras.utils import data_utils
@@ -18,47 +16,10 @@ from tensorflow.python.keras.utils import layer_utils
 from tensorflow.python.keras.applications import imagenet_utils
 from tensorflow.python.platform import tf_logging as logging
 from stn import pre_spatial_transformer_network
+from data.orchids import IMG_SHAPE_224, default_image_size
 
-default_image_size = 224
-IMG_SIZE_224 = (default_image_size, default_image_size)
-IMG_SHAPE_224 = IMG_SIZE_224 + (3,)
 BASE_WEIGHT_PATH = ('https://storage.googleapis.com/tensorflow/'
                     'keras-applications/mobilenet_v2/')
-
-
-def wrapped_partial(func, *args, **kwargs):
-    partial_func = functools.partial(func, *args, **kwargs)
-    functools.update_wrapper(partial_func, func)
-    return partial_func
-
-
-def get_label(file_path, class_names):
-    parts = tf.strings.split(file_path, os.path.sep)
-    one_hot = parts[-2] == class_names
-    return tf.cast(one_hot, tf.float32)
-
-
-def decode_img(img, size):
-    # convert the compressed string to a 3D uint8 tensor
-    img = tf.image.decode_jpeg(img, channels=3)
-    # resize the image to the desired size
-    return tf.image.resize(img, size)
-
-
-def process_path(file_path, class_names, image_size):
-    label = get_label(file_path, class_names)
-    # load the raw data from the file as a string
-    img = tf.io.read_file(file_path)
-    img = decode_img(img, image_size)
-    return img, label
-
-
-def configure_for_performance(ds, batch_size=32):
-    ds = ds.cache()
-    ds = ds.shuffle(buffer_size=1000)
-    ds = ds.batch(batch_size)
-    ds = ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
-    return ds
 
 
 def get_step_number(checkpoint_dir):
@@ -80,45 +41,6 @@ def latest_checkpoint(checkpoint_path):
                 file_path = file
         return file_path, max_step
     return None, 0
-
-
-def create_dataset(batch_size):
-    train_data_dir = pathlib.Path("/Volumes/Data/_dataset/_orchids_dataset/orchids52_data/train-en")
-    test_data_dir = pathlib.Path("/Volumes/Data/_dataset/_orchids_dataset/orchids52_data/test-en")
-
-    image_count = len(list(train_data_dir.glob('*/*.jpg')))
-    train_ds = tf.data.Dataset.list_files(str(train_data_dir / '*/*'), shuffle=False)
-    train_ds = train_ds.shuffle(image_count, reshuffle_each_iteration=False)
-    test_ds = tf.data.Dataset.list_files(str(test_data_dir / '*/*'), shuffle=False)
-
-    class_names = np.array(sorted([item.name for item in train_data_dir.glob('*')]))
-    print(class_names)
-
-    val_batches = tf.data.experimental.cardinality(test_ds)
-    val_ds = test_ds.skip(val_batches // 5)
-    test_ds = test_ds.take(val_batches // 5)
-
-    print(tf.data.experimental.cardinality(train_ds).numpy())
-    print(tf.data.experimental.cardinality(val_ds).numpy())
-    print(tf.data.experimental.cardinality(test_ds).numpy())
-
-    _process_path = wrapped_partial(
-        process_path,
-        class_names=class_names,
-        image_size=IMG_SIZE_224)
-
-    # Set `num_parallel_calls` so multiple images are loaded/processed in parallel.
-    train_ds = train_ds.map(_process_path, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-    val_ds = val_ds.map(_process_path, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-    test_ds = test_ds.map(_process_path, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-
-    train_ds = configure_for_performance(train_ds, batch_size=batch_size)
-    val_ds = configure_for_performance(val_ds, batch_size=batch_size)
-    test_ds = configure_for_performance(test_ds, batch_size=batch_size)
-
-    num_classes = len(class_names)
-
-    return train_ds, val_ds, test_ds, num_classes
 
 
 def _inverted_res_block(name, inputs, expansion, stride, alpha, filters, block_id):
@@ -495,8 +417,6 @@ def create_orchid_mobilenet_v2_14_cus(num_classes,
                                       freeze_base_model=False,
                                       is_training=False,
                                       **kwargs):
-    ds = kwargs.pop('ds')
-    batch, _ = next(iter(ds))
 
     global_average_layer = keras.layers.GlobalAveragePooling2D()
 
@@ -509,7 +429,7 @@ def create_orchid_mobilenet_v2_14_cus(num_classes,
 
     scales = [0.8, 0.6]
 
-    inputs = keras.Input(batch_input_shape=batch.shape)
+    inputs = keras.Input(shape=(default_image_size, default_image_size, 3), batch_size=2) #batch_input_shape=batch.shape)
     inputs = data_augmentation(inputs)
     inputs = preprocess_input(inputs)
 
