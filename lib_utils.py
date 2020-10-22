@@ -9,6 +9,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
 from tensorflow.python.keras import backend
+from tensorflow.python.keras import layers
 from tensorflow.python.keras import initializers
 from tensorflow.python.keras.engine import training
 from tensorflow.python.keras.utils import data_utils
@@ -429,7 +430,9 @@ def create_orchid_mobilenet_v2_14_cus(num_classes,
 
     scales = [0.8, 0.6]
 
-    inputs = keras.Input(shape=(default_image_size, default_image_size, 3), batch_size=2) #batch_input_shape=batch.shape)
+    batch_size = kwargs.pop('batch_size')
+
+    inputs = keras.Input(shape=(default_image_size, default_image_size, 3), batch_size=batch_size) #batch_input_shape=batch.shape)
     inputs = data_augmentation(inputs)
     inputs = preprocess_input(inputs)
 
