@@ -96,9 +96,6 @@ def main(unused_argv):
     validate_step = VALIDATE_SIZE // batch_size
     test_step = TEST_SIZE // batch_size
 
-    train_ds.repeat(total_epochs)
-    validate_ds.repeat(total_epochs)
-
     summary = model.fit(train_ds,
                         epochs=total_epochs,
                         validation_data=validate_ds,
