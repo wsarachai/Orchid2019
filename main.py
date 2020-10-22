@@ -2,13 +2,14 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import os
-
+import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorflow import keras
-from data.orchids import load_dataset
-from data.orchids import IMG_SIZE_224
-from lib_utils import latest_checkpoint, create_orchid_mobilenet_v2_14_cus
+from data import orchids52_dataset, data_utils
+from data.create_orchids_dataset import create_dataset
+from data.data_utils import dataset_mapping
+from lib_utils import latest_checkpoint
+from nets import nets_utils
 
 flags = tf.compat.v1.flags
 logging = tf.compat.v1.logging
@@ -24,55 +25,45 @@ flags.DEFINE_string('output_directory', '/Volumes/Data/_dataset/_orchids_dataset
 flags.DEFINE_string('tf_record_dir', '/Volumes/Data/_dataset/_orchids_dataset/orchids52_data/tf-records',
                     'TF record data directory')
 
-num_classes = 52
-batch_size = 32
+flags.DEFINE_boolean('exp_decay', False,
+                     'Exponential decay learning rate')
+
+batch_size = 2
+total_epochs = 2
 
 
-def decode_img(image, size):
-    img = tf.image.decode_jpeg(image, channels=3)
-    return tf.image.resize(img, size)
-
-
-def get_label(serialize_example):
-    label = serialize_example['image/class/label']
-    label_string = tf.strings.split(label, ',')
-    label_values = tf.strings.to_number(label_string, out_type=tf.dtypes.int64)
-    return label_values
-
-
-def get_ds(serialize_example):
-    image = serialize_example['image/image_raw']
-    image = decode_img(image=image, size=IMG_SIZE_224)
-    label_values = get_label(serialize_example)
-    return image, label_values
-
-
-def get_dataset(filename):
-    dataset = load_dataset(filename)
-    dataset = dataset.map(get_ds, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-    dataset = dataset.shuffle(1000)
-    dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
-    dataset = dataset.batch(batch_size=batch_size)
-    return dataset
+def _main(unused_argv):
+    create_dataset(images_dir=FLAGS.images_dir,
+                   output_directory=FLAGS.output_directory)
 
 
 def main(unused_argv):
-    train_file = os.path.join(FLAGS.tf_record_dir, "orchids52-train.tfrecord")
-    test_file = os.path.join(FLAGS.tf_record_dir, "orchids52-test.tfrecord")
-    validate_file = os.path.join(FLAGS.tf_record_dir, "orchids52-validate.tfrecord")
+    load_dataset = dataset_mapping[data_utils.MOBILENET_V2_TFRECORD].load_dataset
+    train_ds = load_dataset(
+        split="train",
+        batch_size=batch_size)
+    test_ds = load_dataset(
+        split="test",
+        batch_size=batch_size)
+    validate_ds = load_dataset(
+        split="validate",
+        batch_size=batch_size)
 
-    train_ds = get_dataset(train_file)
-    test_ds = get_dataset(test_file)
-    validate_ds = get_dataset(validate_file)
+    # d = iter(train_ds).next()
+    # print(d)
+    # d = iter(test_ds).next()
+    # print(d)
+    # d = iter(validate_ds).next()
+    # print(d)
 
-    model = create_orchid_mobilenet_v2_14_cus(num_classes=num_classes,
-                                              freeze_base_model=True,
-                                              is_training=True,
-                                              batch_size=batch_size,
-                                              step='pretrain1')
+    create_model = nets_utils.nets_mapping[nets_utils.MOBILENET_V2_140_ORCHIDS52]
+    model = create_model(num_classes=orchids52_dataset.NUM_OF_CLASSES,
+                         freeze_base_model=True,
+                         is_training=True,
+                         batch_size=batch_size,
+                         step='pretrain1')
 
-    exp_decay = False
-    if exp_decay:
+    if FLAGS.exp_decay:
         base_learning_rate = keras.optimizers.schedules.ExponentialDecay(
             initial_learning_rate=0.001,
             decay_steps=1000,
@@ -91,12 +82,12 @@ def main(unused_argv):
     checkpoint_file = "/Volumes/Data/tmp/orchids-models/orchid2019/cp-{epoch:04d}.h5"
 
     epochs = 0
-    total_epochs = 100
 
     latest, step = latest_checkpoint(checkpoint_path)
     if latest:
-        checkpoint_file = checkpoint_file.format(epoch=step)
-        model.load_weights(checkpoint_file, by_name=True)
+        epochs = step
+        chk_file = checkpoint_file.format(epoch=step)
+        model.load_weights(chk_file, by_name=True)
     else:
         if not tf.io.gfile.exists(checkpoint_path):
             tf.io.gfile.mkdir(checkpoint_path)
@@ -107,14 +98,36 @@ def main(unused_argv):
                                                   save_weights_only=True,
                                                   verbose=1)
 
-    history_fine = model.fit(train_ds,
-                             epochs=total_epochs,
-                             validation_data=validate_ds,
-                             callbacks=[cp_callback],
-                             initial_epoch=epochs,
-                             verbose=1)
+    summary = model.fit(train_ds,
+                        epochs=total_epochs,
+                        validation_data=validate_ds,
+                        callbacks=[cp_callback],
+                        initial_epoch=epochs)
 
-    loss, accuracy = model.evaluate(test_ds, verbose=2)
+    if hasattr(summary.history, 'history'):
+        acc = summary.history['accuracy']
+        val_acc = summary.history['val_accuracy']
+
+        loss = summary.history['loss']
+        val_loss = summary.history['val_loss']
+
+        epochs_range = range(total_epochs)
+
+        plt.figure(figsize=(8, 8))
+        plt.subplot(1, 2, 1)
+        plt.plot(epochs_range, acc, label='Training Accuracy')
+        plt.plot(epochs_range, val_acc, label='Validation Accuracy')
+        plt.legend(loc='lower right')
+        plt.title('Training and Validation Accuracy')
+
+        plt.subplot(1, 2, 2)
+        plt.plot(epochs_range, loss, label='Training Loss')
+        plt.plot(epochs_range, val_loss, label='Validation Loss')
+        plt.legend(loc='upper right')
+        plt.title('Training and Validation Loss')
+        plt.show()
+
+    loss, accuracy = model.evaluate(test_ds)
     print('Test accuracy :', accuracy)
 
 
