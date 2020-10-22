@@ -8,6 +8,7 @@ from tensorflow import keras
 from data import orchids52_dataset, data_utils
 from data.create_orchids_dataset import create_dataset
 from data.data_utils import dataset_mapping
+from data.orchids52_dataset import TRAIN_SIZE, VALIDATE_SIZE, TEST_SIZE
 from lib_utils import latest_checkpoint
 from nets import nets_utils
 
@@ -28,7 +29,7 @@ flags.DEFINE_string('tf_record_dir', '/Volumes/Data/_dataset/_orchids_dataset/or
 flags.DEFINE_boolean('exp_decay', False,
                      'Exponential decay learning rate')
 
-batch_size = 2
+batch_size = 4
 total_epochs = 2
 
 
@@ -48,13 +49,6 @@ def main(unused_argv):
     validate_ds = load_dataset(
         split="validate",
         batch_size=batch_size)
-
-    # d = iter(train_ds).next()
-    # print(d)
-    # d = iter(test_ds).next()
-    # print(d)
-    # d = iter(validate_ds).next()
-    # print(d)
 
     create_model = nets_utils.nets_mapping[nets_utils.MOBILENET_V2_140_ORCHIDS52]
     model = create_model(num_classes=orchids52_dataset.NUM_OF_CLASSES,
@@ -98,11 +92,17 @@ def main(unused_argv):
                                                   save_weights_only=True,
                                                   verbose=1)
 
+    train_step = TRAIN_SIZE // batch_size
+    validate_step = VALIDATE_SIZE // batch_size
+    test_step = TEST_SIZE // batch_size
+
     summary = model.fit(train_ds,
                         epochs=total_epochs,
                         validation_data=validate_ds,
                         callbacks=[cp_callback],
-                        initial_epoch=epochs)
+                        initial_epoch=epochs,
+                        steps_per_epoch=train_step,
+                        validation_steps=validate_step)
 
     if hasattr(summary.history, 'history'):
         acc = summary.history['accuracy']
@@ -127,7 +127,7 @@ def main(unused_argv):
         plt.title('Training and Validation Loss')
         plt.show()
 
-    loss, accuracy = model.evaluate(test_ds)
+    loss, accuracy = model.evaluate(test_ds, steps=test_step)
     print('Test accuracy :', accuracy)
 
 

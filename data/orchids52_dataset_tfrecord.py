@@ -6,6 +6,7 @@ import functools
 import os
 
 import tensorflow as tf
+from tensorflow.keras import layers
 
 from nets.mobilenet_v2 import IMG_SIZE_224
 
@@ -64,8 +65,10 @@ def _load_dataset(split,
     pattern = "orchids52-{split}*.tfrecord".format(split=split)
     pattern = os.path.join(data_dir, pattern)
     dataset = tf.data.Dataset.list_files(file_pattern=pattern)
-    dataset = dataset.interleave(tf.data.TFRecordDataset,
-                                 cycle_length=num_readers, block_length=1)
+    dataset = dataset.interleave(lambda x: tf.data.TFRecordDataset(x),
+                                 cycle_length=num_readers,
+                                 num_parallel_calls=tf.data.experimental.AUTOTUNE,
+                                 deterministic=False)
     ignore_order = tf.data.Options()
     ignore_order.experimental_deterministic = False  # disable order, increase speed
     dataset = dataset.with_options(
@@ -73,8 +76,12 @@ def _load_dataset(split,
     )
     parsed_dataset = dataset.map(parse_function, num_parallel_calls=num_map_threads)
     parsed_dataset = parsed_dataset.map(_decode_example)
-    parsed_dataset = parsed_dataset.batch(batch_size)
-    return parsed_dataset
+    normalization_layer = layers.experimental.preprocessing.Rescaling(1. / 255)
+    normalized_ds = parsed_dataset.map(lambda x, y: (normalization_layer(x), y))
+    normalized_ds = normalized_ds.batch(batch_size)
+    normalized_ds = normalized_ds.cache()
+    normalized_ds = normalized_ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
+    return normalized_ds
 
 
 _decode_example = wrapped_partial(decode_example, image_size=IMG_SIZE_224)

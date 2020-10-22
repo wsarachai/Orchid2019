@@ -7,6 +7,7 @@ import pathlib
 import functools
 import numpy as np
 import tensorflow as tf
+from tensorflow.keras import layers
 
 from nets.mobilenet_v2 import IMG_SIZE_224
 
@@ -17,8 +18,8 @@ _process_path = None
 
 def check_wrap_process_path(data_dir, image_size):
     global already_wrap, _process_path
-    if already_wrap:
-        class_names = np.array(sorted([item.name for item in data_dir.glob('*')]))
+    if not already_wrap:
+        class_names = np.array(sorted([item.name for item in data_dir.glob('n*')]))
         _process_path = wrapped_partial(
             process_path,
             class_names=class_names,
@@ -41,7 +42,7 @@ def decode_img(image, size):
 def get_label(file_path, class_names):
     parts = tf.strings.split(file_path, os.path.sep)
     one_hot = parts[-2] == class_names
-    label = tf.cast(one_hot, tf.int64)
+    label = tf.cast(one_hot, tf.float32)
     return label
 
 
@@ -53,9 +54,11 @@ def process_path(file_path, class_names, image_size):
 
 
 def configure_for_performance(ds, batch_size=32):
+    normalization_layer = layers.experimental.preprocessing.Rescaling(1. / 255)
+    ds = ds.map(lambda x, y: (normalization_layer(x), y))
     ds = ds.cache()
-    ds = ds.shuffle(buffer_size=1000)
     ds = ds.batch(batch_size)
+    ds = ds.shuffle(buffer_size=1000)
     ds = ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
     return ds
 
@@ -68,36 +71,28 @@ def _load_dataset(split,
 
     if 'train' == split:
         train_data_dir = pathlib.Path(os.path.join(data_dir, "train-en"))
-        image_count = len(list(train_data_dir.glob('*/*.jpg')))
         train_ds = tf.data.Dataset.list_files(str(train_data_dir / '*/*'), shuffle=False)
-        train_ds = train_ds.shuffle(image_count, reshuffle_each_iteration=False)
         check_wrap_process_path(data_dir=train_data_dir, image_size=image_size)
         train_ds = train_ds.map(_process_path, num_parallel_calls=tf.data.experimental.AUTOTUNE)
         train_ds = configure_for_performance(train_ds, batch_size=batch_size)
-
         return train_ds
     elif 'test' == split:
-        test_data_dir = os.path.join(data_dir, "test-en")
-        test_data_dir = pathlib.Path(test_data_dir)
-
+        test_data_dir = pathlib.Path(os.path.join(data_dir, "test-en"))
         test_ds = tf.data.Dataset.list_files(str(test_data_dir / '*/*'), shuffle=False)
         val_batches = tf.data.experimental.cardinality(test_ds)
         test_ds = test_ds.take(val_batches // 5)
         check_wrap_process_path(data_dir=test_data_dir, image_size=image_size)
         test_ds = test_ds.map(_process_path, num_parallel_calls=tf.data.experimental.AUTOTUNE)
         test_ds = configure_for_performance(test_ds, batch_size=batch_size)
-
         return test_ds
     elif 'validate' == split:
-        test_data_dir = os.path.join(data_dir, "test-en")
-        test_data_dir = pathlib.Path(test_data_dir)
+        test_data_dir = pathlib.Path(os.path.join(data_dir, "test-en"))
         test_ds = tf.data.Dataset.list_files(str(test_data_dir / '*/*'), shuffle=False)
-        check_wrap_process_path(data_dir=test_data_dir, image_size=image_size)
         val_batches = tf.data.experimental.cardinality(test_ds)
         val_ds = test_ds.skip(val_batches // 5)
+        check_wrap_process_path(data_dir=test_data_dir, image_size=image_size)
         val_ds = val_ds.map(_process_path, num_parallel_calls=tf.data.experimental.AUTOTUNE)
         val_ds = configure_for_performance(val_ds, batch_size=batch_size)
-
         return val_ds
 
 
