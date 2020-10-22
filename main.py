@@ -29,8 +29,8 @@ flags.DEFINE_string('tf_record_dir', '/Volumes/Data/_dataset/_orchids_dataset/or
 flags.DEFINE_boolean('exp_decay', False,
                      'Exponential decay learning rate')
 
-batch_size = 4
-total_epochs = 2
+batch_size = 1 
+total_epochs = 100
 
 
 def _main(unused_argv):
@@ -134,4 +134,7 @@ def main(unused_argv):
 if __name__ == '__main__':
     logging.set_verbosity(logging.INFO)
     logging.info("tf.version %s" % tf.version.VERSION)
+    physical_devices = tf.config.experimental.list_physical_devices('GPU')
+    assert len(physical_devices) > 0, "Not enough GPU hardware devices available"
+    config = tf.config.experimental.set_memory_growth(physical_devices[0], True)
     tf.compat.v1.app.run(main)
