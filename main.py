@@ -96,6 +96,9 @@ def main(unused_argv):
     validate_step = VALIDATE_SIZE // batch_size
     test_step = TEST_SIZE // batch_size
 
+    train_ds.repeat(total_epochs)
+    validate_ds.repeat(total_epochs)
+
     summary = model.fit(train_ds,
                         epochs=total_epochs,
                         validation_data=validate_ds,
@@ -135,6 +138,6 @@ if __name__ == '__main__':
     logging.set_verbosity(logging.INFO)
     logging.info("tf.version %s" % tf.version.VERSION)
     physical_devices = tf.config.experimental.list_physical_devices('GPU')
-    assert len(physical_devices) > 0, "Not enough GPU hardware devices available"
-    config = tf.config.experimental.set_memory_growth(physical_devices[0], True)
+    if len(physical_devices) > 0:
+        config = tf.config.experimental.set_memory_growth(physical_devices[0], True)
     tf.compat.v1.app.run(main)
