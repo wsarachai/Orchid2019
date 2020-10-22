@@ -10,6 +10,7 @@ import tensorflow as tf
 import numpy as np
 from datetime import datetime
 from data.data_utils import _bytes_feature, _int64_feature
+from data.orchids52_dataset import TRAIN_SIZE, TEST_SIZE
 from data.orchids52_dataset_file import get_label
 from nets.mobilenet_v2 import IMG_SIZE_224
 
@@ -45,15 +46,10 @@ def _find_image_files(images_dir, image_size):
 
     all_ds = all_ds.map(_process_path, num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
-    train_size = int(image_count * 0.7)
-    test_size = image_count - train_size
-    validate_size = test_size // 5
-    test_size = test_size - validate_size
-
-    train_ds = all_ds.take(train_size)
-    test_ds = all_ds.skip(train_size)
-    validate_ds = test_ds.skip(test_size)
-    test_ds = test_ds.take(test_size)
+    train_ds = all_ds.take(TRAIN_SIZE)
+    test_ds = all_ds.skip(TRAIN_SIZE)
+    validate_ds = test_ds.skip(TEST_SIZE)
+    test_ds = test_ds.take(TEST_SIZE)
 
     return train_ds, test_ds, validate_ds
 
