@@ -2,6 +2,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from pickle import dump
+
 import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorflow import keras
@@ -60,7 +62,7 @@ def main(unused_argv):
     if FLAGS.exp_decay:
         base_learning_rate = keras.optimizers.schedules.ExponentialDecay(
             initial_learning_rate=0.001,
-            decay_steps=1000,
+            decay_steps=10,
             decay_rate=0.96
         )
     else:
@@ -103,6 +105,9 @@ def main(unused_argv):
                         initial_epoch=epochs,
                         steps_per_epoch=train_step,
                         validation_steps=validate_step)
+
+    with open('trainHistoryOld', 'wb') as handle:  # saving the history of the model
+        dump(summary.history, handle)
 
     if hasattr(summary.history, 'history'):
         acc = summary.history['accuracy']

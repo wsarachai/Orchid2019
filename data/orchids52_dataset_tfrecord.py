@@ -79,8 +79,8 @@ def _load_dataset(split,
     normalization_layer = layers.experimental.preprocessing.Rescaling(1. / 255)
     normalized_ds = parsed_dataset.map(lambda x, y: (normalization_layer(x), y))
     normalized_ds = normalized_ds.batch(batch_size)
-    normalized_ds = normalized_ds.cache()
     normalized_ds = normalized_ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
+    normalized_ds = normalized_ds.cache()
     return normalized_ds.repeat()
 
 
