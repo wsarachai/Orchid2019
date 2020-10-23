@@ -42,7 +42,7 @@ def decode_img(image, size):
 def get_label(file_path, class_names):
     parts = tf.strings.split(file_path, os.path.sep)
     one_hot = parts[-2] == class_names
-    label = tf.cast(one_hot, tf.float32)
+    label = tf.cast(one_hot, tf.int8)
     return label
 
 
