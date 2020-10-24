@@ -11,7 +11,7 @@ from data import orchids52_dataset, data_utils
 from data.create_orchids_dataset import create_dataset
 from data.data_utils import dataset_mapping
 from data.orchids52_dataset import TRAIN_SIZE, VALIDATE_SIZE, TEST_SIZE
-from lib_utils import latest_checkpoint
+from lib_utils import latest_checkpoint, start
 from nets import nets_utils
 
 flags = tf.compat.v1.flags
@@ -44,12 +44,12 @@ def main(unused_argv):
     load_dataset = dataset_mapping[data_utils.MOBILENET_V2_TFRECORD].load_dataset
     train_ds = load_dataset(
         split="train",
-        batch_size=batch_size)
-    test_ds = load_dataset(
-        split="test",
-        batch_size=batch_size)
+        batch_size=batch_size).repeat()
     validate_ds = load_dataset(
         split="validate",
+        batch_size=batch_size).repeat()
+    test_ds = load_dataset(
+        split="test",
         batch_size=batch_size)
 
     create_model = nets_utils.nets_mapping[nets_utils.MOBILENET_V2_140_ORCHIDS52]
@@ -137,9 +137,4 @@ def main(unused_argv):
 
 
 if __name__ == '__main__':
-    logging.set_verbosity(logging.INFO)
-    logging.info("tf.version %s" % tf.version.VERSION)
-    physical_devices = tf.config.experimental.list_physical_devices('GPU')
-    if len(physical_devices) > 0:
-        config = tf.config.experimental.set_memory_growth(physical_devices[0], True)
-    tf.compat.v1.app.run(main)
+    start(main)

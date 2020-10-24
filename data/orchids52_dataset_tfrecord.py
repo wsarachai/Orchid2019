@@ -81,7 +81,7 @@ def _load_dataset(split,
     normalized_ds = normalized_ds.batch(batch_size)
     normalized_ds = normalized_ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
     normalized_ds = normalized_ds.cache()
-    return normalized_ds.repeat()
+    return normalized_ds
 
 
 _decode_example = wrapped_partial(decode_example, image_size=IMG_SIZE_224)
