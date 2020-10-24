@@ -5,7 +5,8 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
-from tensorflow.keras import initializers, layers
+from tensorflow.keras import initializers
+from tensorflow.keras import layers
 from nets.mobilenet_v2 import default_image_size, create_mobilenet_v2, IMG_SHAPE_224
 from stn import pre_spatial_transformer_network
 
@@ -107,7 +108,8 @@ def create_orchid_mobilenet_v2_14(num_classes,
                     values=[c_t, net],
                     name='t2_concat_{i:02d}'.format(i=i))
                 c_t = layers.Dense(num_classes,
-                                   kernel_initializer=initializers.truncated_normal(mean=0.5),
+                                   kernel_initializer=initializers.random_normal(stddev=0.5),
+                                   bias_initializer=initializers.Zeros(),
                                    name='t2_Dense_{i:02d}'.format(i=i)
                                    )(input_and_hstate_concatenated)
                 main_net = main_net + c_t
@@ -132,7 +134,6 @@ def create_orchid_mobilenet_v2_14(num_classes,
                 layer.trainable = True
             else:
                 layer.trainable = False
-
 
     model.summary()
 
