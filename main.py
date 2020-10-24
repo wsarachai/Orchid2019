@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
 from pickle import dump
 
 import matplotlib.pyplot as plt
@@ -13,6 +14,7 @@ from data.data_utils import dataset_mapping
 from data.orchids52_dataset import TRAIN_SIZE, VALIDATE_SIZE, TEST_SIZE
 from lib_utils import latest_checkpoint, start
 from nets import nets_utils
+from nets.nets_utils import TRAIN_STEP1
 
 flags = tf.compat.v1.flags
 logging = tf.compat.v1.logging
@@ -28,8 +30,14 @@ flags.DEFINE_string('output_directory', '/Volumes/Data/_dataset/_orchids_dataset
 flags.DEFINE_string('tf_record_dir', '/Volumes/Data/_dataset/_orchids_dataset/orchids52_data/tf-records',
                     'TF record data directory')
 
+flags.DEFINE_string('checkpoint_path', '/Volumes/Data/tmp/orchids-models/orchid2019',
+                    'The checkpoint path')
+
 flags.DEFINE_boolean('exp_decay', False,
                      'Exponential decay learning rate')
+
+flags.DEFINE_string('training_step', TRAIN_STEP1,
+                    'The training step')
 
 batch_size = 1 
 total_epochs = 100
@@ -54,10 +62,9 @@ def main(unused_argv):
 
     create_model = nets_utils.nets_mapping[nets_utils.MOBILENET_V2_140_ORCHIDS52]
     model = create_model(num_classes=orchids52_dataset.NUM_OF_CLASSES,
-                         freeze_base_model=True,
                          is_training=True,
                          batch_size=batch_size,
-                         step='pretrain1')
+                         step=FLAGS.training_step)
 
     if FLAGS.exp_decay:
         base_learning_rate = keras.optimizers.schedules.ExponentialDecay(
@@ -74,12 +81,12 @@ def main(unused_argv):
                   optimizer=optimizer,
                   metrics=['accuracy'])
 
-    checkpoint_path = "/Volumes/Data/tmp/orchids-models/orchid2019"
-    checkpoint_file = "/Volumes/Data/tmp/orchids-models/orchid2019/cp-{epoch:04d}.h5"
-
     epochs = 0
 
-    latest, step = latest_checkpoint(checkpoint_path)
+    checkpoint_path = os.path.join(FLAGS.checkpoint_path, FLAGS.training_step)
+    checkpoint_file = os.path.join(checkpoint_path, 'cp-{epoch:04d}.h5')
+
+    latest, step = latest_checkpoint(FLAGS.training_step)
     if latest:
         epochs = step
         chk_file = checkpoint_file.format(epoch=step)
