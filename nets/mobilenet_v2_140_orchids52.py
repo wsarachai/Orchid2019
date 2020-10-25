@@ -94,7 +94,7 @@ def create_orchid_mobilenet_v2_14(num_classes,
         all_predicts.append(x)
     # ---- End model branches
 
-    if step == nets.nets_utils.TRAIN_STEP1:
+    if step == nets.nets_utils.TRAIN_STEP2:
         outputs = tf.add_n(all_predicts)
         outputs = tf.divide(outputs, len(all_predicts))
     else:
@@ -108,8 +108,6 @@ def create_orchid_mobilenet_v2_14(num_classes,
                     values=[c_t, net],
                     name='t2_concat_{i:02d}'.format(i=i))
                 c_t = layers.Dense(num_classes,
-                                   kernel_initializer=initializers.random_normal(stddev=0.5),
-                                   bias_initializer=initializers.Zeros(),
                                    name='t2_Dense_{i:02d}'.format(i=i)
                                    )(input_and_hstate_concatenated)
                 main_net = main_net + c_t

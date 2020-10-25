@@ -90,7 +90,7 @@ def main(unused_argv):
     if latest:
         epochs = step
         chk_file = checkpoint_file.format(epoch=step)
-        model.load_weights(chk_file, by_name=True)
+        model.load_weights(chk_file, by_name=True, skip_mismatch=True)
     else:
         if not tf.io.gfile.exists(checkpoint_path):
             tf.io.gfile.mkdir(checkpoint_path)
