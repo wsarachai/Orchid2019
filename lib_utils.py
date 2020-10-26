@@ -22,7 +22,7 @@ def latest_checkpoint(train_step,
     file_list = list(file_path.glob('*.h5'))
 
     if len(file_list) > 0:
-        max_step = 0
+        max_step = -1
         for file in file_list:
             step = get_step_number(file.name)
             if max_step < step:

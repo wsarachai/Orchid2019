@@ -2,13 +2,77 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import h5py
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
-from tensorflow.keras import initializers
 from tensorflow.keras import layers
 from nets.mobilenet_v2 import default_image_size, create_mobilenet_v2, IMG_SHAPE_224
 from stn import pre_spatial_transformer_network
+
+from tensorflow.python.keras.saving import hdf5_format
+from tensorflow.python.training.tracking import util as trackable_utils
+from tensorflow.python.keras import backend
+from tensorflow.python.eager import context
+from tensorflow.python.framework import errors_impl
+from tensorflow.python.training import py_checkpoint_reader
+
+
+def _is_hdf5_filepath(filepath):
+    return (filepath.endswith('.h5') or filepath.endswith('.keras') or
+            filepath.endswith('.hdf5'))
+
+
+class MyModel(keras.Model):
+    def __init__(self, inputs, outputs):
+        super(MyModel, self).__init__(inputs, outputs)
+
+    def load_weights(self, filepath, by_name=False, skip_mismatch=False):
+        if skip_mismatch and not by_name:
+            raise ValueError(
+                'When calling model.load_weights, skip_mismatch can only be set to '
+                'True when by_name is True.')
+
+        if _is_hdf5_filepath(filepath):
+            save_format = 'h5'
+        else:
+            try:
+                py_checkpoint_reader.NewCheckpointReader(filepath)
+                save_format = 'tf'
+            except errors_impl.DataLossError:
+                # The checkpoint is not readable in TensorFlow format. Try HDF5.
+                save_format = 'h5'
+        if save_format == 'tf':
+            status = self._trackable_saver.restore(filepath)
+            if by_name:
+                raise NotImplementedError(
+                    'Weights may only be loaded based on topology into Models when '
+                    'loading TensorFlow-formatted weights (got by_name=True to '
+                    'load_weights).')
+            if not context.executing_eagerly():
+                session = backend.get_session()
+                # Restore existing variables (if any) immediately, and set up a
+                # streaming restore for any variables created in the future.
+                trackable_utils.streaming_restore(status=status, session=session)
+            status.assert_nontrivial_match()
+            return status
+        if h5py is None:
+            raise ImportError(
+                '`load_weights` requires h5py when loading weights from HDF5.')
+        if self._is_graph_network and not self.built:
+            raise NotImplementedError(
+                'Unable to load weights saved in HDF5 format into a subclassed '
+                'Model which has not created its variables yet. Call the Model '
+                'first, then load the weights.')
+        self._assert_weights_created()
+        with h5py.File(filepath, 'r') as f:
+            if 'layer_names' not in f.attrs and 'model_weights' in f:
+                f = f['model_weights']
+            if by_name:
+                hdf5_format.load_weights_from_hdf5_group_by_name(
+                    f, self.layers, skip_mismatch=skip_mismatch)
+            else:
+                hdf5_format.load_weights_from_hdf5_group(f, self.layers)
 
 
 def create_orchid_mobilenet_v2_14(num_classes,
@@ -94,7 +158,7 @@ def create_orchid_mobilenet_v2_14(num_classes,
         all_predicts.append(x)
     # ---- End model branches
 
-    if step == nets.nets_utils.TRAIN_STEP2:
+    if step == nets.nets_utils.TRAIN_STEP1:
         outputs = tf.add_n(all_predicts)
         outputs = tf.divide(outputs, len(all_predicts))
     else:
@@ -115,7 +179,7 @@ def create_orchid_mobilenet_v2_14(num_classes,
                 main_net = net
                 c_t = net
         outputs = main_net
-    model = keras.Model(inputs, outputs)
+    model = MyModel(inputs, outputs)
 
     if step == nets.nets_utils.TRAIN_STEP1:
         for layer in stn_base_model.layers:
@@ -127,12 +191,10 @@ def create_orchid_mobilenet_v2_14(num_classes,
             layer.trainable = False
         for layer in branches_base_model.layers:
             layer.trainable = False
-        for layer in model.layers:
-            if layer.name.startswith('t2_'):
-                layer.trainable = True
-            else:
-                layer.trainable = False
-
-    model.summary()
+        # for layer in model.layers:
+        #     if layer.name.startswith('t2_'):
+        #         layer.trainable = True
+        #     else:
+        #         layer.trainable = False
 
     return model

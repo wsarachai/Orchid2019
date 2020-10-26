@@ -66,6 +66,8 @@ def main(unused_argv):
                          batch_size=batch_size,
                          step=FLAGS.training_step)
 
+    model.summary()
+
     if FLAGS.exp_decay:
         base_learning_rate = keras.optimizers.schedules.ExponentialDecay(
             initial_learning_rate=0.001,
