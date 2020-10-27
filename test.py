@@ -37,7 +37,7 @@ def main(unused_argv):
 
     latest, step = latest_checkpoint(train_step=FLAGS.training_step)
     if latest:
-        model.load_weights(str(latest), by_name=True)
+        model.load_weights(latest, by_name=True)
         test_step = TEST_SIZE // batch_size
         loss, accuracy = model.evaluate(test_ds, steps=test_step)
         print('Test accuracy :', accuracy)

@@ -66,8 +66,6 @@ def main(unused_argv):
                          batch_size=batch_size,
                          step=FLAGS.training_step)
 
-    model.summary()
-
     if FLAGS.exp_decay:
         base_learning_rate = keras.optimizers.schedules.ExponentialDecay(
             initial_learning_rate=0.001,
@@ -76,6 +74,8 @@ def main(unused_argv):
         )
     else:
         base_learning_rate = 0.001
+        if FLAGS.training_step == 'all':
+            base_learning_rate = 0.00001
 
     optimizer = keras.optimizers.RMSprop(learning_rate=base_learning_rate)
 
@@ -91,8 +91,7 @@ def main(unused_argv):
     latest, step = latest_checkpoint(FLAGS.training_step)
     if latest:
         epochs = step
-        chk_file = checkpoint_file.format(epoch=step)
-        model.load_weights(chk_file, by_name=True, skip_mismatch=True)
+        model.load_weights(latest, by_name=True, skip_mismatch=True)
     else:
         if not tf.io.gfile.exists(checkpoint_path):
             tf.io.gfile.mkdir(checkpoint_path)
@@ -106,6 +105,8 @@ def main(unused_argv):
     train_step = TRAIN_SIZE // batch_size
     validate_step = VALIDATE_SIZE // batch_size
     test_step = TEST_SIZE // batch_size
+
+    model.summary()
 
     summary = model.fit(train_ds,
                         epochs=total_epochs,
