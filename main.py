@@ -18,16 +18,9 @@ from nets.nets_utils import TRAIN_STEP1
 
 flags = tf.compat.v1.flags
 logging = tf.compat.v1.logging
-
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('images_dir', '/Volumes/Data/_dataset/_orchids_dataset/orchids52_data/all',
-                    'Original orchid flower images directory')
-
-flags.DEFINE_string('output_directory', '/Volumes/Data/_dataset/_orchids_dataset/orchids52_data/tf-records',
-                    'Output data directory')
-
-flags.DEFINE_string('tf_record_dir', '/Volumes/Data/_dataset/_orchids_dataset/orchids52_data/tf-records',
+flags.DEFINE_string('tf_record_dir', '/Volumes/Data/_dataset/_orchids_dataset/orchids52_data/v1/tf-records',
                     'TF record data directory')
 
 flags.DEFINE_string('checkpoint_path', '/Volumes/Data/tmp/orchids-models/orchid2019',

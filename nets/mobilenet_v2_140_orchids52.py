@@ -45,7 +45,7 @@ class Orchids52Mobilenet140(keras.Model):
                     layer.trainable = True
                 else:
                     layer.trainable = False
-        elif self.step == nets.nets_utils.TRAIN_ALL:
+        elif self.step == nets.nets_utils.TRAIN_FIRST_ALL:
             for layer in self.base_model.layers:
                 layer.trainable = False
             for layer in self.branches_model.layers:
@@ -56,6 +56,9 @@ class Orchids52Mobilenet140(keras.Model):
                 layer.trainable = True
             for layer in self.branches_model.layers:
                 layer.trainable = True
+        elif self.step == nets.nets_utils.TRAIN_ALL:
+            super(Orchids52Mobilenet140, self).load_weights(
+                filepath=filepath, by_name=by_name, skip_mismatch=skip_mismatch)
 
 
 

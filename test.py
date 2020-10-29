@@ -6,7 +6,7 @@ import tensorflow as tf
 
 from data import data_utils, orchids52_dataset
 from data.data_utils import dataset_mapping
-from data.orchids52_dataset import TEST_SIZE
+from data.orchids52_dataset import TEST_SIZE_V1
 from lib_utils import latest_checkpoint, start
 from nets import nets_utils
 from nets.nets_utils import TRAIN_STEP1
@@ -22,7 +22,7 @@ batch_size = 1
 
 
 def main(unused_argv):
-    load_dataset = dataset_mapping[data_utils.MOBILENET_V2_TFRECORD].load_dataset
+    load_dataset = dataset_mapping[data_utils.MOBILENET_V1_TFRECORD]
     test_ds = load_dataset(
         split="test",
         batch_size=batch_size)
@@ -37,8 +37,8 @@ def main(unused_argv):
 
     latest, step = latest_checkpoint(train_step=FLAGS.training_step)
     if latest:
-        model.load_weights(latest, by_name=True)
-        test_step = TEST_SIZE // batch_size
+        model.load_weights(latest, by_name=True, skip_mismatch=True)
+        test_step = TEST_SIZE_V1 // batch_size
         loss, accuracy = model.evaluate(test_ds, steps=test_step)
         print('Test accuracy :', accuracy)
 

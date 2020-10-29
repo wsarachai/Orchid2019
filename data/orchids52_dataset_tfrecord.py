@@ -85,6 +85,9 @@ def _load_dataset(split,
 
 
 _decode_example = wrapped_partial(decode_example, image_size=IMG_SIZE_224)
-load_dataset = wrapped_partial(
+load_dataset_v1 = wrapped_partial(
     _load_dataset,
-    data_dir='/Volumes/Data/_dataset/_orchids_dataset/orchids52_data/tf-records')
+    data_dir='/Volumes/Data/_dataset/_orchids_dataset/orchids52_data/tf-records/v1')
+load_dataset_v2 = wrapped_partial(
+    _load_dataset,
+    data_dir='/Volumes/Data/_dataset/_orchids_dataset/orchids52_data/tf-records/v2')

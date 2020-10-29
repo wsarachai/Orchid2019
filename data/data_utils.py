@@ -7,6 +7,8 @@ from data import orchids52_dataset_file
 from data import orchids52_dataset_tfrecord
 
 
+MOBILENET_V1_FILE = 'const/MOBILENET_V1_FILE'
+MOBILENET_V1_TFRECORD = 'const/MOBILENET_V1_TFRECORD'
 MOBILENET_V2_FILE = 'const/MOBILENET_V2_FILE'
 MOBILENET_V2_TFRECORD = 'const/MOBILENET_V2_TFRECORD'
 
@@ -31,6 +33,8 @@ def _int64_feature(value):
 
 
 dataset_mapping = {
-    MOBILENET_V2_FILE: orchids52_dataset_file,
-    MOBILENET_V2_TFRECORD: orchids52_dataset_tfrecord
+    MOBILENET_V1_FILE: orchids52_dataset_file.load_dataset,
+    MOBILENET_V1_TFRECORD: orchids52_dataset_tfrecord.load_dataset_v1,
+    MOBILENET_V2_FILE: orchids52_dataset_file.load_dataset,
+    MOBILENET_V2_TFRECORD: orchids52_dataset_tfrecord.load_dataset_v2
 }

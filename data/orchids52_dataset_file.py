@@ -67,8 +67,6 @@ def _load_dataset(split,
                   batch_size,
                   data_dir,
                   image_size):
-    global _process_path
-
     if 'train' == split:
         train_data_dir = pathlib.Path(os.path.join(data_dir, "train-en"))
         train_ds = tf.data.Dataset.list_files(str(train_data_dir / '*/*'), shuffle=False)
@@ -86,11 +84,11 @@ def _load_dataset(split,
         test_ds = configure_for_performance(test_ds, batch_size=batch_size)
         return test_ds
     elif 'validate' == split:
-        test_data_dir = pathlib.Path(os.path.join(data_dir, "test-en"))
-        test_ds = tf.data.Dataset.list_files(str(test_data_dir / '*/*'), shuffle=False)
-        val_batches = tf.data.experimental.cardinality(test_ds)
-        val_ds = test_ds.skip(val_batches // 5)
-        check_wrap_process_path(data_dir=test_data_dir, image_size=image_size)
+        train_data_dir = pathlib.Path(os.path.join(data_dir, "train-en"))
+        train_ds = tf.data.Dataset.list_files(str(train_data_dir / '*/*'), shuffle=False)
+        val_batches = tf.data.experimental.cardinality(train_ds)
+        val_ds = train_ds.skip(val_batches // 5)
+        check_wrap_process_path(data_dir=train_data_dir, image_size=image_size)
         val_ds = val_ds.map(_process_path, num_parallel_calls=tf.data.experimental.AUTOTUNE)
         val_ds = configure_for_performance(val_ds, batch_size=batch_size)
         return val_ds
