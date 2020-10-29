@@ -7,7 +7,8 @@ import os
 
 import tensorflow as tf
 from tensorflow.keras import layers
-
+from data.orchids52_dataset import TRAIN_SIZE_V1, TEST_SIZE_V1, VALIDATE_SIZE_V2, TRAIN_SIZE_V2, TEST_SIZE_V2, \
+    VALIDATE_SIZE_V1
 from nets.mobilenet_v2 import IMG_SIZE_224
 
 feature_description = {
@@ -59,6 +60,10 @@ def parse_function(example_proto):
 def _load_dataset(split,
                   batch_size,
                   data_dir,
+                  train_size,
+                  test_size,
+                  validate_size,
+                  repeat=False,
                   num_readers=1,
                   num_map_threads=1,
                   **kwargs):
@@ -81,13 +86,31 @@ def _load_dataset(split,
     normalized_ds = normalized_ds.batch(batch_size)
     normalized_ds = normalized_ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
     normalized_ds = normalized_ds.cache()
+
+    if repeat:
+        normalized_ds = normalized_ds.repeat()
+
+    if split:
+        if split == 'train':
+            setattr(normalized_ds, 'size', train_size)
+        elif split == 'test':
+            setattr(normalized_ds, 'size', test_size)
+        elif split == 'validate':
+            setattr(normalized_ds, 'size', validate_size)
+
     return normalized_ds
 
 
 _decode_example = wrapped_partial(decode_example, image_size=IMG_SIZE_224)
 load_dataset_v1 = wrapped_partial(
     _load_dataset,
+    train_size=TRAIN_SIZE_V1,
+    test_size=TEST_SIZE_V1,
+    validate_size=VALIDATE_SIZE_V1,
     data_dir='/Volumes/Data/_dataset/_orchids_dataset/orchids52_data/tf-records/v1')
 load_dataset_v2 = wrapped_partial(
     _load_dataset,
+    train_size=TRAIN_SIZE_V2,
+    test_size=TEST_SIZE_V2,
+    validate_size=VALIDATE_SIZE_V2,
     data_dir='/Volumes/Data/_dataset/_orchids_dataset/orchids52_data/tf-records/v2')

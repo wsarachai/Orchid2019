@@ -70,10 +70,15 @@ def _find_image_files_v1(images_dir, image_size):
     train_ds = train_ds.map(_process_path, num_parallel_calls=tf.data.experimental.AUTOTUNE)
     test_ds = test_ds.map(_process_path, num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
-    train_ds = train_ds.take(TRAIN_SIZE_V1)
+    validate_ds = train_ds.take(train_count // 5)
+    train_ds = train_ds.skip(train_count // 5)
     test_ds = test_ds.take(TEST_SIZE_V1)
 
-    return train_ds, test_ds
+    logging.info('Total train: {}'.format(tf.data.experimental.cardinality(train_ds).numpy()))
+    logging.info('Total validate: {}'.format(tf.data.experimental.cardinality(validate_ds).numpy()))
+    logging.info('Total test: {}'.format(tf.data.experimental.cardinality(test_ds).numpy()))
+
+    return train_ds, test_ds, validate_ds
 
 
 def _find_image_files_v2(images_dir, image_size):
@@ -140,8 +145,8 @@ def _create_dataset(images_dir,
     validate_ds = None
 
     if FLAGS.data_version == ORCHIDS52_DATA_V1:
-        train_ds, test_ds = _find_image_files_v1(images_dir=images_dir,
-                                                 image_size=image_size)
+        train_ds, test_ds, validate_ds = _find_image_files_v1(images_dir=images_dir,
+                                                              image_size=image_size)
     elif FLAGS.data_version == ORCHIDS52_DATA_V2:
         train_ds, test_ds, validate_ds = _find_image_files_v2(images_dir=images_dir,
                                                               image_size=image_size)

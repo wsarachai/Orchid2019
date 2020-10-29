@@ -20,43 +20,49 @@ class Orchids52Mobilenet140(keras.Model):
         self.branches_model = branches_model
         self.step = step
 
-    def load_weights(self, filepath, by_name=False, skip_mismatch=False):
+    def layers_config(self, step):
         import nets
-        if filepath and not hasattr(filepath, 'endswith'):
-            filepath = str(filepath)
-
-        if self.step == nets.nets_utils.TRAIN_STEP1:
-            for layer in self.base_model.layers:
-                layer.trainable = False
-            for layer in self.branches_model.layers:
-                layer.trainable = False
-            if filepath:
-                super(Orchids52Mobilenet140, self).load_weights(
-                    filepath=filepath, by_name=by_name, skip_mismatch=skip_mismatch)
-        elif self.step == nets.nets_utils.TRAIN_STEP2:
-            for layer in self.base_model.layers:
-                layer.trainable = False
-            for layer in self.branches_model.layers:
-                layer.trainable = False
-            if filepath:
-                super(Orchids52Mobilenet140, self).load_weights(
-                    filepath=filepath, by_name=by_name, skip_mismatch=skip_mismatch)
+        if step == nets.nets_utils.TRAIN_STEP1:
             for layer in self.layers:
-                if layer.name.startswith('t2_'):
+                if layer.name.startswith('mobilenet'):
+                    for sub_layer in layer.layers:
+                        sub_layer.trainable = False
+                elif layer.name.startswith('t1'):
                     layer.trainable = True
                 else:
                     layer.trainable = False
-        elif self.step == nets.nets_utils.TRAIN_FIRST_ALL:
-            for layer in self.base_model.layers:
-                layer.trainable = False
-            for layer in self.branches_model.layers:
-                layer.trainable = False
-            if filepath:
-                super(Orchids52Mobilenet140, self).load_weights(
-                    filepath=filepath, by_name=by_name, skip_mismatch=skip_mismatch)
-        elif self.step == nets.nets_utils.TRAIN_ALL:
+        elif step == nets.nets_utils.TRAIN_STEP2:
+            for layer in self.layers:
+                if layer.name.startswith('mobilenet'):
+                    for sub_layer in layer.layers:
+                        sub_layer.trainable = False
+        elif step == nets.nets_utils.TRAIN_STEP3:
+            for layer in self.layers:
+                if layer.name.startswith('mobilenet'):
+                    for sub_layer in layer.layers:
+                        sub_layer.trainable = False
+
+    def load_weights(self, filepath, by_name=False, skip_mismatch=False):
+        import nets
+
+        if self.step == nets.nets_utils.TRAIN_STEP2:
+            self.layers_config(nets.nets_utils.TRAIN_STEP1)
+        elif self.step == nets.nets_utils.TRAIN_STEP3:
+            self.layers_config(nets.nets_utils.TRAIN_STEP2)
+        else:
+            self.layers_config(self.step)
+
+        if filepath and not hasattr(filepath, 'endswith'):
+            filepath = str(filepath)
             super(Orchids52Mobilenet140, self).load_weights(
                 filepath=filepath, by_name=by_name, skip_mismatch=skip_mismatch)
+
+        if self.step in [nets.nets_utils.TRAIN_STEP2, nets.nets_utils.TRAIN_STEP3]:
+            self.layers_config(self.step)
+
+    def save_weights(self, filepath, overwrite=True, save_format=None):
+        self.layers_config(self.step)
+        super(Orchids52Mobilenet140, self).save_weights(filepath=filepath, overwrite=overwrite, save_format=save_format)
 
 
 def create_orchid_mobilenet_v2_14(num_classes,

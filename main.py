@@ -11,7 +11,6 @@ from tensorflow import keras
 from data import orchids52_dataset, data_utils
 from data.create_orchids_dataset import create_dataset
 from data.data_utils import dataset_mapping
-from data.orchids52_dataset import TRAIN_SIZE_V1, TEST_SIZE_V1
 from lib_utils import latest_checkpoint, start
 from nets import nets_utils
 from nets.nets_utils import TRAIN_STEP1
@@ -45,13 +44,15 @@ def main(unused_argv):
     load_dataset = dataset_mapping[data_utils.MOBILENET_V1_TFRECORD]
     train_ds = load_dataset(
         split="train",
-        batch_size=batch_size).repeat()
+        repeat=True,
+        batch_size=batch_size)
     test_ds = load_dataset(
         split="test",
         batch_size=batch_size)
-    # validate_ds = load_dataset(
-    #     split="validate",
-    #     batch_size=batch_size).repeat()
+    validate_ds = load_dataset(
+        split="validate",
+        repeat=True,
+        batch_size=batch_size)
 
     create_model = nets_utils.nets_mapping[nets_utils.MOBILENET_V2_140_ORCHIDS52]
     model = create_model(num_classes=orchids52_dataset.NUM_OF_CLASSES,
@@ -67,7 +68,7 @@ def main(unused_argv):
         )
     else:
         base_learning_rate = 0.001
-        if FLAGS.training_step == 'all':
+        if str(FLAGS.training_step).startswith('fine-tune'):
             base_learning_rate = 0.00001
 
     optimizer = keras.optimizers.RMSprop(learning_rate=base_learning_rate)
@@ -79,9 +80,6 @@ def main(unused_argv):
     checkpoint_path = os.path.join(FLAGS.checkpoint_path, FLAGS.training_step)
     checkpoint_file = os.path.join(checkpoint_path, 'cp-{epoch:04d}.h5')
 
-    latest, epochs = latest_checkpoint(FLAGS.training_step)
-    model.load_weights(latest, by_name=True, skip_mismatch=True)
-
     if not tf.io.gfile.exists(checkpoint_path):
         tf.io.gfile.mkdir(checkpoint_path)
 
@@ -90,18 +88,24 @@ def main(unused_argv):
                                                   save_weights_only=True,
                                                   verbose=1)
 
-    train_step = TRAIN_SIZE_V1 // batch_size
-    test_step = TEST_SIZE_V1 // batch_size
-    #validate_step = VALIDATE_SIZE // batch_size
+    train_step = train_ds.size // batch_size
+    test_step = test_ds.size // batch_size
+    validate_step = validate_ds.size // batch_size
+
+    latest, epoch = latest_checkpoint(FLAGS.training_step)
+    if latest:
+        model.load_weights(latest, by_name=True, skip_mismatch=True)
+    else:
+        model.save_weights(checkpoint_file.format(epoch=epoch))
 
     model.summary()
 
     summary = model.fit(train_ds,
                         epochs=total_epochs,
-                        #validation_data=validate_ds,
-                        #validation_steps=validate_step,
+                        validation_data=validate_ds,
+                        validation_steps=validate_step,
                         callbacks=[cp_callback],
-                        initial_epoch=epochs,
+                        initial_epoch=epoch,
                         steps_per_epoch=train_step)
 
     with open('trainHistoryOld', 'wb') as handle:  # saving the history of the model
