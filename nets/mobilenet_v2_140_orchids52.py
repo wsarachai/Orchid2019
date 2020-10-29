@@ -7,7 +7,6 @@ import tensorflow as tf
 import tensorflow.keras as keras
 from tensorflow.keras import layers
 
-from lib_utils import latest_checkpoint
 from nets.mobilenet_v2 import default_image_size, create_mobilenet_v2, IMG_SHAPE_224
 from stn import pre_spatial_transformer_network
 
@@ -23,7 +22,7 @@ class Orchids52Mobilenet140(keras.Model):
 
     def load_weights(self, filepath, by_name=False, skip_mismatch=False):
         import nets
-        if not hasattr(filepath, 'endswith'):
+        if filepath and not hasattr(filepath, 'endswith'):
             filepath = str(filepath)
 
         if self.step == nets.nets_utils.TRAIN_STEP1:
@@ -31,15 +30,17 @@ class Orchids52Mobilenet140(keras.Model):
                 layer.trainable = False
             for layer in self.branches_model.layers:
                 layer.trainable = False
-            super(Orchids52Mobilenet140, self).load_weights(
-                filepath=filepath, by_name=by_name, skip_mismatch=skip_mismatch)
+            if filepath:
+                super(Orchids52Mobilenet140, self).load_weights(
+                    filepath=filepath, by_name=by_name, skip_mismatch=skip_mismatch)
         elif self.step == nets.nets_utils.TRAIN_STEP2:
             for layer in self.base_model.layers:
                 layer.trainable = False
             for layer in self.branches_model.layers:
                 layer.trainable = False
-            super(Orchids52Mobilenet140, self).load_weights(
-                filepath=filepath, by_name=by_name, skip_mismatch=skip_mismatch)
+            if filepath:
+                super(Orchids52Mobilenet140, self).load_weights(
+                    filepath=filepath, by_name=by_name, skip_mismatch=skip_mismatch)
             for layer in self.layers:
                 if layer.name.startswith('t2_'):
                     layer.trainable = True
@@ -50,16 +51,12 @@ class Orchids52Mobilenet140(keras.Model):
                 layer.trainable = False
             for layer in self.branches_model.layers:
                 layer.trainable = False
-            super(Orchids52Mobilenet140, self).load_weights(
-                filepath=filepath, by_name=by_name, skip_mismatch=skip_mismatch)
-            for layer in self.base_model.layers:
-                layer.trainable = True
-            for layer in self.branches_model.layers:
-                layer.trainable = True
+            if filepath:
+                super(Orchids52Mobilenet140, self).load_weights(
+                    filepath=filepath, by_name=by_name, skip_mismatch=skip_mismatch)
         elif self.step == nets.nets_utils.TRAIN_ALL:
             super(Orchids52Mobilenet140, self).load_weights(
                 filepath=filepath, by_name=by_name, skip_mismatch=skip_mismatch)
-
 
 
 def create_orchid_mobilenet_v2_14(num_classes,
