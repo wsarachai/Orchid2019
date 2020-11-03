@@ -81,24 +81,21 @@ def _load_dataset(split,
     )
     parsed_dataset = dataset.map(parse_function, num_parallel_calls=num_map_threads)
     parsed_dataset = parsed_dataset.map(_decode_example)
-    normalization_layer = layers.experimental.preprocessing.Rescaling(1. / 255)
-    normalized_ds = parsed_dataset.map(lambda x, y: (normalization_layer(x), y))
-    normalized_ds = normalized_ds.batch(batch_size)
-    normalized_ds = normalized_ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
-    normalized_ds = normalized_ds.cache()
+    parsed_dataset = parsed_dataset.batch(batch_size)
+    parsed_dataset = parsed_dataset.cache()
 
     if repeat:
-        normalized_ds = normalized_ds.repeat()
+        normalized_ds = parsed_dataset.repeat()
 
     if split:
         if split == 'train':
-            setattr(normalized_ds, 'size', train_size)
+            setattr(parsed_dataset, 'size', train_size)
         elif split == 'test':
-            setattr(normalized_ds, 'size', test_size)
+            setattr(parsed_dataset, 'size', test_size)
         elif split == 'validate':
-            setattr(normalized_ds, 'size', validate_size)
+            setattr(parsed_dataset, 'size', validate_size)
 
-    return normalized_ds
+    return parsed_dataset
 
 
 _decode_example = wrapped_partial(decode_example, image_size=IMG_SIZE_224)

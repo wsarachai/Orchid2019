@@ -78,7 +78,7 @@ def main(unused_argv):
 
     optimizer = keras.optimizers.RMSprop(learning_rate=base_learning_rate)
 
-    model.compile(loss=keras.losses.BinaryCrossentropy(from_logits=True),
+    model.compile(loss=keras.losses.CategoricalCrossentropy(from_logits=True),
                   optimizer=optimizer,
                   metrics=['accuracy'])
 
@@ -124,35 +124,13 @@ def main(unused_argv):
                         initial_epoch=epoch,
                         steps_per_epoch=train_step)
 
-    with open('trainHistoryOld', 'wb') as handle:  # saving the history of the model
+    with open('trainHistoryOld-v2-2', 'wb') as handle:  # saving the history of the model
         dump(summary.history, handle)
-
-    if hasattr(summary.history, 'history'):
-        acc = summary.history['accuracy']
-        val_acc = summary.history['val_accuracy']
-
-        loss = summary.history['loss']
-        val_loss = summary.history['val_loss']
-
-        epochs_range = range(FLAGS.total_epochs)
-
-        plt.figure(figsize=(8, 8))
-        plt.subplot(1, 2, 1)
-        plt.plot(epochs_range, acc, label='Training Accuracy')
-        plt.plot(epochs_range, val_acc, label='Validation Accuracy')
-        plt.legend(loc='lower right')
-        plt.title('Training and Validation Accuracy')
-
-        plt.subplot(1, 2, 2)
-        plt.plot(epochs_range, loss, label='Training Loss')
-        plt.plot(epochs_range, val_loss, label='Validation Loss')
-        plt.legend(loc='upper right')
-        plt.title('Training and Validation Loss')
-        plt.show()
 
     loss, accuracy = model.evaluate(test_ds, steps=test_step)
     print('Test accuracy :', accuracy)
 
 
 if __name__ == '__main__':
+    tf.config.experimental_run_functions_eagerly(True)
     start(main)
