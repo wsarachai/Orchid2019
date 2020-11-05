@@ -32,6 +32,21 @@ def _int64_feature(value):
     return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
 
 
+def get_data_files(data_sources):
+  if isinstance(data_sources, (list, tuple)):
+    data_files = []
+    for source in data_sources:
+      data_files += get_data_files(source)
+  else:
+    if '*' in data_sources or '?' in data_sources or '[' in data_sources:
+      data_files = tf.io.gfile.glob(data_sources)
+    else:
+      data_files = [data_sources]
+  if not data_files:
+    raise ValueError('No data files found in %s' % (data_sources,))
+  return data_files
+
+
 dataset_mapping = {
     ORCHIDS52_V1_FILE: orchids52_dataset_file.load_dataset,
     ORCHIDS52_V1_TFRECORD: orchids52_dataset_tfrecord.load_dataset_v1,

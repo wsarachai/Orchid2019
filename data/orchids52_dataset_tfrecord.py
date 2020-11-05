@@ -9,6 +9,7 @@ import tensorflow as tf
 
 from data.orchids52_dataset import TRAIN_SIZE_V1, TEST_SIZE_V1, VALIDATE_SIZE_V2, TRAIN_SIZE_V2, TEST_SIZE_V2, \
     VALIDATE_SIZE_V1
+from lib_utils import apply_with_random_selector
 from nets.mobilenet_v2 import IMG_SIZE_224
 
 feature_description = {
@@ -26,11 +27,6 @@ def wrapped_partial(func, *args, **kwargs):
     return partial_func
 
 
-def decode_img(image, size):
-    img = tf.image.decode_jpeg(image, channels=3)
-    return tf.image.resize(img, size)
-
-
 def get_label(serialize_example):
     label = serialize_example['image/class/label']
     label_string = tf.strings.split(label, ',')
@@ -38,15 +34,81 @@ def get_label(serialize_example):
     return label_values
 
 
-def decode_example(serialize_example, image_size):
+def decode_example(serialize_example):
     image = serialize_example['image/image_raw']
-    image = decode_img(image=image, size=image_size)
+    image = tf.image.decode_jpeg(image, channels=3)
+    image = tf.image.convert_image_dtype(image, dtype=tf.float32)
     label_values = get_label(serialize_example)
     return image, label_values
 
 
 def parse_function(example_proto):
     return tf.io.parse_single_example(example_proto, feature_description)
+
+
+def distort_color(image, color_ordering=0, fast_mode=True):
+    if fast_mode:
+        if color_ordering == 0:
+            image = tf.image.random_brightness(image, max_delta=32. / 255.)
+            image = tf.image.random_saturation(image, lower=0.5, upper=1.5)
+        else:
+            image = tf.image.random_saturation(image, lower=0.5, upper=1.5)
+            image = tf.image.random_brightness(image, max_delta=32. / 255.)
+    else:
+        if color_ordering == 0:
+            image = tf.image.random_brightness(image, max_delta=32. / 255.)
+            image = tf.image.random_saturation(image, lower=0.5, upper=1.5)
+            image = tf.image.random_hue(image, max_delta=0.2)
+            image = tf.image.random_contrast(image, lower=0.5, upper=1.5)
+        elif color_ordering == 1:
+            image = tf.image.random_saturation(image, lower=0.5, upper=1.5)
+            image = tf.image.random_brightness(image, max_delta=32. / 255.)
+            image = tf.image.random_contrast(image, lower=0.5, upper=1.5)
+            image = tf.image.random_hue(image, max_delta=0.2)
+        elif color_ordering == 2:
+            image = tf.image.random_contrast(image, lower=0.5, upper=1.5)
+            image = tf.image.random_hue(image, max_delta=0.2)
+            image = tf.image.random_brightness(image, max_delta=32. / 255.)
+            image = tf.image.random_saturation(image, lower=0.5, upper=1.5)
+        elif color_ordering == 3:
+            image = tf.image.random_hue(image, max_delta=0.2)
+            image = tf.image.random_saturation(image, lower=0.5, upper=1.5)
+            image = tf.image.random_contrast(image, lower=0.5, upper=1.5)
+            image = tf.image.random_brightness(image, max_delta=32. / 255.)
+        else:
+            raise ValueError('color_ordering must be in [0, 3]')
+    return tf.clip_by_value(image, 0.0, 1.0)
+
+
+def preprocess_for_train(image, label_values):
+    method = [tf.image.ResizeMethod.BILINEAR,
+              tf.image.ResizeMethod.NEAREST_NEIGHBOR,
+              tf.image.ResizeMethod.BICUBIC,
+              tf.image.ResizeMethod.AREA,
+              tf.image.ResizeMethod.LANCZOS3,
+              tf.image.ResizeMethod.LANCZOS5,
+              tf.image.ResizeMethod.GAUSSIAN,
+              tf.image.ResizeMethod.MITCHELLCUBIC
+            ]
+
+    num_resize_cases = len(method)
+    distorted_image = apply_with_random_selector(
+        image,
+        lambda x, mode: tf.image.resize(x, IMG_SIZE_224, method[mode]),
+        num_cases=num_resize_cases)
+    distorted_image = tf.image.random_flip_left_right(distorted_image)
+
+    fast_mode = False
+    num_distort_cases = 4
+    distorted_image = apply_with_random_selector(
+        distorted_image,
+        lambda x, ordering: distort_color(x, ordering, fast_mode),
+        num_cases=num_distort_cases)
+
+    distorted_image = distorted_image * 2
+    distorted_image = distorted_image - 1
+
+    return distorted_image, label_values
 
 
 def _load_dataset(split,
@@ -67,30 +129,25 @@ def _load_dataset(split,
                                  cycle_length=num_readers,
                                  num_parallel_calls=tf.data.experimental.AUTOTUNE,
                                  deterministic=False)
-    ignore_order = tf.data.Options()
-    ignore_order.experimental_deterministic = False  # disable order, increase speed
-    dataset = dataset.with_options(
-        ignore_order
-    )
     parsed_dataset = dataset.map(parse_function, num_parallel_calls=num_map_threads)
-    parsed_dataset = parsed_dataset.map(_decode_example)
-    parsed_dataset = parsed_dataset.batch(batch_size=batch_size).cache()
+    decode_dataset = parsed_dataset.map(decode_example)
+    decode_dataset = decode_dataset.map(preprocess_for_train)
+    decode_dataset = decode_dataset.batch(batch_size=batch_size).cache()
 
     if repeat:
-        parsed_dataset = parsed_dataset.repeat()
+        decode_dataset = decode_dataset.repeat()
 
     if split:
         if split == 'train':
-            setattr(parsed_dataset, 'size', train_size)
+            setattr(decode_dataset, 'size', train_size)
         elif split == 'test':
-            setattr(parsed_dataset, 'size', test_size)
+            setattr(decode_dataset, 'size', test_size)
         elif split == 'validate':
-            setattr(parsed_dataset, 'size', validate_size)
+            setattr(decode_dataset, 'size', validate_size)
 
-    return parsed_dataset
+    return decode_dataset
 
 
-_decode_example = wrapped_partial(decode_example, image_size=IMG_SIZE_224)
 load_dataset_v1 = wrapped_partial(
     _load_dataset,
     train_size=TRAIN_SIZE_V1,
