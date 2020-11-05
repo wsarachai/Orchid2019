@@ -3,19 +3,15 @@ from __future__ import division
 from __future__ import print_function
 
 import copy
-import os
-
 import tensorflow as tf
-from tensorflow.keras import layers, applications
-from tensorflow.keras.utils import Progbar
-from tensorflow.python.keras import Sequential, Input
 
 from data import data_utils, orchids52_dataset
 from data.data_utils import dataset_mapping
-from lib_utils import start, latest_checkpoint, get_checkpoint_file
+from lib_utils import start, latest_checkpoint
 from nets import nets_utils
 from nets.mobilenet_v2 import create_mobilenet_v2
-from nets.nets_utils import TRAIN_STEP1, TRAIN_STEP2, TRAIN_STEP3, TRAIN_V2_STEP2, TRAIN_V2_STEP1, TRAIN_TEMPLATE
+from nets.mobilenet_v2_140_orchids52 import create_predict_module
+from nets.nets_utils import TRAIN_V2_STEP2, TRAIN_TEMPLATE, TRAIN_STEP4
 
 flags = tf.compat.v1.flags
 logging = tf.compat.v1.logging
@@ -33,18 +29,19 @@ flags.DEFINE_boolean('exp_decay', False,
 flags.DEFINE_integer('batch_size', 1,
                      'Batch size')
 
-flags.DEFINE_integer('total_epochs', 11,
+flags.DEFINE_integer('total_epochs', 100,
                      'Total epochs')
 
 
 class TrainClassifier:
 
-    def __init__(self, model):
+    def __init__(self, model, learning_rate, batch_size):
         self.model = model
-        self.optimizer = tf.keras.optimizers.RMSprop(learning_rate=0.001)
+        self.optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate)
         self.loss_fn = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
         self.loss_metric = tf.keras.metrics.Mean(name='train_loss')
         self.accuracy_metric = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
+        self.batch_size = batch_size
 
     @tf.function
     def train_step(self, inputs, labels):
@@ -100,11 +97,17 @@ class TrainClassifier:
                     num_steps = logs.pop('num_steps', 1)
                     seen += num_steps
                     progbar.update(seen, list(logs.items()), finalize=False)
+                else:
+                    logging.error('\n{epoch}: Error batch size {b1} != {b2}.'.format(
+                        epoch=epoch,
+                        b1=batch_size,
+                        b2=inputs.shape.as_list()[0]
+                    ))
 
             self.reset_metric()
 
             for inputs, labels in validate_ds:
-                if inputs.shape.as_list()[0] == FLAGS.batch_size:
+                if inputs.shape.as_list()[0] == self.batch_size:
                     logs = self.evaluate_step(inputs, labels)
 
             logs = copy.copy(logs) if logs else {}
@@ -122,65 +125,58 @@ class TrainClassifier:
         print('loss: {:.3f}, accuracy: {:.3f}'.format(logs['loss'], logs['accuracy']))
 
 
-def load_weight(checkpoint_path, training_step, model):
-    if training_step == TRAIN_STEP1:
-        model.config_layers(TRAIN_STEP1)
-    elif FLAGS.training_step == TRAIN_STEP2:
-        _, step = latest_checkpoint(TRAIN_STEP1, checkpoint_path)
-        model.load_model_weights(checkpoint_path, step, by_name=True, skip_mismatch=True)
-    elif FLAGS.training_step == TRAIN_STEP3:
-        latest, _ = latest_checkpoint(TRAIN_STEP2)
-        model.load_weights(latest, by_name=True, skip_mismatch=True)
-    elif FLAGS.training_step == TRAIN_V2_STEP2:
-        latest, _ = latest_checkpoint(TRAIN_V2_STEP1)
-        model.load_weights(latest, by_name=True, skip_mismatch=True)
-
-
 def main(unused_argv):
     logging.debug(unused_argv)
     load_dataset = dataset_mapping[data_utils.ORCHIDS52_V1_TFRECORD]
-    train_ds = load_dataset(
-        split="train",
-        repeat=True,
-        batch_size=FLAGS.batch_size)
-    validate_ds = load_dataset(
-        split="validate",
-        repeat=True,
-        batch_size=FLAGS.batch_size)
-    test_ds = load_dataset(
-        split="test",
-        repeat=True,
-        batch_size=FLAGS.batch_size)
-
     create_model = nets_utils.nets_mapping[nets_utils.MOBILENET_V2_140_ORCHIDS52]
 
-    for train_step in range(1, 3):
+    for train_step in range(1, 5):
+        if train_step == 1:
+            batch_size = FLAGS.batch_size
+        else:
+            batch_size = FLAGS.batch_size // 4
+
+        train_ds = load_dataset(split="train", batch_size=batch_size)
+        validate_ds = load_dataset(split="validate", batch_size=batch_size)
+        test_ds = load_dataset(split="test", batch_size=batch_size)
+
         training_step = TRAIN_TEMPLATE.format(step=train_step)
         model = create_model(num_classes=orchids52_dataset.NUM_OF_CLASSES,
                              is_training=True,
-                             batch_size=FLAGS.batch_size,
+                             batch_size=batch_size,
                              step=training_step)
 
-        latest, epoch = latest_checkpoint(training_step)
+        latest, epoch = latest_checkpoint(FLAGS.checkpoint_path, training_step)
         if latest:
-            model.resume_weights(latest)
+            model.resume_model_weights(latest)
         else:
+            model.load_model_weights(FLAGS.checkpoint_path, epoch)
             epoch = 0
-            load_weight(FLAGS.checkpoint_path, training_step, model)
 
         model.summary()
 
-        train_model = TrainClassifier(model=model)
+        if FLAGS.exp_decay:
+            base_learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(
+                initial_learning_rate=0.001,
+                decay_steps=10,
+                decay_rate=0.96
+            )
+        else:
+            base_learning_rate = 0.001
+            if training_step in [TRAIN_STEP4, TRAIN_V2_STEP2]:
+                base_learning_rate = 0.00001
+
+        train_model = TrainClassifier(model=model, learning_rate=base_learning_rate, batch_size=batch_size)
 
         train_model.fit(initial_epoch=epoch,
                         epoches=FLAGS.total_epochs,
                         train_ds=train_ds,
                         validate_ds=validate_ds,
-                        batch_size=FLAGS.batch_size,
+                        batch_size=batch_size,
                         checkpoint_path=FLAGS.checkpoint_path)
 
         print('Test accuracy: ')
-        train_model.evaluate(datasets=test_ds, batch_size=FLAGS.batch_size)
+        train_model.evaluate(datasets=test_ds, batch_size=batch_size)
 
 
 if __name__ == '__main__':

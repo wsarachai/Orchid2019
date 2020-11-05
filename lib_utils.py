@@ -7,7 +7,6 @@ import pathlib
 import tensorflow as tf
 
 logging = tf.compat.v1.logging
-default_dir = "/Volumes/Data/tmp/orchids-models/orchid2019/{train_step}"
 CHECK_FILE = 'cp-{epoch:04d}'
 
 
@@ -21,9 +20,8 @@ def get_step_number(checkpoint_dir):
     return step
 
 
-def latest_checkpoint(train_step,
-                      checkpoint_dir=None):
-    checkpoint_dir = checkpoint_dir or default_dir.format(train_step=train_step)
+def latest_checkpoint(checkpoint_dir, train_step):
+    checkpoint_dir = os.path.join(checkpoint_dir, '{train_step}'.format(train_step=train_step))
     file_path = pathlib.Path(checkpoint_dir)
     file_list = list(file_path.glob('*.index'))
 

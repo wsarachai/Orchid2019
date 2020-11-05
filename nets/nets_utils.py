@@ -9,6 +9,7 @@ TRAIN_TEMPLATE = 'pretrain{step}'
 TRAIN_STEP1 = 'pretrain1'
 TRAIN_STEP2 = 'pretrain2'
 TRAIN_STEP3 = 'pretrain3'
+TRAIN_STEP4 = 'pretrain4'
 TRAIN_V2_STEP1 = 'v2-pretrain1'
 TRAIN_V2_STEP2 = 'v2-pretrain2'
 

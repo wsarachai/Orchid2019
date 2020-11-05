@@ -6,7 +6,7 @@ import functools
 import os
 
 import tensorflow as tf
-from tensorflow.keras import layers
+
 from data.orchids52_dataset import TRAIN_SIZE_V1, TEST_SIZE_V1, VALIDATE_SIZE_V2, TRAIN_SIZE_V2, TEST_SIZE_V2, \
     VALIDATE_SIZE_V1
 from nets.mobilenet_v2 import IMG_SIZE_224
@@ -45,21 +45,13 @@ def decode_example(serialize_example, image_size):
     return image, label_values
 
 
-def configure_for_performance(ds, batch_size=32):
-    ds = ds.shuffle(buffer_size=1000)
-    ds = ds.batch(batch_size)
-    ds = ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
-    ds = ds.cache()
-    return ds
-
-
 def parse_function(example_proto):
     return tf.io.parse_single_example(example_proto, feature_description)
 
 
 def _load_dataset(split,
-                  batch_size,
                   data_dir,
+                  batch_size,
                   train_size,
                   test_size,
                   validate_size,
@@ -81,11 +73,10 @@ def _load_dataset(split,
     )
     parsed_dataset = dataset.map(parse_function, num_parallel_calls=num_map_threads)
     parsed_dataset = parsed_dataset.map(_decode_example)
-    parsed_dataset = parsed_dataset.batch(batch_size)
-    parsed_dataset = parsed_dataset.cache()
+    parsed_dataset = parsed_dataset.batch(batch_size=batch_size).cache()
 
     if repeat:
-        normalized_ds = parsed_dataset.repeat()
+        parsed_dataset = parsed_dataset.repeat()
 
     if split:
         if split == 'train':
