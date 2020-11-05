@@ -3,14 +3,14 @@ from __future__ import division
 from __future__ import print_function
 
 import copy
+import os
+
 import tensorflow as tf
 
 from data import data_utils, orchids52_dataset
 from data.data_utils import dataset_mapping
 from lib_utils import start, latest_checkpoint
 from nets import nets_utils
-from nets.mobilenet_v2 import create_mobilenet_v2
-from nets.mobilenet_v2_140_orchids52 import create_predict_module
 from nets.nets_utils import TRAIN_V2_STEP2, TRAIN_TEMPLATE, TRAIN_STEP4
 
 flags = tf.compat.v1.flags
@@ -20,17 +20,17 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string('tf_record_dir', '/Volumes/Data/_dataset/_orchids_dataset/orchids52_data/v1/tf-records',
                     'TF record data directory')
 
-flags.DEFINE_string('checkpoint_path', '/Volumes/Data/tmp/orchids-models/orchid2019',
-                    'The checkpoint path')
-
 flags.DEFINE_boolean('exp_decay', False,
                      'Exponential decay learning rate')
 
-flags.DEFINE_integer('batch_size', 1,
+flags.DEFINE_integer('batch_size', 32,
                      'Batch size')
 
 flags.DEFINE_integer('total_epochs', 100,
                      'Total epochs')
+
+flags.DEFINE_integer('start_state', 1,
+                     'Start state')
 
 
 class TrainClassifier:
@@ -127,18 +127,25 @@ class TrainClassifier:
 
 def main(unused_argv):
     logging.debug(unused_argv)
+    workspace_path = os.environ['WORKSPACE'] or '/Volumes/Data/tmp'
+    data_path = os.environ['DATA_DIR'] or '/Volumes/Data/_dataset/_orchids_dataset'
+    data_dir = os.path.join(data_path, 'orchids52_data')
+    checkpoint_path = os.path.join(workspace_path, 'orchids-models', 'orchids2019')
     load_dataset = dataset_mapping[data_utils.ORCHIDS52_V1_TFRECORD]
     create_model = nets_utils.nets_mapping[nets_utils.MOBILENET_V2_140_ORCHIDS52]
 
-    for train_step in range(1, 5):
+    if not tf.io.gfile.exists(checkpoint_path):
+        tf.io.gfile.mkdir(checkpoint_path)
+
+    for train_step in range(FLAGS.start_state, 5):
         if train_step == 1:
             batch_size = FLAGS.batch_size
         else:
             batch_size = FLAGS.batch_size // 4
 
-        train_ds = load_dataset(split="train", batch_size=batch_size)
-        validate_ds = load_dataset(split="validate", batch_size=batch_size)
-        test_ds = load_dataset(split="test", batch_size=batch_size)
+        train_ds = load_dataset(split="train", batch_size=batch_size, root_path=data_dir)
+        validate_ds = load_dataset(split="validate", batch_size=batch_size, root_path=data_dir)
+        test_ds = load_dataset(split="test", batch_size=batch_size, root_path=data_dir)
 
         training_step = TRAIN_TEMPLATE.format(step=train_step)
         model = create_model(num_classes=orchids52_dataset.NUM_OF_CLASSES,
@@ -146,11 +153,11 @@ def main(unused_argv):
                              batch_size=batch_size,
                              step=training_step)
 
-        latest, epoch = latest_checkpoint(FLAGS.checkpoint_path, training_step)
+        latest, epoch = latest_checkpoint(checkpoint_path, training_step)
         if latest:
             model.resume_model_weights(latest)
         else:
-            model.load_model_weights(FLAGS.checkpoint_path, epoch)
+            model.load_model_weights(checkpoint_path, epoch)
             epoch = 0
 
         model.summary()
@@ -173,7 +180,7 @@ def main(unused_argv):
                         train_ds=train_ds,
                         validate_ds=validate_ds,
                         batch_size=batch_size,
-                        checkpoint_path=FLAGS.checkpoint_path)
+                        checkpoint_path=checkpoint_path)
 
         print('Test accuracy: ')
         train_model.evaluate(datasets=test_ds, batch_size=batch_size)

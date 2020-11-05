@@ -50,6 +50,7 @@ def parse_function(example_proto):
 
 
 def _load_dataset(split,
+                  root_path,
                   data_dir,
                   batch_size,
                   train_size,
@@ -60,7 +61,7 @@ def _load_dataset(split,
                   num_map_threads=1,
                   **kwargs):
     pattern = "orchids52-{split}*.tfrecord".format(split=split)
-    pattern = os.path.join(data_dir, pattern)
+    pattern = os.path.join(root_path, data_dir, pattern)
     dataset = tf.data.Dataset.list_files(file_pattern=pattern)
     dataset = dataset.interleave(lambda x: tf.data.TFRecordDataset(x),
                                  cycle_length=num_readers,
@@ -95,10 +96,10 @@ load_dataset_v1 = wrapped_partial(
     train_size=TRAIN_SIZE_V1,
     test_size=TEST_SIZE_V1,
     validate_size=VALIDATE_SIZE_V1,
-    data_dir='/Volumes/Data/_dataset/_orchids_dataset/orchids52_data/tf-records/v1')
+    data_dir='tf-records/v1')
 load_dataset_v2 = wrapped_partial(
     _load_dataset,
     train_size=TRAIN_SIZE_V2,
     test_size=TEST_SIZE_V2,
     validate_size=VALIDATE_SIZE_V2,
-    data_dir='/Volumes/Data/_dataset/_orchids_dataset/orchids52_data/tf-records/v2')
+    data_dir='tf-records/v2')
