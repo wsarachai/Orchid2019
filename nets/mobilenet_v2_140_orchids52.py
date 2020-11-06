@@ -174,15 +174,15 @@ def create_orchid_mobilenet_v2_14(num_classes,
     stn_dense = None
     branch_base_model = None
     branches_prediction_models = []
-    # data_augmentation = keras.Sequential([
-    #     keras.layers.experimental.preprocessing.RandomFlip('horizontal'),
-    #     keras.layers.experimental.preprocessing.RandomRotation(0.2),
-    # ])
+    data_augmentation = keras.Sequential([
+        keras.layers.experimental.preprocessing.RandomFlip('horizontal'),
+        keras.layers.experimental.preprocessing.RandomRotation(0.2),
+    ])
     preprocess_input = keras.applications.mobilenet_v2.preprocess_input
     batch_size = kwargs.pop('batch_size')
 
     inputs = keras.Input(shape=(default_image_size, default_image_size, 3), batch_size=batch_size)
-    # inputs = data_augmentation(inputs)
+    inputs = data_augmentation(inputs)
     inputs = preprocess_input(inputs)
 
     # Create the base model from the pre-trained model MobileNet V2
