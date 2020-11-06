@@ -37,10 +37,9 @@ def latest_checkpoint(checkpoint_dir, train_step):
 
 
 def apply_with_random_selector(x, func, num_cases):
-  sel = tf.random.uniform([], maxval=num_cases, dtype=tf.int32)
-  return tf.raw_ops.Merge(inputs=[
-      func(tf.raw_ops.Switch(data=x, pred=tf.equal(sel, case))[1], case)
-      for case in range(num_cases)])[0]
+    sel = tf.random.uniform([], maxval=num_cases, dtype=tf.int32)
+    return tf.raw_ops.Merge(inputs=[func(tf.raw_ops.Switch(data=x, pred=tf.equal(sel, case))[1], case)
+                                    for case in range(num_cases)])[0]
 
 
 def start(start_fn):

@@ -37,7 +37,6 @@ def get_label(serialize_example):
 def decode_example(serialize_example):
     image = serialize_example['image/image_raw']
     image = tf.image.decode_jpeg(image, channels=3)
-    image = tf.image.convert_image_dtype(image, dtype=tf.float32)
     label_values = get_label(serialize_example)
     return image, label_values
 
@@ -77,26 +76,29 @@ def distort_color(image, color_ordering=0, fast_mode=True):
             image = tf.image.random_brightness(image, max_delta=32. / 255.)
         else:
             raise ValueError('color_ordering must be in [0, 3]')
-    return tf.clip_by_value(image, 0.0, 1.0)
+    return tf.clip_by_value(image, clip_value_min=0, clip_value_max=255)
 
 
 def preprocess_for_train(image, label_values):
     method = [tf.image.ResizeMethod.BILINEAR,
               tf.image.ResizeMethod.NEAREST_NEIGHBOR,
               tf.image.ResizeMethod.BICUBIC,
-              tf.image.ResizeMethod.AREA,
               tf.image.ResizeMethod.LANCZOS3,
               tf.image.ResizeMethod.LANCZOS5,
               tf.image.ResizeMethod.GAUSSIAN,
-              tf.image.ResizeMethod.MITCHELLCUBIC
-            ]
+              tf.image.ResizeMethod.MITCHELLCUBIC]
 
-    num_resize_cases = len(method)
-    distorted_image = apply_with_random_selector(
-        image,
-        lambda x, mode: tf.image.resize(x, IMG_SIZE_224, method[mode]),
-        num_cases=num_resize_cases)
-    distorted_image = tf.image.random_flip_left_right(distorted_image)
+    def apply_random_selector(x):
+        num_cases = len(method)
+        sel = tf.random.uniform([], maxval=num_cases, dtype=tf.int32)
+        inputs = [tf.raw_ops.Switch(data=tf.image.resize(images=x,
+                                                         size=IMG_SIZE_224,
+                                                         method=method[case]),
+                                    pred=tf.equal(case, sel))[1] for case in range(num_cases)]
+        return tf.raw_ops.Merge(inputs=inputs)[0]
+
+    cast_image = tf.cast(image, dtype=tf.float32)
+    distorted_image = apply_random_selector(cast_image)
 
     fast_mode = False
     num_distort_cases = 4
@@ -105,10 +107,9 @@ def preprocess_for_train(image, label_values):
         lambda x, ordering: distort_color(x, ordering, fast_mode),
         num_cases=num_distort_cases)
 
-    distorted_image = distorted_image * 2
-    distorted_image = distorted_image - 1
+    flip_image = tf.image.random_flip_left_right(distorted_image)
 
-    return distorted_image, label_values
+    return flip_image, label_values
 
 
 def _load_dataset(split,
