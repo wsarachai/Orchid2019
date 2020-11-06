@@ -131,7 +131,10 @@ def _load_dataset(split,
                                  deterministic=False)
     parsed_dataset = dataset.map(parse_function, num_parallel_calls=num_map_threads)
     decode_dataset = parsed_dataset.map(decode_example)
-    decode_dataset = decode_dataset.map(preprocess_for_train)
+
+    if split == 'train':
+        decode_dataset = decode_dataset.map(preprocess_for_train)
+
     decode_dataset = decode_dataset.batch(batch_size=batch_size).cache()
 
     if repeat:
