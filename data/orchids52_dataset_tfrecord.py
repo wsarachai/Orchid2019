@@ -88,6 +88,8 @@ def preprocess_for_train(image, label_values):
               tf.image.ResizeMethod.GAUSSIAN,
               tf.image.ResizeMethod.MITCHELLCUBIC]
 
+    cast_image = tf.cast(image, dtype=tf.float32)
+    
     def apply_random_selector(x):
         num_cases = len(method)
         sel = tf.random.uniform([], maxval=num_cases, dtype=tf.int32)
@@ -97,7 +99,6 @@ def preprocess_for_train(image, label_values):
                                     pred=tf.equal(case, sel))[1] for case in range(num_cases)]
         return tf.raw_ops.Merge(inputs=inputs)[0]
 
-    cast_image = tf.cast(image, dtype=tf.float32)
     distorted_image = apply_random_selector(cast_image)
 
     num_distort_cases = 4
@@ -109,6 +110,14 @@ def preprocess_for_train(image, label_values):
     flip_image = tf.image.random_flip_left_right(distorted_image)
 
     return flip_image, label_values
+
+
+def preprocess_for_eval(image, label_values):
+    cast_image = tf.cast(image, dtype=tf.float32)
+    image_resize = tf.image.resize(images=cast_image,
+                                   size=IMG_SIZE_224,
+                                   method=tf.image.ResizeMethod.BILINEAR)
+    return image_resize, label_values
 
 
 def _load_dataset(split,
