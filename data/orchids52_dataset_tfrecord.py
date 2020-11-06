@@ -89,7 +89,7 @@ def preprocess_for_train(image, label_values):
               tf.image.ResizeMethod.MITCHELLCUBIC]
 
     cast_image = tf.cast(image, dtype=tf.float32)
-    
+
     def apply_random_selector(x):
         num_cases = len(method)
         sel = tf.random.uniform([], maxval=num_cases, dtype=tf.int32)
@@ -143,6 +143,8 @@ def _load_dataset(split,
 
     if split == 'train':
         decode_dataset = decode_dataset.map(preprocess_for_train)
+    else:
+        decode_dataset = decode_dataset.map(preprocess_for_eval)
 
     decode_dataset = decode_dataset.batch(batch_size=batch_size).cache()
 
