@@ -44,8 +44,7 @@ def decode_img(image, size):
 def get_label(file_path, class_names):
     parts = tf.strings.split(file_path, os.path.sep)
     one_hot = parts[-2] == class_names
-    label = tf.cast(one_hot, tf.int8)
-    return label
+    return tf.cast(one_hot, tf.float32)
 
 
 def process_path(file_path, class_names, image_size):
@@ -56,11 +55,9 @@ def process_path(file_path, class_names, image_size):
 
 
 def configure_for_performance(ds, batch_size=32):
-    normalization_layer = layers.experimental.preprocessing.Rescaling(1. / 255)
-    ds = ds.map(lambda x, y: (normalization_layer(x), y))
     ds = ds.cache()
-    ds = ds.batch(batch_size)
     ds = ds.shuffle(buffer_size=1000)
+    ds = ds.batch(batch_size)
     ds = ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
     return ds
 

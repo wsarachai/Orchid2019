@@ -92,10 +92,6 @@ def main(unused_argv):
                                                    include_top=False,
                                                    weights='imagenet')
 
-    image_batch, label_batch = next(iter(train_ds))
-    feature_batch = base_model(image_batch)
-    print(feature_batch.shape)
-
     global_average_layer = tf.keras.layers.GlobalAveragePooling2D()
     prediction_layer = tf.keras.layers.Dense(num_classes)
 
