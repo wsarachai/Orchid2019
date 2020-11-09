@@ -71,7 +71,6 @@ flags.DEFINE_string('aug_method', 'fast',
 
 def main(unused_argv):
     logging.debug(unused_argv)
-    batch_size = 1
     num_classes = 52
     workspace_path = os.environ['WORKSPACE'] or '/Volumes/Data/tmp'
     data_path = os.environ['DATA_DIR'] or '/Volumes/Data/_dataset/_orchids_dataset'
@@ -80,11 +79,11 @@ def main(unused_argv):
     load_dataset = dataset_mapping[data_utils.ORCHIDS52_V2_FILE]
 
     train_ds = load_dataset(split="train",
-                            batch_size=batch_size,
+                            batch_size=FLAGS.batch_size,
                             root_path=data_dir,
                             aug_method=FLAGS.aug_method)
-    validate_ds = load_dataset(split="validate", batch_size=batch_size, root_path=data_dir)
-    test_ds = load_dataset(split="test", batch_size=batch_size, root_path=data_dir)
+    validate_ds = load_dataset(split="validate", batch_size=FLAGS.batch_size, root_path=data_dir)
+    test_ds = load_dataset(split="test", batch_size=FLAGS.batch_size, root_path=data_dir)
 
     # Create the base model from the pre-trained model MobileNet V2
     IMG_SHAPE = (224, 224, 3)
