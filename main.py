@@ -2,18 +2,14 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import numpy as np
 import os
-from pickle import dump
-
-import matplotlib.pyplot as plt
+import pathlib
 import tensorflow as tf
-from tensorflow import keras
-from data import orchids52_dataset, data_utils
-from data.create_orchids_dataset import create_dataset
+
+from data import data_utils
 from data.data_utils import dataset_mapping
-from lib_utils import latest_checkpoint, start
-from nets import nets_utils
-from nets.nets_utils import TRAIN_STEP1, TRAIN_STEP2, TRAIN_STEP3, TRAIN_V2_STEP2, TRAIN_V2_STEP1
+from lib_utils import start
 
 flags = tf.compat.v1.flags
 logging = tf.compat.v1.logging
@@ -22,112 +18,121 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string('tf_record_dir', '/Volumes/Data/_dataset/_orchids_dataset/orchids52_data/v1/tf-records',
                     'TF record data directory')
 
-flags.DEFINE_string('checkpoint_path', '/Volumes/Data/tmp/orchids-models/orchid2019',
-                    'The checkpoint path')
-
 flags.DEFINE_boolean('exp_decay', False,
                      'Exponential decay learning rate')
 
-flags.DEFINE_string('training_step', TRAIN_STEP1,
-                    'Training step')
-
-flags.DEFINE_integer('batch_size', 1,
+flags.DEFINE_integer('batch_size', 32,
                      'Batch size')
 
 flags.DEFINE_integer('total_epochs', 100,
                      'Total epochs')
 
+flags.DEFINE_integer('start_state', 1,
+                     'Start state')
 
-def _main(unused_argv):
-    logging.debug(unused_argv)
-    create_dataset(images_dir=FLAGS.images_dir,
-                   output_directory=FLAGS.output_directory)
+flags.DEFINE_integer('end_state', 5,
+                     'End state')
+
+flags.DEFINE_float('learning_rate', 0.001,
+                   'Learning Rate')
+
+flags.DEFINE_string('aug_method', 'fast',
+                    'Augmentation Method')
+
+
+# def get_label(file_path):
+#     parts = tf.strings.split(file_path, os.path.sep)
+#     one_hot = parts[-2] == class_names
+#     return tf.cast(one_hot, tf.float32)
+#
+#
+# def decode_img(img):
+#     # convert the compressed string to a 3D uint8 tensor
+#     img = tf.image.decode_jpeg(img, channels=3)
+#     # resize the image to the desired size
+#     return tf.image.resize(img, IMG_SIZE)
+#
+#
+# def process_path(file_path):
+#     label = get_label(file_path)
+#     # load the raw data from the file as a string
+#     img = tf.io.read_file(file_path)
+#     img = decode_img(img)
+#     return img, label
+#
+#
+# def configure_for_performance(ds, batch_size=32):
+#     ds = ds.cache()
+#     ds = ds.shuffle(buffer_size=1000)
+#     ds = ds.batch(batch_size)
+#     ds = ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
+#     return ds
 
 
 def main(unused_argv):
     logging.debug(unused_argv)
-    load_dataset = dataset_mapping[data_utils.ORCHIDS52_V1_TFRECORD]
-    train_ds = load_dataset(
-        split="train",
-        repeat=True,
-        batch_size=FLAGS.batch_size)
-    test_ds = load_dataset(
-        split="test",
-        batch_size=FLAGS.batch_size)
-    validate_ds = load_dataset(
-        split="validate",
-        repeat=True,
-        batch_size=FLAGS.batch_size)
+    batch_size = 1
+    num_classes = 52
+    workspace_path = os.environ['WORKSPACE'] or '/Volumes/Data/tmp'
+    data_path = os.environ['DATA_DIR'] or '/Volumes/Data/_dataset/_orchids_dataset'
+    data_dir = os.path.join(data_path, 'orchids52_data')
+    checkpoint_path = os.path.join(workspace_path, 'orchids-models', 'orchids2019')
+    load_dataset = dataset_mapping[data_utils.ORCHIDS52_V2_FILE]
 
-    create_model = nets_utils.nets_mapping[nets_utils.MOBILENET_V2_140_ORCHIDS52]
-    model = create_model(num_classes=orchids52_dataset.NUM_OF_CLASSES,
-                         is_training=True,
-                         batch_size=FLAGS.batch_size,
-                         step=FLAGS.training_step)
+    train_ds = load_dataset(split="train",
+                            batch_size=batch_size,
+                            root_path=data_dir,
+                            aug_method=FLAGS.aug_method)
+    validate_ds = load_dataset(split="validate", batch_size=batch_size, root_path=data_dir)
+    test_ds = load_dataset(split="test", batch_size=batch_size, root_path=data_dir)
 
-    if FLAGS.exp_decay:
-        base_learning_rate = keras.optimizers.schedules.ExponentialDecay(
-            initial_learning_rate=0.001,
-            decay_steps=10,
-            decay_rate=0.96
-        )
-    else:
-        base_learning_rate = 0.001
-        if FLAGS.training_step in [TRAIN_STEP3, TRAIN_V2_STEP2]:
-            base_learning_rate = 0.00001
+    # Create the base model from the pre-trained model MobileNet V2
+    IMG_SHAPE = (224, 224, 3)
+    base_model = tf.keras.applications.MobileNetV2(input_shape=IMG_SHAPE,
+                                                   alpha=1.4,
+                                                   include_top=False,
+                                                   weights='imagenet')
 
-    optimizer = keras.optimizers.RMSprop(learning_rate=base_learning_rate)
+    image_batch, label_batch = next(iter(train_ds))
+    feature_batch = base_model(image_batch)
+    print(feature_batch.shape)
 
-    model.compile(loss=keras.losses.CategoricalCrossentropy(from_logits=True),
-                  optimizer=optimizer,
+    global_average_layer = tf.keras.layers.GlobalAveragePooling2D()
+    prediction_layer = tf.keras.layers.Dense(num_classes)
+
+    data_augmentation = tf.keras.Sequential([
+        tf.keras.layers.experimental.preprocessing.RandomFlip('horizontal'),
+        tf.keras.layers.experimental.preprocessing.RandomRotation(0.2),
+    ])
+
+    preprocess_input = tf.keras.applications.mobilenet_v2.preprocess_input
+
+    inputs = tf.keras.Input(shape=IMG_SHAPE)
+    x = data_augmentation(inputs)
+    x = preprocess_input(x)
+    x = base_model(x, training=False)
+    x = global_average_layer(x)
+    x = tf.keras.layers.Dropout(0.2)(x)
+    outputs = prediction_layer(x)
+    model = tf.keras.Model(inputs, outputs)
+
+    # Freeze all the layers except for dense layer
+    for layer in base_model.layers:
+        layer.trainable = False
+
+    base_learning_rate = 0.0001
+    model.compile(loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
+                  optimizer=tf.keras.optimizers.RMSprop(lr=base_learning_rate),
                   metrics=['accuracy'])
 
-    checkpoint_path = os.path.join(FLAGS.checkpoint_path, FLAGS.training_step)
-    checkpoint_file = os.path.join(checkpoint_path, 'cp-{epoch:04d}.h5')
-
-    if not tf.io.gfile.exists(checkpoint_path):
-        tf.io.gfile.mkdir(checkpoint_path)
-
-    # Create a callback that saves the model's weights
-    cp_callback = keras.callbacks.ModelCheckpoint(filepath=checkpoint_file,
-                                                  save_weights_only=True,
-                                                  verbose=1)
-
-    train_step = train_ds.size // FLAGS.batch_size
-    test_step = test_ds.size // FLAGS.batch_size
-    validate_step = validate_ds.size // FLAGS.batch_size
-
-    latest, epoch = latest_checkpoint(FLAGS.training_step)
-    if latest:
-        model.resume_weights(latest)
-    else:
-        epoch = 0
-        if FLAGS.training_step == TRAIN_STEP1:
-            model.config_layers(TRAIN_STEP1)
-        elif FLAGS.training_step == TRAIN_STEP2:
-            latest, _ = latest_checkpoint(TRAIN_STEP1)
-            model.load_weights(latest, by_name=True, skip_mismatch=True)
-        elif FLAGS.training_step == TRAIN_STEP3:
-            latest, _ = latest_checkpoint(TRAIN_STEP2)
-            model.load_weights(latest, by_name=True, skip_mismatch=True)
-        elif FLAGS.training_step == TRAIN_V2_STEP2:
-            latest, _ = latest_checkpoint(TRAIN_V2_STEP1)
-            model.load_weights(latest, by_name=True, skip_mismatch=True)
-
     model.summary()
+    total_epochs = 50
 
-    summary = model.fit(train_ds,
-                        epochs=FLAGS.total_epochs,
-                        validation_data=validate_ds,
-                        validation_steps=validate_step,
-                        callbacks=[cp_callback],
-                        initial_epoch=epoch,
-                        steps_per_epoch=train_step)
+    history_fine = model.fit(train_ds,
+                             epochs=total_epochs,
+                             validation_data=validate_ds)
 
-    with open('trainHistoryOld-v2-2', 'wb') as handle:  # saving the history of the model
-        dump(summary.history, handle)
-
-    loss, accuracy = model.evaluate(test_ds, steps=test_step)
+    loss, accuracy = model.evaluate(test_ds)
     print('Test accuracy :', accuracy)
 
 
