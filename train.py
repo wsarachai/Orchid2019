@@ -17,9 +17,6 @@ flags = tf.compat.v1.flags
 logging = tf.compat.v1.logging
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('tf_record_dir', '/Volumes/Data/_dataset/_orchids_dataset/orchids52_data/v1/tf-records',
-                    'TF record data directory')
-
 flags.DEFINE_boolean('exp_decay', False,
                      'Exponential decay learning rate')
 
@@ -136,8 +133,8 @@ class TrainClassifier:
 
 def main(unused_argv):
     logging.debug(unused_argv)
-    workspace_path = os.environ['WORKSPACE'] or '/Volumes/Data/tmp'
-    data_path = os.environ['DATA_DIR'] or '/Volumes/Data/_dataset/_orchids_dataset'
+    workspace_path = os.environ['WORKSPACE'] if 'WORKSPACE' in os.environ else '/Volumes/Data/tmp'
+    data_path = os.environ['DATA_DIR'] if 'DATA_DIR' in os.environ else '/Volumes/Data/_dataset/_orchids_dataset'
     data_dir = os.path.join(data_path, 'orchids52_data')
     checkpoint_path = os.path.join(workspace_path, 'orchids-models', 'orchids2019')
     load_dataset = dataset_mapping[data_utils.ORCHIDS52_V1_TFRECORD]
