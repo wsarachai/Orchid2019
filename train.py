@@ -131,7 +131,7 @@ def main(unused_argv):
     data_path = os.environ['DATA_DIR'] or '/Volumes/Data/_dataset/_orchids_dataset'
     data_dir = os.path.join(data_path, 'orchids52_data')
     checkpoint_path = os.path.join(workspace_path, 'orchids-models', 'orchids2019')
-    load_dataset = dataset_mapping[data_utils.ORCHIDS52_V1_TFRECORD]
+    load_dataset = dataset_mapping[data_utils.ORCHIDS52_V2_FILE]
     create_model = nets_utils.nets_mapping[nets_utils.MOBILENET_V2_140_ORCHIDS52]
 
     if not tf.io.gfile.exists(checkpoint_path):

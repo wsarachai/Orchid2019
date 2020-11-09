@@ -48,8 +48,8 @@ def get_data_files(data_sources):
 
 
 dataset_mapping = {
-    ORCHIDS52_V1_FILE: orchids52_dataset_file.load_dataset,
+    ORCHIDS52_V1_FILE: orchids52_dataset_file.load_dataset_v1,
     ORCHIDS52_V1_TFRECORD: orchids52_dataset_tfrecord.load_dataset_v1,
-    ORCHIDS52_V2_FILE: orchids52_dataset_file.load_dataset,
+    ORCHIDS52_V2_FILE: orchids52_dataset_file.load_dataset_v2,
     ORCHIDS52_V2_TFRECORD: orchids52_dataset_tfrecord.load_dataset_v2
 }

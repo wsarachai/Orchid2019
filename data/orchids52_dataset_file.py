@@ -9,6 +9,8 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
 
+from data.orchids52_dataset import TRAIN_SIZE_V1, TEST_SIZE_V1, VALIDATE_SIZE_V1, TRAIN_SIZE_V2, TEST_SIZE_V2, \
+    VALIDATE_SIZE_V2
 from nets.mobilenet_v2 import IMG_SIZE_224
 
 logging = tf.compat.v1.logging
@@ -64,37 +66,85 @@ def configure_for_performance(ds, batch_size=32):
 
 
 def _load_dataset(split,
-                  batch_size,
+                  root_path,
                   data_dir,
-                  image_size):
-    if 'train' == split:
-        train_data_dir = pathlib.Path(os.path.join(data_dir, "train-en"))
-        train_ds = tf.data.Dataset.list_files(str(train_data_dir / '*/*'), shuffle=False)
-        check_wrap_process_path(data_dir=train_data_dir, image_size=image_size)
-        train_ds = train_ds.map(_process_path, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-        train_ds = configure_for_performance(train_ds, batch_size=batch_size)
-        return train_ds
-    elif 'test' == split:
-        test_data_dir = pathlib.Path(os.path.join(data_dir, "test-en"))
-        test_ds = tf.data.Dataset.list_files(str(test_data_dir / '*/*'), shuffle=False)
-        val_batches = tf.data.experimental.cardinality(test_ds)
-        test_ds = test_ds.take(val_batches // 5)
-        check_wrap_process_path(data_dir=test_data_dir, image_size=image_size)
-        test_ds = test_ds.map(_process_path, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-        test_ds = configure_for_performance(test_ds, batch_size=batch_size)
-        return test_ds
-    elif 'validate' == split:
-        train_data_dir = pathlib.Path(os.path.join(data_dir, "train-en"))
-        train_ds = tf.data.Dataset.list_files(str(train_data_dir / '*/*'), shuffle=False)
-        val_batches = tf.data.experimental.cardinality(train_ds)
-        val_ds = train_ds.skip(val_batches // 5)
-        check_wrap_process_path(data_dir=train_data_dir, image_size=image_size)
-        val_ds = val_ds.map(_process_path, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-        val_ds = configure_for_performance(val_ds, batch_size=batch_size)
-        return val_ds
+                  batch_size,
+                  train_size,
+                  test_size,
+                  validate_size,
+                  repeat=False,
+                  **kwargs):
+    dataset = None
+    image_path = os.path.join(root_path, data_dir)
+    if 'v1' == data_dir:
+        if 'train' == split:
+            train_data_dir = pathlib.Path(os.path.join(image_path, "train-en"))
+            dataset = tf.data.Dataset.list_files(str(train_data_dir / '*/*'), shuffle=False)
+            check_wrap_process_path(data_dir=train_data_dir, image_size=IMG_SIZE_224)
+            dataset = dataset.map(_process_path, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+            dataset = configure_for_performance(dataset, batch_size=batch_size)
+        elif 'test' == split:
+            test_data_dir = pathlib.Path(os.path.join(image_path, "test-en"))
+            dataset = tf.data.Dataset.list_files(str(test_data_dir / '*/*'), shuffle=False)
+            val_batches = tf.data.experimental.cardinality(dataset)
+            dataset = dataset.take(val_batches // 5)
+            check_wrap_process_path(data_dir=test_data_dir, image_size=IMG_SIZE_224)
+            dataset = dataset.map(_process_path, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+            dataset = configure_for_performance(dataset, batch_size=batch_size)
+        elif 'validate' == split:
+            train_data_dir = pathlib.Path(os.path.join(image_path, "train-en"))
+            dataset = tf.data.Dataset.list_files(str(train_data_dir / '*/*'), shuffle=False)
+            val_batches = tf.data.experimental.cardinality(dataset)
+            dataset = dataset.skip(val_batches // 5)
+            check_wrap_process_path(data_dir=train_data_dir, image_size=IMG_SIZE_224)
+            dataset = dataset.map(_process_path, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+            dataset = configure_for_performance(dataset, batch_size=batch_size)
+
+    elif 'v2' == data_dir:
+        image_path = pathlib.Path(image_path)
+        dataset = tf.data.Dataset.list_files(os.path.join(str(image_path), '*/*'), shuffle=False)
+        if 'train' == split:
+            dataset = dataset.take(train_size)
+            check_wrap_process_path(data_dir=image_path, image_size=IMG_SIZE_224)
+            dataset = dataset.map(_process_path, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+            dataset = configure_for_performance(dataset, batch_size=batch_size)
+        elif 'test' == split:
+            dataset = dataset.skip(train_size)
+            dataset = dataset.skip(validate_size)
+            dataset = dataset.take(test_size)
+            check_wrap_process_path(data_dir=image_path, image_size=IMG_SIZE_224)
+            dataset = dataset.map(_process_path, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+            dataset = configure_for_performance(dataset, batch_size=batch_size)
+        elif 'validate' == split:
+            dataset = dataset.skip(train_size)
+            dataset = dataset.take(validate_size)
+            check_wrap_process_path(data_dir=image_path, image_size=IMG_SIZE_224)
+            dataset = dataset.map(_process_path, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+            dataset = configure_for_performance(dataset, batch_size=batch_size)
+
+    if repeat:
+        dataset = dataset.repeat()
+
+    if split:
+        if split == 'train':
+            setattr(dataset, 'size', train_size)
+        elif split == 'test':
+            setattr(dataset, 'size', test_size)
+        elif split == 'validate':
+            setattr(dataset, 'size', validate_size)
+
+    return dataset
 
 
-load_dataset = wrapped_partial(
+load_dataset_v1 = wrapped_partial(
     _load_dataset,
-    data_dir="/Volumes/Data/_dataset/_orchids_dataset/orchids52_data",
-    image_size=IMG_SIZE_224)
+    train_size=TRAIN_SIZE_V1,
+    test_size=TEST_SIZE_V1,
+    validate_size=VALIDATE_SIZE_V1,
+    data_dir='v1')
+load_dataset_v2 = wrapped_partial(
+    _load_dataset,
+    train_size=TRAIN_SIZE_V2,
+    test_size=TEST_SIZE_V2,
+    validate_size=VALIDATE_SIZE_V2,
+    data_dir='v2')
