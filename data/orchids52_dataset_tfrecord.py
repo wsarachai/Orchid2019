@@ -19,6 +19,7 @@ feature_description = {
     'image/class/label': tf.io.FixedLenFeature([], tf.string, default_value=''),
     'image/image_raw': tf.io.FixedLenFeature((), tf.string, default_value='')
 }
+preprocess_for_train = None
 
 
 def wrapped_partial(func, *args, **kwargs):
@@ -79,7 +80,7 @@ def distort_color(image, color_ordering=0, fast_mode=True):
     return tf.clip_by_value(image, clip_value_min=0, clip_value_max=255)
 
 
-def preprocess_for_train(image, label_values):
+def _preprocess_for_train(image, label_values, aug_method):
     method = [tf.image.ResizeMethod.BILINEAR,
               tf.image.ResizeMethod.NEAREST_NEIGHBOR,
               tf.image.ResizeMethod.BICUBIC,
@@ -87,6 +88,8 @@ def preprocess_for_train(image, label_values):
               tf.image.ResizeMethod.LANCZOS5,
               tf.image.ResizeMethod.GAUSSIAN,
               tf.image.ResizeMethod.MITCHELLCUBIC]
+
+    cast_image = tf.cast(image, dtype=tf.float32)
 
     def apply_random_selector(x):
         num_cases = len(method)
@@ -97,19 +100,26 @@ def preprocess_for_train(image, label_values):
                                     pred=tf.equal(case, sel))[1] for case in range(num_cases)]
         return tf.raw_ops.Merge(inputs=inputs)[0]
 
-    cast_image = tf.cast(image, dtype=tf.float32)
     distorted_image = apply_random_selector(cast_image)
 
-    fast_mode = False
     num_distort_cases = 4
+    distort_method = True if aug_method == 'fast' else False
     distorted_image = apply_with_random_selector(
         distorted_image,
-        lambda x, ordering: distort_color(x, ordering, fast_mode),
+        lambda x, ordering: distort_color(x, ordering, distort_method),
         num_cases=num_distort_cases)
 
     flip_image = tf.image.random_flip_left_right(distorted_image)
 
     return flip_image, label_values
+
+
+def preprocess_for_eval(image, label_values):
+    cast_image = tf.cast(image, dtype=tf.float32)
+    image_resize = tf.image.resize(images=cast_image,
+                                   size=IMG_SIZE_224,
+                                   method=tf.image.ResizeMethod.BILINEAR)
+    return image_resize, label_values
 
 
 def _load_dataset(split,
@@ -120,6 +130,7 @@ def _load_dataset(split,
                   test_size,
                   validate_size,
                   repeat=False,
+                  aug_method='fast',
                   num_readers=1,
                   num_map_threads=1,
                   **kwargs):
@@ -132,7 +143,18 @@ def _load_dataset(split,
                                  deterministic=False)
     parsed_dataset = dataset.map(parse_function, num_parallel_calls=num_map_threads)
     decode_dataset = parsed_dataset.map(decode_example)
-    decode_dataset = decode_dataset.map(preprocess_for_train)
+
+    if split == 'train':
+        global preprocess_for_train
+        if not preprocess_for_train:
+            preprocess_for_train = wrapped_partial(
+                _preprocess_for_train,
+                aug_method=aug_method
+            )
+        decode_dataset = decode_dataset.map(preprocess_for_train)
+    else:
+        decode_dataset = decode_dataset.map(preprocess_for_eval)
+
     decode_dataset = decode_dataset.batch(batch_size=batch_size).cache()
 
     if repeat:

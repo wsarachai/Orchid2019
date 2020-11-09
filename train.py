@@ -32,6 +32,12 @@ flags.DEFINE_integer('total_epochs', 100,
 flags.DEFINE_integer('start_state', 1,
                      'Start state')
 
+flags.DEFINE_float('learning_rate', 0.001,
+                   'Learning Rate')
+
+flags.DEFINE_string('aug_method', 'fast',
+                    'Augmentation Method')
+
 
 class TrainClassifier:
 
@@ -143,7 +149,10 @@ def main(unused_argv):
         else:
             batch_size = FLAGS.batch_size // 4
 
-        train_ds = load_dataset(split="train", batch_size=batch_size, root_path=data_dir)
+        train_ds = load_dataset(split="train",
+                                batch_size=batch_size,
+                                root_path=data_dir,
+                                aug_method=FLAGS.aug_method)
         validate_ds = load_dataset(split="validate", batch_size=batch_size, root_path=data_dir)
         test_ds = load_dataset(split="test", batch_size=batch_size, root_path=data_dir)
 
@@ -164,12 +173,12 @@ def main(unused_argv):
 
         if FLAGS.exp_decay:
             base_learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(
-                initial_learning_rate=0.001,
+                initial_learning_rate=FLAGS.learning_rate,
                 decay_steps=10,
                 decay_rate=0.96
             )
         else:
-            base_learning_rate = 0.001
+            base_learning_rate = FLAGS.learning_rate
             if training_step in [TRAIN_STEP4, TRAIN_V2_STEP2]:
                 base_learning_rate = 0.00001
 
