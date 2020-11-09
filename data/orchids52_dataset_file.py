@@ -7,15 +7,17 @@ import pathlib
 import functools
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras import layers
 
 from data.orchids52_dataset import TRAIN_SIZE_V1, TEST_SIZE_V1, VALIDATE_SIZE_V1, TRAIN_SIZE_V2, TEST_SIZE_V2, \
-    VALIDATE_SIZE_V2
+    VALIDATE_SIZE_V2, _preprocess_for_train, _preprocess_for_eval
 from nets.mobilenet_v2 import IMG_SIZE_224
 
 logging = tf.compat.v1.logging
 already_wrap = False
 _process_path = None
+
+preprocess_for_train = None
+preprocess_for_eval = None
 
 
 def check_wrap_process_path(data_dir, image_size):
@@ -69,55 +71,61 @@ def _load_dataset(split,
                   train_size,
                   test_size,
                   validate_size,
+                  aug_method='fast',
                   repeat=False,
                   **kwargs):
     dataset = None
     image_path = os.path.join(root_path, data_dir)
     if 'v1' == data_dir:
         if 'train' == split:
-            train_data_dir = pathlib.Path(os.path.join(image_path, "train-en"))
-            dataset = tf.data.Dataset.list_files(str(train_data_dir / '*/*'), shuffle=False)
-            check_wrap_process_path(data_dir=train_data_dir, image_size=IMG_SIZE_224)
-            dataset = dataset.map(_process_path, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-            dataset = configure_for_performance(dataset, batch_size=batch_size)
+            images_dir = pathlib.Path(os.path.join(image_path, "train-en"))
+            dataset = tf.data.Dataset.list_files(str(images_dir / '*/*'), shuffle=False)
         elif 'test' == split:
-            test_data_dir = pathlib.Path(os.path.join(image_path, "test-en"))
-            dataset = tf.data.Dataset.list_files(str(test_data_dir / '*/*'), shuffle=False)
+            images_dir = pathlib.Path(os.path.join(image_path, "test-en"))
+            dataset = tf.data.Dataset.list_files(str(images_dir / '*/*'), shuffle=False)
             val_batches = tf.data.experimental.cardinality(dataset)
             dataset = dataset.take(val_batches // 5)
-            check_wrap_process_path(data_dir=test_data_dir, image_size=IMG_SIZE_224)
-            dataset = dataset.map(_process_path, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-            dataset = configure_for_performance(dataset, batch_size=batch_size)
         elif 'validate' == split:
-            train_data_dir = pathlib.Path(os.path.join(image_path, "train-en"))
-            dataset = tf.data.Dataset.list_files(str(train_data_dir / '*/*'), shuffle=False)
+            images_dir = pathlib.Path(os.path.join(image_path, "train-en"))
+            dataset = tf.data.Dataset.list_files(str(images_dir / '*/*'), shuffle=False)
             val_batches = tf.data.experimental.cardinality(dataset)
             dataset = dataset.skip(val_batches // 5)
-            check_wrap_process_path(data_dir=train_data_dir, image_size=IMG_SIZE_224)
-            dataset = dataset.map(_process_path, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-            dataset = configure_for_performance(dataset, batch_size=batch_size)
 
     elif 'v2' == data_dir:
         image_path = pathlib.Path(image_path)
         dataset = tf.data.Dataset.list_files(os.path.join(str(image_path), '*/*'), shuffle=False)
         if 'train' == split:
             dataset = dataset.take(train_size)
-            check_wrap_process_path(data_dir=image_path, image_size=IMG_SIZE_224)
-            dataset = dataset.map(_process_path, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-            dataset = configure_for_performance(dataset, batch_size=batch_size)
         elif 'test' == split:
             dataset = dataset.skip(train_size)
             dataset = dataset.skip(validate_size)
             dataset = dataset.take(test_size)
-            check_wrap_process_path(data_dir=image_path, image_size=IMG_SIZE_224)
-            dataset = dataset.map(_process_path, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-            dataset = configure_for_performance(dataset, batch_size=batch_size)
         elif 'validate' == split:
             dataset = dataset.skip(train_size)
             dataset = dataset.take(validate_size)
-            check_wrap_process_path(data_dir=image_path, image_size=IMG_SIZE_224)
-            dataset = dataset.map(_process_path, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-            dataset = configure_for_performance(dataset, batch_size=batch_size)
+
+    check_wrap_process_path(data_dir=image_path, image_size=IMG_SIZE_224)
+    decode_dataset = dataset.map(_process_path, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+
+    if split == 'train':
+        global preprocess_for_train
+        if not preprocess_for_train:
+            preprocess_for_train = wrapped_partial(
+                _preprocess_for_train,
+                aug_method=aug_method,
+                image_size=IMG_SIZE_224
+            )
+        decode_dataset = decode_dataset.map(preprocess_for_train)
+    else:
+        global preprocess_for_eval
+        if not preprocess_for_eval:
+            preprocess_for_eval = wrapped_partial(
+                _preprocess_for_eval,
+                image_size=IMG_SIZE_224
+            )
+        decode_dataset = decode_dataset.map(preprocess_for_eval)
+
+    dataset = configure_for_performance(decode_dataset, batch_size=batch_size)
 
     if repeat:
         dataset = dataset.repeat()
