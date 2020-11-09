@@ -155,7 +155,7 @@ def create_predict_module(num_classes, name):
     module = Sequential([
         keras.layers.GlobalAveragePooling2D(name='{}_global'.format(name)),
         layers.Dropout(0.2, name='{}_droupout'.format(name)),
-        layers.Dense(num_classes, name='{}_fc'.format(name))
+        layers.Dense(num_classes, activation=tf.keras.activations.linear, name='{}_fc'.format(name))
     ])
     return module
 

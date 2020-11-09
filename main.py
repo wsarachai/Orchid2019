@@ -93,7 +93,7 @@ def main(unused_argv):
                                                    weights='imagenet')
 
     global_average_layer = tf.keras.layers.GlobalAveragePooling2D()
-    prediction_layer = tf.keras.layers.Dense(num_classes)
+    prediction_layer = tf.keras.layers.Dense(num_classes, activation=tf.keras.activations.linear)
 
     data_augmentation = tf.keras.Sequential([
         tf.keras.layers.experimental.preprocessing.RandomFlip('horizontal'),
