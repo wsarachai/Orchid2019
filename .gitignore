@@ -132,3 +132,4 @@ dmypy.json
 
 #training log
 *.out
+*.txt
