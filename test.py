@@ -3,105 +3,106 @@ from __future__ import division
 from __future__ import print_function
 
 import os
-
 import tensorflow as tf
 import matplotlib.pyplot as plt
 from data import data_utils
 from data.data_utils import dataset_mapping
 from lib_utils import start
-from tensorflow import keras
-from tensorflow.keras import layers
-from tensorflow.keras.models import Sequential
-from nets.mobilenet_v2 import create_mobilenet_v2, IMG_SHAPE_224
 
+flags = tf.compat.v1.flags
 logging = tf.compat.v1.logging
+FLAGS = flags.FLAGS
+
+flags.DEFINE_string('tf_record_dir', '/Volumes/Data/_dataset/_orchids_dataset/orchids52_data/v1/tf-records',
+                    'TF record data directory')
+
+flags.DEFINE_boolean('exp_decay', False,
+                     'Exponential decay learning rate')
+
+flags.DEFINE_integer('batch_size', 32,
+                     'Batch size')
+
+flags.DEFINE_integer('total_epochs', 100,
+                     'Total epochs')
+
+flags.DEFINE_integer('start_state', 1,
+                     'Start state')
+
+flags.DEFINE_integer('end_state', 5,
+                     'End state')
+
+flags.DEFINE_float('learning_rate', 0.001,
+                   'Learning Rate')
+
+flags.DEFINE_string('aug_method', 'fast',
+                    'Augmentation Method')
 
 
 def main(unused_argv):
     logging.debug(unused_argv)
-    batch_size = 32
+    num_classes = 52
     data_path = os.environ['DATA_DIR'] or '/Volumes/Data/_dataset/_orchids_dataset'
     data_dir = os.path.join(data_path, 'orchids52_data')
-    load_dataset = dataset_mapping[data_utils.ORCHIDS52_V1_TFRECORD]
-    train_ds = load_dataset(split="train", batch_size=batch_size, root_path=data_dir)
-    validate_ds = load_dataset(split="validate", batch_size=batch_size, root_path=data_dir)
+    load_dataset = dataset_mapping[data_utils.ORCHIDS52_V2_FILE]
 
-    train_step = train_ds.size // batch_size
-    validate_step = validate_ds.size // batch_size
+    train_ds = load_dataset(split="train",
+                            batch_size=FLAGS.batch_size,
+                            root_path=data_dir,
+                            aug_method=FLAGS.aug_method)
+    validate_ds = load_dataset(split="validate", batch_size=FLAGS.batch_size, root_path=data_dir)
+    test_ds = load_dataset(split="test", batch_size=FLAGS.batch_size, root_path=data_dir)
 
-    data_augmentation = Sequential([
-            layers.experimental.preprocessing.RandomCrop(200, 200),
-            layers.experimental.preprocessing.RandomFlip("horizontal",input_shape=(224, 224, 3)),
-            layers.experimental.preprocessing.RandomRotation(0.1)
-        ])
+    for images, _ in train_ds.take(1):
+        for i in range(9):
+            ax = plt.subplot(3, 3, i + 1)
+            plt.imshow(images[i].numpy().astype("uint8"))
+            plt.title(str(i))
+            plt.axis("off")
+        plt.show()
 
-    # for images, labels in train_ds.take(1):
-    #     for i in range(9):
-    #         augmented_images = data_augmentation(images)
-    #         ax = plt.subplot(3, 3, i + 1)
-    #         plt.imshow(augmented_images[i].numpy().astype("uint8"))
-    #         plt.title(str(i))
-    #         plt.axis("off")
-    #     plt.show()
+    IMG_SHAPE = (224, 224, 3)
+    base_model = tf.keras.applications.MobileNetV2(input_shape=IMG_SHAPE,
+                                                   alpha=1.4,
+                                                   include_top=False,
+                                                   weights='imagenet')
 
-    # model = Sequential([
-    #     data_augmentation,
-    #     layers.experimental.preprocessing.Rescaling(1. / 255),
-    #     layers.Conv2D(16, 3, padding='same', activation='relu'),
-    #     layers.MaxPooling2D(),
-    #     layers.Conv2D(32, 3, padding='same', activation='relu'),
-    #     layers.MaxPooling2D(),
-    #     layers.Conv2D(64, 3, padding='same', activation='relu'),
-    #     layers.MaxPooling2D(),
-    #     layers.Dropout(0.2),
-    #     layers.Flatten(),
-    #     layers.Dense(128, activation='relu'),
-    #     layers.Dense(52)
-    # ])
+    global_average_layer = tf.keras.layers.GlobalAveragePooling2D()
+    prediction_layer = tf.keras.layers.Dense(num_classes, activation=tf.keras.activations.linear)
 
-    inputs = layers.Input(shape=(224, 224, 3), batch_size=batch_size)
-
-    base_model = create_mobilenet_v2(input_tensor=inputs,
-                                     alpha=1.4,
-                                     include_top=False,
-                                     weights='imagenet',
-                                     sub_name='02')
+    data_augmentation = tf.keras.Sequential([
+        tf.keras.layers.experimental.preprocessing.RandomFlip('horizontal'),
+        tf.keras.layers.experimental.preprocessing.RandomRotation(0.2),
+    ])
 
     preprocess_input = tf.keras.applications.mobilenet_v2.preprocess_input
+
+    inputs = tf.keras.Input(shape=IMG_SHAPE)
     x = data_augmentation(inputs)
     x = preprocess_input(x)
     x = base_model(x, training=False)
-    x = tf.keras.layers.GlobalAveragePooling2D()(x)
+    x = global_average_layer(x)
     x = tf.keras.layers.Dropout(0.2)(x)
-    outputs = tf.keras.layers.Dense(52)(x)
+    outputs = prediction_layer(x)
     model = tf.keras.Model(inputs, outputs)
 
-    # optimizer = keras.optimizers.RMSprop()
-    # model.compile(loss=keras.losses.CategoricalCrossentropy(from_logits=True),
-    #               optimizer=optimizer,
-    #               metrics=['accuracy'])
+    # Freeze all the layers except for dense layer
+    for layer in base_model.layers:
+        layer.trainable = False
 
-    model.compile(optimizer='adam',
-                  loss=tf.keras.losses.CategoricalCrossentropy(from_logits=True),
+    base_learning_rate = 0.0001
+    model.compile(loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
+                  optimizer=tf.keras.optimizers.RMSprop(lr=base_learning_rate),
                   metrics=['accuracy'])
 
-    base_model.trainable = False
-
     model.summary()
+    total_epochs = 50
 
-    # for inp, labels in train_ds:
-    #     result = model(inp)
-    #     print(result)
+    history_fine = model.fit(train_ds,
+                             epochs=total_epochs,
+                             validation_data=validate_ds)
 
-    summary = model.fit(train_ds,
-                        epochs=100,
-                        validation_data=validate_ds,
-                        validation_steps=validate_step,
-                        initial_epoch=1,
-                        steps_per_epoch=train_step)
-
-    img, lbl = next(iter(train_ds))
-    print(lbl)
+    loss, accuracy = model.evaluate(test_ds)
+    print('Test accuracy :', accuracy)
 
 
 if __name__ == '__main__':

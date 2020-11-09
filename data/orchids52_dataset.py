@@ -64,10 +64,10 @@ def _preprocess_for_train(image, label_values, aug_method, image_size):
     distorted_image = apply_random_selector(cast_image)
 
     num_distort_cases = 4
-    distort_method = True if aug_method == 'fast' else False
+    fast_mode = True if aug_method == 'fast' else False
     distorted_image = apply_with_random_selector(
         distorted_image,
-        lambda x, ordering: distort_color(x, ordering, distort_method),
+        lambda x, ordering: distort_color(x, ordering, fast_mode),
         num_cases=num_distort_cases)
 
     flip_image = tf.image.random_flip_left_right(distorted_image)

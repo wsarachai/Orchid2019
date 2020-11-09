@@ -2,9 +2,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import numpy as np
 import os
-import pathlib
 import tensorflow as tf
 
 from data import data_utils
@@ -40,42 +38,12 @@ flags.DEFINE_string('aug_method', 'fast',
                     'Augmentation Method')
 
 
-# def get_label(file_path):
-#     parts = tf.strings.split(file_path, os.path.sep)
-#     one_hot = parts[-2] == class_names
-#     return tf.cast(one_hot, tf.float32)
-#
-#
-# def decode_img(img):
-#     # convert the compressed string to a 3D uint8 tensor
-#     img = tf.image.decode_jpeg(img, channels=3)
-#     # resize the image to the desired size
-#     return tf.image.resize(img, IMG_SIZE)
-#
-#
-# def process_path(file_path):
-#     label = get_label(file_path)
-#     # load the raw data from the file as a string
-#     img = tf.io.read_file(file_path)
-#     img = decode_img(img)
-#     return img, label
-#
-#
-# def configure_for_performance(ds, batch_size=32):
-#     ds = ds.cache()
-#     ds = ds.shuffle(buffer_size=1000)
-#     ds = ds.batch(batch_size)
-#     ds = ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
-#     return ds
-
-
 def main(unused_argv):
     logging.debug(unused_argv)
     num_classes = 52
     workspace_path = os.environ['WORKSPACE'] or '/Volumes/Data/tmp'
     data_path = os.environ['DATA_DIR'] or '/Volumes/Data/_dataset/_orchids_dataset'
     data_dir = os.path.join(data_path, 'orchids52_data')
-    checkpoint_path = os.path.join(workspace_path, 'orchids-models', 'orchids2019')
     load_dataset = dataset_mapping[data_utils.ORCHIDS52_V2_FILE]
 
     train_ds = load_dataset(split="train",
@@ -123,9 +91,9 @@ def main(unused_argv):
     model.summary()
     total_epochs = 50
 
-    history_fine = model.fit(train_ds,
-                             epochs=total_epochs,
-                             validation_data=validate_ds)
+    model.fit(train_ds,
+              epochs=total_epochs,
+              validation_data=validate_ds)
 
     loss, accuracy = model.evaluate(test_ds)
     print('Test accuracy :', accuracy)
