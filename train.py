@@ -32,6 +32,9 @@ flags.DEFINE_integer('total_epochs', 100,
 flags.DEFINE_integer('start_state', 1,
                      'Start state')
 
+flags.DEFINE_integer('end_state', 5,
+                     'End state')
+
 flags.DEFINE_float('learning_rate', 0.001,
                    'Learning Rate')
 
@@ -143,7 +146,7 @@ def main(unused_argv):
     if not tf.io.gfile.exists(checkpoint_path):
         tf.io.gfile.mkdir(checkpoint_path)
 
-    for train_step in range(FLAGS.start_state, 5):
+    for train_step in range(FLAGS.start_state, FLAGS.end_state):
         if train_step == 1:
             batch_size = FLAGS.batch_size
         else:
