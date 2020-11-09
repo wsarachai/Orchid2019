@@ -103,12 +103,12 @@ class TrainClassifier:
                     num_steps = logs.pop('num_steps', 1)
                     seen += num_steps
                     progbar.update(seen, list(logs.items()), finalize=False)
-                else:
-                    logging.error('\n{epoch}: Error batch size {b1} != {b2}.'.format(
-                        epoch=epoch,
-                        b1=batch_size,
-                        b2=inputs.shape.as_list()[0]
-                    ))
+                # else:
+                #     logging.error('\n{epoch}: Error batch size {b1} != {b2}.'.format(
+                #         epoch=epoch,
+                #         b1=batch_size,
+                #         b2=inputs.shape.as_list()[0]
+                #     ))
 
             self.reset_metric()
 
