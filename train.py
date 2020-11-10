@@ -163,7 +163,11 @@ def main(unused_argv):
                              step=training_step)
 
         latest, epoch = latest_checkpoint(checkpoint_path, training_step)
-        model.load_model_weights(checkpoint_path, epoch)
+        if latest:
+            model.resume_model_weights(latest)
+        else:
+            model.load_model_weights(checkpoint_path, epoch)
+            epoch = 0
 
         model.summary()
 

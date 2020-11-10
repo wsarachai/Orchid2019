@@ -57,27 +57,43 @@ class Orchids52Mobilenet140(keras.Model):
         elif step == nets.nets_utils.TRAIN_V2_STEP2:
             self.set_mobilenet_training_status(True)
 
-    def save_model_weights(self, filepath, epoch, overwrite=True, save_format=None):
+    def save_model(self,
+                   filepath,
+                   epoch,
+                   overwrite=True,
+                   include_optimizer=True,
+                   save_format=None,
+                   signatures=None,
+                   options=None):
         model_path = os.path.join(filepath, self.step)
         if not tf.io.gfile.exists(model_path):
             tf.io.gfile.mkdir(model_path)
-        super(Orchids52Mobilenet140, self).save_weights(filepath=get_checkpoint_file(model_path, epoch),
-                                                        overwrite=overwrite,
-                                                        save_format=save_format)
+        super(Orchids52Mobilenet140, self).save(filepath=get_checkpoint_file(model_path, epoch),
+                                                overwrite=overwrite,
+                                                include_optimizer=include_optimizer,
+                                                save_format=save_format,
+                                                signatures=signatures,
+                                                options=options)
         if self.base_model:
             base_model_path = os.path.join(filepath, 'base_model')
             if not tf.io.gfile.exists(base_model_path):
                 tf.io.gfile.mkdir(base_model_path)
-            self.base_model.save_weights(filepath=get_checkpoint_file(base_model_path, 0),
-                                         overwrite=overwrite,
-                                         save_format=save_format)
+            self.base_model.save(filepath=get_checkpoint_file(base_model_path, 0),
+                                 overwrite=overwrite,
+                                 include_optimizer=include_optimizer,
+                                 save_format=save_format,
+                                 signatures=signatures,
+                                 options=options)
         if self.branch_model:
             branch_model_path = os.path.join(filepath, 'branch_model')
             if not tf.io.gfile.exists(branch_model_path):
                 tf.io.gfile.mkdir(branch_model_path)
-            self.branch_model.save_weights(filepath=get_checkpoint_file(branch_model_path, 0),
-                                           overwrite=overwrite,
-                                           save_format=save_format)
+            self.branch_model.save(filepath=get_checkpoint_file(branch_model_path, 0),
+                                   overwrite=overwrite,
+                                   include_optimizer=include_optimizer,
+                                   save_format=save_format,
+                                   signatures=signatures,
+                                   options=options)
         if self.predict_models:
             predict_model_path = os.path.join(filepath, 'predict_model')
             if not tf.io.gfile.exists(predict_model_path):
@@ -86,9 +102,12 @@ class Orchids52Mobilenet140(keras.Model):
                 model_path = os.path.join(predict_model_path, '{:02d}'.format(k))
                 if not tf.io.gfile.exists(model_path):
                     tf.io.gfile.mkdir(model_path)
-                m.save_weights(filepath=get_checkpoint_file(model_path, 0),
-                               overwrite=overwrite,
-                               save_format=save_format)
+                m.save(filepath=get_checkpoint_file(model_path, 0),
+                       overwrite=overwrite,
+                       include_optimizer=include_optimizer,
+                       save_format=save_format,
+                       signatures=signatures,
+                       options=options)
 
     def load_model_step1(self, filepath, epoch, by_name=False, skip_mismatch=False):
         predict_model_path = os.path.join(filepath, 'predict_model', '00')
