@@ -90,6 +90,14 @@ class Orchids52Mobilenet140(keras.Model):
                                overwrite=overwrite,
                                save_format=save_format)
 
+    def load_model_step1(self, filepath, epoch, by_name=False, skip_mismatch=False):
+        predict_model_path = os.path.join(filepath, 'predict_model', '00')
+        if tf.io.gfile.exists(predict_model_path):
+            for m in self.predict_models:
+                m.load_weights(filepath=get_checkpoint_file(predict_model_path, epoch),
+                               by_name=by_name,
+                               skip_mismatch=skip_mismatch)
+
     def load_model_step2(self, filepath, epoch, by_name=False, skip_mismatch=False):
         base_model_path = os.path.join(filepath, 'base_model')
         self.base_model.load_weights(filepath=get_checkpoint_file(base_model_path, epoch),
@@ -122,7 +130,9 @@ class Orchids52Mobilenet140(keras.Model):
                            by_name=False,
                            skip_mismatch=False):
         self.config_layers(self.step)
-        if self.step == nets.nets_utils.TRAIN_STEP2:
+        if self.step == nets.nets_utils.TRAIN_STEP1:
+            self.load_model_step1(checkpoint_path, epoch, by_name, skip_mismatch)
+        elif self.step == nets.nets_utils.TRAIN_STEP2:
             self.load_model_step2(checkpoint_path, epoch, by_name, skip_mismatch)
         elif self.step == nets.nets_utils.TRAIN_STEP3:
             self.load_model_step3(checkpoint_path, epoch, by_name, skip_mismatch)
