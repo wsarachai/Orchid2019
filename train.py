@@ -44,7 +44,8 @@ class TrainClassifier:
     def __init__(self, model, learning_rate, batch_size):
         self.model = model
         self.optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate)
-        self.loss_fn = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
+        self.loss_fn = tf.keras.losses.CategoricalCrossentropy(from_logits=True,
+                                                               reduction=tf.keras.losses.Reduction.NONE)
         self.loss_metric = tf.keras.metrics.Mean(name='train_loss')
         self.accuracy_metric = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
         self.batch_size = batch_size
@@ -57,7 +58,10 @@ class TrainClassifier:
     def train_step(self, inputs, labels):
         with tf.GradientTape() as tape:
             predictions = self.model(inputs, training=True)
-            total_loss = self.loss_fn(labels, predictions)
+            loss = self.loss_fn(labels, predictions)
+            loss = tf.reduce_sum(loss) * (1. / self.batch_size)
+            regularization_loss = tf.reduce_sum(self.model.losses)
+            total_loss = regularization_loss + loss
 
         gradients = tape.gradient(total_loss, self.model.trainable_variables)
         self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))

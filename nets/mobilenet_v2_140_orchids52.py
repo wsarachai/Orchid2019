@@ -197,6 +197,7 @@ def create_orchid_mobilenet_v2_14(num_classes,
     else:
         step = ''
 
+    b_loss = None
     stn_dense = None
     branch_base_model = None
     branches_prediction_models = []
@@ -225,8 +226,8 @@ def create_orchid_mobilenet_v2_14(num_classes,
         stn_dense = Sequential([
             layers.Conv2D(128, [1, 1], activation='relu', name="t2_stn_conv2d_resize_128"),
             layers.Flatten(name='t2_stn_flatten'),
+            layers.Dense(128, name='t2_stn_dense_128'),
             keras.layers.Dropout(rate=0.2, name='t2_stn_dropout'),
-            layers.Dense(128, activation='relu', name='t2_stn_dense_128'),
             layers.Dense(fc_num, activation='tanh', activity_regularizer='l2', name='t1_dense_6')
         ])
 
@@ -242,7 +243,7 @@ def create_orchid_mobilenet_v2_14(num_classes,
         if is_training:
             _len = bound_err.get_shape().as_list()[0]
             bound_std = tf.constant(np.full(_len, 0.00, dtype=np.float32))
-            tf.losses.mean_squared_error(bound_err, bound_std)
+            b_loss = tf.losses.mean_squared_error(bound_err, bound_std)
 
         all_images = []
         for img in stn_inputs:
@@ -302,4 +303,6 @@ def create_orchid_mobilenet_v2_14(num_classes,
                                   branch_model=branch_base_model,
                                   is_training=is_training,
                                   step=step)
+    if b_loss:
+        model.add_loss(b_loss)
     return model
