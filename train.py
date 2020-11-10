@@ -85,7 +85,14 @@ class TrainClassifier:
         self.loss_metric.reset_states()
         self.accuracy_metric.reset_states()
 
-    def fit(self, initial_epoch, epoches, train_ds, validate_ds, batch_size, checkpoint_path):
+    def fit(self,
+            initial_epoch,
+            epoches,
+            train_ds,
+            validate_ds,
+            test_ds,
+            batch_size,
+            checkpoint_path):
         logs = None
         target = train_ds.size // batch_size
         progbar = tf.keras.utils.Progbar(
@@ -119,9 +126,15 @@ class TrainClassifier:
             for inputs, labels in validate_ds:
                 if inputs.shape.as_list()[0] == self.batch_size:
                     logs = self.evaluate_step(inputs, labels)
-
             logs = copy.copy(logs) if logs else {}
             print(', val_loss: {:.3f}, val_accuracy: {:.3f}'.format(logs['loss'], logs['accuracy']))
+
+            if epoch % 20 == 0:
+                for inputs, labels in test_ds:
+                    if inputs.shape.as_list()[0] == self.batch_size:
+                        logs = self.evaluate_step(inputs, labels)
+                logs = copy.copy(logs) if logs else {}
+                print('\ntest_loss: {:.3f}, test_accuracy: {:.3f}'.format(logs['loss'], logs['accuracy']))
 
             if val_accuracy < logs['accuracy'].numpy() or val_loss > logs['loss'].numpy():
                 self.model.save_model_weights(checkpoint_path, epoch)
@@ -192,6 +205,7 @@ def main(unused_argv):
                         epoches=FLAGS.total_epochs,
                         train_ds=train_ds,
                         validate_ds=validate_ds,
+                        test_ds=test_ds,
                         batch_size=batch_size,
                         checkpoint_path=checkpoint_path)
 
