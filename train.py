@@ -179,15 +179,6 @@ def main(unused_argv):
                              batch_size=batch_size,
                              step=training_step)
 
-        latest, epoch = latest_checkpoint(checkpoint_path, training_step)
-        if latest:
-            model.resume_model_weights(latest)
-        else:
-            model.load_model_weights(checkpoint_path, epoch)
-            epoch = 0
-
-        model.summary()
-
         if FLAGS.exp_decay:
             base_learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(
                 initial_learning_rate=FLAGS.learning_rate,
@@ -200,6 +191,15 @@ def main(unused_argv):
                 base_learning_rate = 0.00001
 
         train_model = TrainClassifier(model=model, learning_rate=base_learning_rate, batch_size=batch_size)
+
+        latest, epoch = latest_checkpoint(checkpoint_path, training_step)
+        if latest:
+            model.resume_model_weights(latest)
+        else:
+            model.load_model_weights(checkpoint_path, epoch)
+            epoch = 0
+
+        model.summary()
 
         train_model.fit(initial_epoch=epoch,
                         epoches=FLAGS.total_epochs,
