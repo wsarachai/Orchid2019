@@ -49,6 +49,10 @@ class TrainClassifier:
         self.accuracy_metric = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
         self.batch_size = batch_size
 
+        self.model.compile(optimizer=self.optimizer,
+                           loss=self.loss_fn,
+                           metrics=[self.loss_metric, self.accuracy_metric])
+
     @tf.function
     def train_step(self, inputs, labels):
         with tf.GradientTape() as tape:
@@ -68,7 +72,7 @@ class TrainClassifier:
 
     @tf.function
     def evaluate_step(self, inputs, labels):
-        predictions = self.model(inputs, training=True)
+        predictions = self.model(inputs, training=False)
         total_loss = self.loss_fn(labels, predictions)
         self.loss_metric.update_state(total_loss)
         self.accuracy_metric.update_state(labels, predictions)
@@ -193,6 +197,11 @@ def main(unused_argv):
 
         print('Test accuracy: ')
         train_model.evaluate(datasets=test_ds, batch_size=batch_size)
+
+        model_path = os.path.join(checkpoint_path, str(train_step))
+        if not tf.io.gfile.exists(model_path):
+            tf.io.gfile.mkdir(model_path)
+        model.save(model_path)
 
 
 if __name__ == '__main__':

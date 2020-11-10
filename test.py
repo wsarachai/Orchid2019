@@ -52,13 +52,13 @@ def main(unused_argv):
     validate_ds = load_dataset(split="validate", batch_size=FLAGS.batch_size, root_path=data_dir)
     test_ds = load_dataset(split="test", batch_size=FLAGS.batch_size, root_path=data_dir)
 
-    for images, _ in train_ds.take(1):
-        for i in range(9):
-            ax = plt.subplot(3, 3, i + 1)
-            plt.imshow(images[i].numpy().astype("uint8"))
-            plt.title(str(i))
-            plt.axis("off")
-        plt.show()
+    # for images, _ in train_ds.take(1):
+    #     for i in range(9):
+    #         ax = plt.subplot(3, 3, i + 1)
+    #         plt.imshow(images[i].numpy().astype("uint8"))
+    #         plt.title(str(i))
+    #         plt.axis("off")
+    #     plt.show()
 
     IMG_SHAPE = (224, 224, 3)
     base_model = tf.keras.applications.MobileNetV2(input_shape=IMG_SHAPE,
