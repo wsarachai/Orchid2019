@@ -68,14 +68,14 @@ class Orchids52Mobilenet140(keras.Model):
             base_model_path = os.path.join(filepath, 'base_model')
             if not tf.io.gfile.exists(base_model_path):
                 tf.io.gfile.mkdir(base_model_path)
-            self.base_model.save_weights(filepath=get_checkpoint_file(base_model_path, epoch),
+            self.base_model.save_weights(filepath=get_checkpoint_file(base_model_path, 0),
                                          overwrite=overwrite,
                                          save_format=save_format)
         if self.branch_model:
             branch_model_path = os.path.join(filepath, 'branch_model')
             if not tf.io.gfile.exists(branch_model_path):
                 tf.io.gfile.mkdir(branch_model_path)
-            self.branch_model.save_weights(filepath=get_checkpoint_file(branch_model_path, epoch),
+            self.branch_model.save_weights(filepath=get_checkpoint_file(branch_model_path, 0),
                                            overwrite=overwrite,
                                            save_format=save_format)
         if self.predict_models:
@@ -86,7 +86,7 @@ class Orchids52Mobilenet140(keras.Model):
                 model_path = os.path.join(predict_model_path, '{:02d}'.format(k))
                 if not tf.io.gfile.exists(model_path):
                     tf.io.gfile.mkdir(model_path)
-                m.save_weights(filepath=get_checkpoint_file(model_path, epoch),
+                m.save_weights(filepath=get_checkpoint_file(model_path, 0),
                                overwrite=overwrite,
                                save_format=save_format)
 
