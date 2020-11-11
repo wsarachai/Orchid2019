@@ -213,7 +213,7 @@ def create_orchid_mobilenet_v2_14(num_classes,
     inputs = preprocess_input(inputs)
 
     # Create the base model from the pre-trained model MobileNet V2
-    stn_base_model = create_mobilenet_v2(input_shape=IMG_SHAPE_224,
+    stn_base_model = create_mobilenet_v2(input_tensor=inputs,
                                          alpha=1.4,
                                          include_top=False,
                                          weights='imagenet',
@@ -232,7 +232,6 @@ def create_orchid_mobilenet_v2_14(num_classes,
         ])
 
         stn_module = Sequential([
-            layers.InputLayer(input_tensor=inputs),
             stn_base_model,
             stn_dense
         ])
