@@ -30,7 +30,7 @@ flags.DEFINE_integer('start_state', 1,
 flags.DEFINE_integer('end_state', 5,
                      'End state')
 
-flags.DEFINE_float('learning_rate', 0.001,
+flags.DEFINE_float('learning_rate', 0.0001,
                    'Learning Rate')
 
 flags.DEFINE_string('aug_method', 'fast',

@@ -209,7 +209,8 @@ def create_orchid_mobilenet_v2_14(num_classes,
     batch_size = kwargs.pop('batch_size')
 
     inputs = keras.Input(shape=(default_image_size, default_image_size, 3), batch_size=batch_size)
-    inputs = data_augmentation(inputs)
+    if is_training:
+        inputs = data_augmentation(inputs)
     inputs = preprocess_input(inputs)
 
     # Create the base model from the pre-trained model MobileNet V2
