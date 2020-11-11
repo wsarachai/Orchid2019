@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import numpy as np
 import tensorflow as tf
+from tensorflow.python.keras.utils import tf_utils
 
 
 def get_pixel_value(img, x, y):
@@ -221,12 +222,8 @@ def pre_spatial_transformer_network(input_map,
                                     height,
                                     scales=None):
     # grab input dimensions
-    in_d = input_map.get_shape().as_list()
-    batch_size = in_d[0]
+    batch_size, _w = tf_utils.get_shapes(theta)
     out_size = (width, height)
-
-    _td = theta.get_shape().as_list()
-    _w = _td[1]
 
     thetas = []
     bound_err = []

@@ -2,16 +2,15 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
 import os
-
+import nets
 import numpy as np
 import tensorflow as tf
-from tensorflow.python.keras import Sequential
-
-import nets
 import tensorflow.keras as keras
+from tensorflow.python.keras.utils import tf_utils
+from tensorflow.python.keras import Sequential
 from tensorflow.keras import layers
-
 from lib_utils import get_checkpoint_file, latest_checkpoint
 from nets.mobilenet_v2 import default_image_size, create_mobilenet_v2, IMG_SHAPE_224
 from stn import pre_spatial_transformer_network
@@ -25,6 +24,7 @@ class Orchids52Mobilenet140(keras.Model):
                  stn_dense,
                  predict_models,
                  branch_model,
+                 boundary_loss,
                  is_training,
                  step):
         super(Orchids52Mobilenet140, self).__init__(inputs, outputs, trainable=is_training)
@@ -32,6 +32,7 @@ class Orchids52Mobilenet140(keras.Model):
         self.stn_dense = stn_dense
         self.predict_models = predict_models
         self.branch_model = branch_model
+        self.boundary_loss = boundary_loss
         self.is_training = is_training
         self.step = step
 
@@ -178,11 +179,11 @@ class Orchids52Mobilenet140(keras.Model):
             filepath=filepath, by_name=by_name, skip_mismatch=skip_mismatch)
 
 
-def create_predict_module(num_classes, name):
+def create_predict_module(num_classes, name, activation='softmax'):
     module = Sequential([
         keras.layers.GlobalAveragePooling2D(name='{}_global'.format(name)),
         layers.Dropout(0.2, name='{}_droupout'.format(name)),
-        layers.Dense(num_classes, activation=tf.keras.activations.linear, name='{}_fc'.format(name))
+        layers.Dense(num_classes, activation=activation, name='{}_fc'.format(name))
     ])
     return module
 
@@ -197,9 +198,9 @@ def create_orchid_mobilenet_v2_14(num_classes,
     else:
         step = ''
 
-    b_loss = None
     stn_dense = None
     branch_base_model = None
+    boundary_loss = None
     branches_prediction_models = []
     data_augmentation = keras.Sequential([
         keras.layers.experimental.preprocessing.RandomFlip('horizontal'),
@@ -231,19 +232,23 @@ def create_orchid_mobilenet_v2_14(num_classes,
             layers.Dense(fc_num, activation='tanh', activity_regularizer='l2', name='t1_dense_6')
         ])
 
-        x = stn_base_model(inputs)
-        h_fc1 = stn_dense(x)
+        stn_module = Sequential([
+            stn_base_model,
+            stn_dense
+        ])
+
+        h_fc = stn_module(inputs)
 
         stn_inputs, bound_err = pre_spatial_transformer_network(inputs,
-                                                                h_fc1,
+                                                                h_fc,
                                                                 width=default_image_size,
                                                                 height=default_image_size,
                                                                 scales=scales)
 
         if is_training:
-            _len = bound_err.get_shape().as_list()[0]
+            _len = tf_utils.get_shapes(bound_err)[0]
             bound_std = tf.constant(np.full(_len, 0.00, dtype=np.float32))
-            b_loss = tf.losses.mean_squared_error(bound_err, bound_std)
+            boundary_loss = keras.Model(inputs, tf.keras.losses.MSE(bound_err, bound_std))
 
         all_images = []
         for img in stn_inputs:
@@ -301,8 +306,15 @@ def create_orchid_mobilenet_v2_14(num_classes,
                                   stn_dense=stn_dense,
                                   predict_models=branches_prediction_models,
                                   branch_model=branch_base_model,
+                                  boundary_loss=boundary_loss,
                                   is_training=is_training,
                                   step=step)
-    if b_loss:
-        model.add_loss(b_loss)
     return model
+
+
+def _handle_boundary_loss(name, variable, error_fn):
+    def _loss_for_boundary(v):
+        with tf.name_scope(name + '/boundary_loss'):
+            regularization = error_fn(v)
+        return regularization
+    return functools.partial(_loss_for_boundary, variable)

@@ -4,9 +4,7 @@ from __future__ import print_function
 
 import copy
 import os
-
 import tensorflow as tf
-
 from data import data_utils, orchids52_dataset
 from data.data_utils import dataset_mapping
 from lib_utils import start, latest_checkpoint
@@ -58,10 +56,11 @@ class TrainClassifier:
     def train_step(self, inputs, labels):
         with tf.GradientTape() as tape:
             predictions = self.model(inputs, training=True)
+            b_loss = self.model.boundary_loss(inputs, training=True)
             loss = self.loss_fn(labels, predictions)
             loss = tf.reduce_sum(loss) * (1. / self.batch_size)
             regularization_loss = tf.reduce_sum(self.model.losses)
-            total_loss = regularization_loss + loss
+            total_loss = regularization_loss + loss + b_loss
 
         gradients = tape.gradient(total_loss, self.model.trainable_variables)
         self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))

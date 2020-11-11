@@ -4,7 +4,6 @@ from __future__ import print_function
 
 import os
 import tensorflow as tf
-from tensorflow.python.keras import layers
 from tensorflow.python.keras import backend
 from tensorflow.python.keras.engine import training
 from tensorflow.python.keras.utils import data_utils
@@ -18,6 +17,7 @@ BASE_WEIGHT_PATH = ('https://storage.googleapis.com/tensorflow/'
 default_image_size = 224
 IMG_SIZE_224 = (default_image_size, default_image_size)
 IMG_SHAPE_224 = IMG_SIZE_224 + (3,)
+regularizers_l2 = 0.0001
 
 
 def _inverted_res_block(name, inputs, expansion, stride, alpha, filters, block_id):
@@ -38,7 +38,7 @@ def _inverted_res_block(name, inputs, expansion, stride, alpha, filters, block_i
             padding='same',
             use_bias=False,
             activation=None,
-            kernel_regularizer=tf.keras.regularizers.l2(0.01),
+            kernel_regularizer=tf.keras.regularizers.l2(regularizers_l2),
             name=prefix + 'expand')(
             x)
         x = layers.BatchNormalization(
@@ -80,7 +80,7 @@ def _inverted_res_block(name, inputs, expansion, stride, alpha, filters, block_i
         padding='same',
         use_bias=False,
         activation=None,
-        kernel_regularizer=tf.keras.regularizers.l2(0.01),
+        kernel_regularizer=tf.keras.regularizers.l2(regularizers_l2),
         name=prefix + 'project')(
         x)
     x = layers.BatchNormalization(
@@ -253,7 +253,7 @@ def create_mobilenet_v2(input_shape=None,
         strides=(2, 2),
         padding='valid',
         use_bias=False,
-        kernel_regularizer=tf.keras.regularizers.l2(0.01),
+        kernel_regularizer=tf.keras.regularizers.l2(regularizers_l2),
         name='%s_Conv1' % model_name)(x)
     x = layers.BatchNormalization(
         axis=channel_axis, epsilon=1e-3, momentum=0.999, name='%s_bn_Conv1' % model_name)(x)
