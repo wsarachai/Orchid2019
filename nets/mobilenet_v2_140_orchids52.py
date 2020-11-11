@@ -178,7 +178,7 @@ class Orchids52Mobilenet140(keras.Model):
             filepath=filepath, by_name=by_name, skip_mismatch=skip_mismatch)
 
 
-def create_predict_module(num_classes, name, activation='softmax'):
+def create_predict_module(num_classes, name, activation='linear'):
     module = Sequential([
         keras.layers.GlobalAveragePooling2D(name='{}_global'.format(name)),
         layers.Dropout(0.2, name='{}_droupout'.format(name)),
