@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import os
 import tensorflow as tf
+from tensorflow.python.keras import layers
 from tensorflow.python.keras import backend
 from tensorflow.python.keras.engine import training
 from tensorflow.python.keras.utils import data_utils
