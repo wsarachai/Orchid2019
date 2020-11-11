@@ -42,8 +42,8 @@ class TrainClassifier:
     def __init__(self, model, learning_rate, batch_size):
         self.model = model
         self.optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate)
-        self.loss_fn = tf.keras.losses.CategoricalCrossentropy(from_logits=True,
-                                                               reduction=tf.keras.losses.Reduction.NONE)
+        self.loss_fn = tf.keras.losses.BinaryCrossentropy(from_logits=True,
+                                                          reduction=tf.keras.losses.Reduction.NONE)
         self.train_loss_metric = tf.keras.metrics.Mean(name='train_loss')
         self.regularization_loss_metric = tf.keras.metrics.Mean(name='regularization_loss')
         self.boundary_loss_metric = tf.keras.metrics.Mean(name='boundary_loss')
