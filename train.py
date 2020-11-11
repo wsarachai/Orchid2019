@@ -46,6 +46,7 @@ class TrainClassifier:
                                                                reduction=tf.keras.losses.Reduction.NONE)
         self.train_loss_metric = tf.keras.metrics.Mean(name='train_loss')
         self.regularization_loss_metric = tf.keras.metrics.Mean(name='regularization_loss')
+        self.boundary_loss_metric = tf.keras.metrics.Mean(name='boundary_loss')
         self.total_loss_metric = tf.keras.metrics.Mean(name='total_loss')
         self.accuracy_metric = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
         self.batch_size = batch_size
@@ -55,6 +56,7 @@ class TrainClassifier:
                            metrics=[
                                self.train_loss_metric,
                                self.regularization_loss_metric,
+                               self.boundary_loss_metric,
                                self.total_loss_metric,
                                self.accuracy_metric
                            ])
@@ -78,12 +80,14 @@ class TrainClassifier:
 
         self.train_loss_metric.update_state(train_loss)
         self.regularization_loss_metric.update_state(regularization_loss)
+        self.boundary_loss_metric.update_state(boundary_loss)
         self.total_loss_metric.update_state(total_loss)
         self.accuracy_metric.update_state(labels, predictions)
 
         return {
             'train_loss': self.train_loss_metric.result(),
             'regularization_loss': self.regularization_loss_metric.result(),
+            'boundary_loss': self.boundary_loss_metric.result(),
             'total_loss': self.total_loss_metric.result(),
             'accuracy': self.accuracy_metric.result()
         }
@@ -102,6 +106,7 @@ class TrainClassifier:
     def reset_metric(self):
         self.train_loss_metric.reset_states()
         self.regularization_loss_metric.reset_states()
+        self.boundary_loss_metric.reset_states()
         self.total_loss_metric.reset_states()
         self.accuracy_metric.reset_states()
 
@@ -117,7 +122,7 @@ class TrainClassifier:
         target = train_ds.size // batch_size
         progbar = tf.keras.utils.Progbar(
             target, width=30, verbose=1, interval=0.05,
-            stateful_metrics={'train_loss', 'regularization_loss', 'total_loss', 'accuracy'},
+            stateful_metrics={'train_loss', 'regularization_loss', 'boundary_loss', 'total_loss', 'accuracy'},
             unit_name='step'
         )
         val_accuracy = 0.0
