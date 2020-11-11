@@ -8,7 +8,6 @@ import nets
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
-from tensorflow.python.keras.utils import tf_utils
 from tensorflow.python.keras import Sequential
 from tensorflow.keras import layers
 from lib_utils import get_checkpoint_file, latest_checkpoint
@@ -214,7 +213,7 @@ def create_orchid_mobilenet_v2_14(num_classes,
     inputs = preprocess_input(inputs)
 
     # Create the base model from the pre-trained model MobileNet V2
-    stn_base_model = create_mobilenet_v2(input_tensor=inputs,
+    stn_base_model = create_mobilenet_v2(input_shape=IMG_SHAPE_224,
                                          alpha=1.4,
                                          include_top=False,
                                          weights='imagenet',
@@ -233,6 +232,7 @@ def create_orchid_mobilenet_v2_14(num_classes,
         ])
 
         stn_module = Sequential([
+            layers.InputLayer(input_tensor=inputs),
             stn_base_model,
             stn_dense
         ])
@@ -246,7 +246,7 @@ def create_orchid_mobilenet_v2_14(num_classes,
                                                                 scales=scales)
 
         if is_training:
-            _len = tf_utils.get_shapes(bound_err)[0]
+            _len = bound_err.shape[0]
             bound_std = tf.constant(np.full(_len, 0.00, dtype=np.float32))
             boundary_loss = keras.Model(inputs, tf.keras.losses.MSE(bound_err, bound_std))
 
