@@ -38,7 +38,7 @@ def _inverted_res_block(name, inputs, expansion, stride, alpha, filters, block_i
             padding='same',
             use_bias=False,
             activation=None,
-            kernel_regularizer=tf.keras.regularizers.L2(0.01),
+            kernel_regularizer=tf.keras.regularizers.l2(0.01),
             name=prefix + 'expand')(
             x)
         x = layers.BatchNormalization(
@@ -80,7 +80,7 @@ def _inverted_res_block(name, inputs, expansion, stride, alpha, filters, block_i
         padding='same',
         use_bias=False,
         activation=None,
-        kernel_regularizer=tf.keras.regularizers.L2(0.01),
+        kernel_regularizer=tf.keras.regularizers.l2(0.01),
         name=prefix + 'project')(
         x)
     x = layers.BatchNormalization(
@@ -253,7 +253,7 @@ def create_mobilenet_v2(input_shape=None,
         strides=(2, 2),
         padding='valid',
         use_bias=False,
-        kernel_regularizer=tf.keras.regularizers.L2(0.01),
+        kernel_regularizer=tf.keras.regularizers.l2(0.01),
         name='%s_Conv1' % model_name)(x)
     x = layers.BatchNormalization(
         axis=channel_axis, epsilon=1e-3, momentum=0.999, name='%s_bn_Conv1' % model_name)(x)
