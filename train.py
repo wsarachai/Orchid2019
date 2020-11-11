@@ -44,34 +44,47 @@ class TrainClassifier:
         self.optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate)
         self.loss_fn = tf.keras.losses.CategoricalCrossentropy(from_logits=True,
                                                                reduction=tf.keras.losses.Reduction.NONE)
-        self.loss_metric = tf.keras.metrics.Mean(name='train_loss')
+        self.train_loss_metric = tf.keras.metrics.Mean(name='train_loss')
+        self.regularization_loss_metric = tf.keras.metrics.Mean(name='regularization_loss')
+        self.total_loss_metric = tf.keras.metrics.Mean(name='total_loss')
         self.accuracy_metric = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
         self.batch_size = batch_size
 
         self.model.compile(optimizer=self.optimizer,
                            loss=self.loss_fn,
-                           metrics=[self.loss_metric, self.accuracy_metric])
+                           metrics=[
+                               self.train_loss_metric,
+                               self.regularization_loss_metric,
+                               self.total_loss_metric,
+                               self.accuracy_metric
+                           ])
 
     @tf.function
     def train_step(self, inputs, labels):
+        boundary_loss = 0.
+        train_loss = 0.
+        regularization_loss = 0.
         with tf.GradientTape() as tape:
-            b_loss = 0.
             predictions = self.model(inputs, training=True)
             if self.model.boundary_loss:
-                b_loss = self.model.boundary_loss(inputs, training=True)
-            loss = self.loss_fn(labels, predictions)
-            loss = tf.reduce_sum(loss) * (1. / self.batch_size)
+                boundary_loss = self.model.boundary_loss(inputs, training=True)
+            train_loss = self.loss_fn(labels, predictions)
+            train_loss = tf.reduce_sum(train_loss) * (1. / self.batch_size)
             regularization_loss = tf.reduce_sum(self.model.losses)
-            total_loss = regularization_loss + loss + b_loss
+            total_loss = regularization_loss + train_loss + boundary_loss
 
         gradients = tape.gradient(total_loss, self.model.trainable_variables)
         self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
 
-        self.loss_metric.update_state(total_loss)
+        self.train_loss_metric.update_state(train_loss)
+        self.regularization_loss_metric.update_state(regularization_loss)
+        self.total_loss_metric.update_state(total_loss)
         self.accuracy_metric.update_state(labels, predictions)
 
         return {
-            'loss': self.loss_metric.result(),
+            'train_loss': self.train_loss_metric.result(),
+            'regularization_loss': self.regularization_loss_metric.result(),
+            'total_loss': self.total_loss_metric.result(),
             'accuracy': self.accuracy_metric.result()
         }
 
@@ -79,15 +92,17 @@ class TrainClassifier:
     def evaluate_step(self, inputs, labels):
         predictions = self.model(inputs, training=False)
         total_loss = self.loss_fn(labels, predictions)
-        self.loss_metric.update_state(total_loss)
+        self.total_loss_metric.update_state(total_loss)
         self.accuracy_metric.update_state(labels, predictions)
         return {
-            'loss': self.loss_metric.result(),
+            'loss': self.total_loss_metric.result(),
             'accuracy': self.accuracy_metric.result()
         }
 
     def reset_metric(self):
-        self.loss_metric.reset_states()
+        self.train_loss_metric.reset_states()
+        self.regularization_loss_metric.reset_states()
+        self.total_loss_metric.reset_states()
         self.accuracy_metric.reset_states()
 
     def fit(self,
@@ -101,7 +116,8 @@ class TrainClassifier:
         logs = None
         target = train_ds.size // batch_size
         progbar = tf.keras.utils.Progbar(
-            target, width=30, verbose=1, interval=0.05, stateful_metrics={'loss', 'accuracy'},
+            target, width=30, verbose=1, interval=0.05,
+            stateful_metrics={'train_loss', 'regularization_loss', 'total_loss', 'accuracy'},
             unit_name='step'
         )
         val_accuracy = 0.0
