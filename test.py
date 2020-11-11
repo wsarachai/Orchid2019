@@ -43,7 +43,7 @@ def main(unused_argv):
     num_classes = 52
     data_path = os.environ['DATA_DIR'] or '/Volumes/Data/_dataset/_orchids_dataset'
     data_dir = os.path.join(data_path, 'orchids52_data')
-    load_dataset = dataset_mapping[data_utils.ORCHIDS52_V2_FILE]
+    load_dataset = dataset_mapping[data_utils.ORCHIDS52_V1_TFRECORD]
 
     train_ds = load_dataset(split="train",
                             batch_size=FLAGS.batch_size,
@@ -67,7 +67,7 @@ def main(unused_argv):
                                                    weights='imagenet')
 
     global_average_layer = tf.keras.layers.GlobalAveragePooling2D()
-    prediction_layer = tf.keras.layers.Dense(num_classes, activation=tf.keras.activations.linear)
+    prediction_layer = tf.keras.layers.Dense(num_classes, activation='linear')
 
     data_augmentation = tf.keras.Sequential([
         tf.keras.layers.experimental.preprocessing.RandomFlip('horizontal'),
