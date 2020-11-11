@@ -55,8 +55,10 @@ class TrainClassifier:
     @tf.function
     def train_step(self, inputs, labels):
         with tf.GradientTape() as tape:
+            b_loss = 0.
             predictions = self.model(inputs, training=True)
-            b_loss = self.model.boundary_loss(inputs, training=True)
+            if self.model.boundary_loss:
+                b_loss = self.model.boundary_loss(inputs, training=True)
             loss = self.loss_fn(labels, predictions)
             loss = tf.reduce_sum(loss) * (1. / self.batch_size)
             regularization_loss = tf.reduce_sum(self.model.losses)
