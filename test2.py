@@ -4,10 +4,10 @@ from __future__ import print_function
 
 import os
 import tensorflow as tf
-import matplotlib.pyplot as plt
-from data import data_utils
+from data import data_utils, orchids52_dataset
 from data.data_utils import dataset_mapping
 from lib_utils import start
+from nets import utils
 
 flags = tf.compat.v1.flags
 logging = tf.compat.v1.logging
@@ -40,10 +40,10 @@ flags.DEFINE_string('aug_method', 'fast',
 
 def main(unused_argv):
     logging.debug(unused_argv)
-    num_classes = 52
-    data_path = os.environ['DATA_DIR'] or '/Volumes/Data/_dataset/_orchids_dataset'
+    data_path = os.environ['DATA_DIR'] if 'DATA_DIR' in os.environ else '/Volumes/Data/_dataset/_orchids_dataset'
     data_dir = os.path.join(data_path, 'orchids52_data')
     load_dataset = dataset_mapping[data_utils.ORCHIDS52_V1_TFRECORD]
+    create_model = utils.nets_mapping[utils.MOBILENET_V2_140]
 
     train_ds = load_dataset(split="train",
                             batch_size=FLAGS.batch_size,
@@ -52,6 +52,7 @@ def main(unused_argv):
     validate_ds = load_dataset(split="validate", batch_size=FLAGS.batch_size, root_path=data_dir)
     test_ds = load_dataset(split="test", batch_size=FLAGS.batch_size, root_path=data_dir)
 
+    # import matplotlib.pyplot as plt
     # for images, _ in train_ds.take(1):
     #     for i in range(9):
     #         ax = plt.subplot(3, 3, i + 1)
@@ -60,38 +61,12 @@ def main(unused_argv):
     #         plt.axis("off")
     #     plt.show()
 
-    IMG_SHAPE = (224, 224, 3)
-    base_model = tf.keras.applications.MobileNetV2(input_shape=IMG_SHAPE,
-                                                   alpha=1.4,
-                                                   include_top=False,
-                                                   weights='imagenet')
+    model = create_model(num_classes=orchids52_dataset.NUM_OF_CLASSES,
+                         training=True,
+                         batch_size=FLAGS.batch_size)
 
-    global_average_layer = tf.keras.layers.GlobalAveragePooling2D()
-    prediction_layer = tf.keras.layers.Dense(num_classes, activation='linear')
-
-    data_augmentation = tf.keras.Sequential([
-        tf.keras.layers.experimental.preprocessing.RandomFlip('horizontal'),
-        tf.keras.layers.experimental.preprocessing.RandomRotation(0.2),
-    ])
-
-    preprocess_input = tf.keras.applications.mobilenet_v2.preprocess_input
-
-    inputs = tf.keras.Input(shape=IMG_SHAPE)
-    x = data_augmentation(inputs)
-    x = preprocess_input(x)
-    x = base_model(x, training=False)
-    x = global_average_layer(x)
-    x = tf.keras.layers.Dropout(0.2)(x)
-    outputs = prediction_layer(x)
-    model = tf.keras.Model(inputs, outputs)
-
-    # Freeze all the layers except for dense layer
-    for layer in base_model.layers:
-        layer.trainable = False
-
-    base_learning_rate = 0.0001
     model.compile(loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
-                  optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
+                  optimizer=tf.keras.optimizers.RMSprop(lr=FLAGS.learning_rate),
                   metrics=['accuracy'])
 
     model.summary()

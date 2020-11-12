@@ -8,8 +8,8 @@ from data import data_utils, orchids52_dataset
 from data.data_utils import dataset_mapping
 from data.orchids52_dataset import TEST_SIZE_V1
 from lib_utils import latest_checkpoint, start
-from nets import nets_utils
-from nets.nets_utils import TRAIN_V2_STEP2
+from nets import utils
+from nets.utils import TRAIN_V2_STEP2
 
 flags = tf.compat.v1.flags
 logging = tf.compat.v1.logging
@@ -27,7 +27,7 @@ def main(unused_argv):
         split="test",
         batch_size=batch_size)
 
-    create_model = nets_utils.nets_mapping[nets_utils.MOBILENET_V2_140_ORCHIDS52]
+    create_model = utils.nets_mapping[utils.MOBILENET_V2_140_ORCHIDS52]
     model = create_model(num_classes=orchids52_dataset.NUM_OF_CLASSES,
                          batch_size=batch_size,
                          step=FLAGS.training_step)
