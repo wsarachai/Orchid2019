@@ -204,7 +204,7 @@ class TrainClassifier:
             logs = copy.copy(logs) if logs else {}
             history['validation_loss'].append(logs['loss'].numpy())
             history['validation_accuracy'].append(logs['accuracy'].numpy())
-            print('\nval_loss: {:.3f}, val_accuracy: {:.3f}'.format(logs['loss'], logs['accuracy']))
+            print(', val_loss: {:.3f}, val_accuracy: {:.3f}'.format(logs['loss'], logs['accuracy']))
 
             if checkpoint_path:
                 if val_accuracy < logs['accuracy'].numpy() or val_loss > logs['loss'].numpy():
