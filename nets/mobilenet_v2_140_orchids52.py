@@ -152,12 +152,11 @@ def create_orchid_mobilenet_v2_14(num_classes,
     batch_size = kwargs.pop('batch_size') if 'batch_size' in kwargs else 32
     step = kwargs.pop('step') if 'step' in kwargs else ''
 
-    inputs = keras.Input(shape=(default_image_size, default_image_size, 3), batch_size=batch_size)
+    inputs = keras.Input(shape=IMG_SHAPE_224)
     inputs = data_augmentation(inputs, training=training)
     inputs = preprocess_input(inputs)
 
-    # Create the base model from the pre-trained model MobileNet V2
-    stn_base_model = create_mobilenet_v2(input_tensor=inputs,
+    stn_base_model = create_mobilenet_v2(input_tensor=IMG_SHAPE_224,
                                          alpha=1.4,
                                          include_top=False,
                                          weights='imagenet',
@@ -242,8 +241,8 @@ def create_orchid_mobilenet_v2_14(num_classes,
     else:
         prediction_layer = nets.utils.create_predict_module(num_classes=num_classes, name='t1')
         branches_prediction_models.append(prediction_layer)
-        x = stn_base_model(inputs)
-        outputs = prediction_layer(x)
+        x = stn_base_model(inputs, training=training)
+        outputs = prediction_layer(x, training=training)
 
     model = Orchids52Mobilenet140STN(inputs, outputs,
                                      base_model=stn_base_model,
