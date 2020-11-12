@@ -69,7 +69,7 @@ def main(unused_argv):
                                  epochs=FLAGS.total_epochs,
                                  validation_data=validate_ds)
 
-        with open('trainHistory', 'wb') as handle:  # saving the history of the model
+        with open('trainHistory.pack', 'wb') as handle:  # saving the history of the model
             dump(history_fine.history, handle)
 
         loss, accuracy = model.evaluate(test_ds)
