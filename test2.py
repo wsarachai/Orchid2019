@@ -64,10 +64,9 @@ def main(unused_argv):
                       metrics=['accuracy'])
 
         model.summary()
-        total_epochs = 50
 
         history_fine = model.fit(train_ds,
-                                 epochs=total_epochs,
+                                 epochs=FLAGS.total_epochs,
                                  validation_data=validate_ds)
 
         with open('trainHistory', 'wb') as handle:  # saving the history of the model
