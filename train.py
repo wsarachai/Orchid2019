@@ -91,7 +91,7 @@ def main(unused_argv):
             model.resume_model_weights(latest)
         else:
             model.load_model_weights(checkpoint_path, epoch)
-            epoch = 0
+            epoch = 1
 
         model.summary()
 
