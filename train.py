@@ -99,7 +99,7 @@ def main(unused_argv):
                                        checkpoint_path=checkpoint_path)
 
         with open('trainHistory.pack', 'wb') as handle:  # saving the history of the model
-            dump(history_fine.history, handle)
+            dump(history_fine['history'], handle)
 
         print('Test accuracy: ')
         train_model.evaluate(datasets=test_ds)

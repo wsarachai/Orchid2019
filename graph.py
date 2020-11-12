@@ -23,22 +23,25 @@ def main(unused_argv):
     file_to_load = '{}.pack'.format(FLAGS.file)
     history = load(open(file_to_load, 'rb'))
 
-    acc = history['accuracy']
-    val_acc = history['val_accuracy']
-    loss = history['loss']
-    val_loss = history['val_loss']
-    epochs_range = range(len(acc))
+    train_loss = history['train_loss']
+    regularization_loss = history['regularization_loss']
+    boundary_loss = history['boundary_loss']
+    total_loss = history['total_loss']
+    accuracy = history['accuracy']
+    validation_loss = history['validation_loss']
+    validation_accuracy = history['validation_accuracy']
+    epochs_range = range(len(accuracy))
 
     plt.figure(figsize=(8, 8))
-    plt.subplot(1, 2, 1)
-    plt.plot(epochs_range, acc, label='Training Accuracy')
-    plt.plot(epochs_range, val_acc, label='Validation Accuracy')
+    plt.subplot(2, 1, 1)
+    plt.plot(epochs_range, accuracy, label='Training Accuracy')
+    plt.plot(epochs_range, validation_accuracy, label='Validation Accuracy')
     plt.legend(loc='lower right')
     plt.title('Training and Validation Accuracy')
 
-    plt.subplot(1, 2, 2)
-    plt.plot(epochs_range, loss, label='Training Loss')
-    plt.plot(epochs_range, val_loss, label='Validation Loss')
+    plt.subplot(2, 1, 2)
+    plt.plot(epochs_range, train_loss, label='Training Loss')
+    plt.plot(epochs_range, validation_loss, label='Validation Loss')
     plt.legend(loc='upper right')
     plt.title('Training and Validation Loss')
     plt.savefig('{}.png'.format(FLAGS.file))

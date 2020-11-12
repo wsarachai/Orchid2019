@@ -186,21 +186,22 @@ class TrainClassifier:
                 #         b2=inputs.shape.as_list()[0]
                 #     ))
 
-            history['train_loss'].append(self.train_loss_metric.result())
-            history['regularization_loss'].append(self.regularization_loss_metric.result())
-            history['boundary_loss'].append(self.boundary_loss_metric.result())
-            history['total_loss'].append(self.total_loss_metric.result())
-            history['accuracy'].append(self.accuracy_metric.result())
+            history['train_loss'].append(self.train_loss_metric.result().numpy())
+            history['regularization_loss'].append(self.regularization_loss_metric.result().numpy())
+            history['boundary_loss'].append(self.boundary_loss_metric.result().numpy())
+            history['total_loss'].append(self.total_loss_metric.result().numpy())
+            history['accuracy'].append(self.accuracy_metric.result().numpy())
 
             self.reset_metric()
 
             for inputs, labels in validate_ds:
                 if inputs.shape.as_list()[0] == self.batch_size:
                     logs = self.evaluate_step(inputs, labels)
+
             logs = copy.copy(logs) if logs else {}
-            history['validation_loss'].append(logs['loss'])
-            history['validation_accuracy'].append(logs['accuracy'])
-            print(', val_loss: {:.3f}, val_accuracy: {:.3f}'.format(logs['loss'], logs['accuracy']))
+            history['validation_loss'].append(logs['loss'].numpy())
+            history['validation_accuracy'].append(logs['accuracy'].numpy())
+            print('\nval_loss: {:.3f}, val_accuracy: {:.3f}'.format(logs['loss'], logs['accuracy']))
 
             if checkpoint_path:
                 if val_accuracy < logs['accuracy'].numpy() or val_loss > logs['loss'].numpy():
