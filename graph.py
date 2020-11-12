@@ -27,7 +27,7 @@ def main(unused_argv):
     train_loss = history['train_loss']
     regularization_loss = history['regularization_loss']
     boundary_loss = history['boundary_loss']
-    #total_loss = history['total_loss']
+    total_loss = history['total_loss']
     accuracy = history['accuracy']
     validation_loss = history['validation_loss']
     validation_accuracy = history['validation_accuracy']
@@ -41,6 +41,7 @@ def main(unused_argv):
     axs[0].set_xlim(0, num_of_data)
     axs[0].set_xlabel('Epochs')
     axs[0].set_ylabel('Accuracy')
+    axs[0].legend(loc='lower right')
     axs[0].grid(True)
 
     axs[1].plot(epochs_range, train_loss, label='Training Loss')
@@ -48,13 +49,16 @@ def main(unused_argv):
     axs[1].set_xlim(0, num_of_data)
     axs[1].set_xlabel('Epochs')
     axs[1].set_ylabel('Loss')
+    axs[1].legend(loc='upper right')
     axs[1].grid(True)
 
     axs[2].plot(epochs_range, regularization_loss, label='Regularization Loss')
     axs[2].plot(epochs_range, boundary_loss, label='Boundary Loss')
+    axs[2].plot(epochs_range, total_loss, label='Total Loss')
     axs[2].set_xlim(0, num_of_data)
     axs[2].set_xlabel('Epochs')
     axs[2].set_ylabel('Loss')
+    axs[2].legend(loc='center right')
     axs[2].grid(True)
 
     fig.tight_layout()

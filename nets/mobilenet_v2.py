@@ -18,7 +18,7 @@ BASE_WEIGHT_PATH = ('https://storage.googleapis.com/tensorflow/'
 default_image_size = 224
 IMG_SIZE_224 = (default_image_size, default_image_size)
 IMG_SHAPE_224 = IMG_SIZE_224 + (3,)
-regularizers_l2 = 0.0001
+regularizers_l2 = 0.00001
 
 
 def _inverted_res_block(name, inputs, expansion, stride, alpha, filters, block_id):

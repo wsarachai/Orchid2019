@@ -99,16 +99,10 @@ def create_mobilenet_v2_14(num_classes,
                            training=False,
                            **kwargs):
     step = kwargs.pop('step') if 'step' in kwargs else ''
-    base_model = create_mobilenet_v2(input_shape=IMG_SHAPE_224,
-                                     alpha=1.4,
-                                     include_top=False,
-                                     weights='imagenet')
-
     data_augmentation = keras.Sequential([
         keras.layers.experimental.preprocessing.RandomFlip('horizontal'),
         keras.layers.experimental.preprocessing.RandomRotation(0.2),
     ])
-
     preprocess_input = keras.applications.mobilenet_v2.preprocess_input
     prediction_layer = nets.utils.create_predict_module(num_classes=num_classes,
                                                         name='mobilenet_v2_14',
@@ -117,6 +111,12 @@ def create_mobilenet_v2_14(num_classes,
     inputs = keras.Input(shape=IMG_SHAPE_224)
     x = data_augmentation(inputs, training=training)
     x = preprocess_input(x)
+
+    base_model = create_mobilenet_v2(input_shape=IMG_SHAPE_224,
+                                     alpha=1.4,
+                                     include_top=False,
+                                     weights='imagenet')
+
     x = base_model(x, training=training)
     outputs = prediction_layer(x, training=training)
 
