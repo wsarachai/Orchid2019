@@ -16,8 +16,8 @@ TRAIN_STEP4 = 'pretrain4'
 TRAIN_V2_STEP1 = 'v2-pretrain1'
 TRAIN_V2_STEP2 = 'v2-pretrain2'
 
-MOBILENET_V2_140 = 'const/MOBILENET_V2_140'
-MOBILENET_V2_140_ORCHIDS52 = 'const/MOBILENET_V2_140-ORCHIDS52'
+MOBILENET_V2_140 = 'mobilenet_v2_140'
+MOBILENET_V2_140_ORCHIDS52 = 'mobilenet_v2_140_orchids52'
 
 
 nets_mapping = {

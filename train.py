@@ -4,8 +4,9 @@ from __future__ import print_function
 
 import os
 import tensorflow as tf
-
 import lib_utils
+
+from pickle import dump
 from data import data_utils, orchids52_dataset
 from data.data_utils import dataset_mapping
 from lib_utils import start, latest_checkpoint
@@ -21,20 +22,26 @@ flags.DEFINE_boolean('exp_decay', False,
 flags.DEFINE_integer('batch_size', 32,
                      'Batch size')
 
-flags.DEFINE_integer('total_epochs', 100,
+flags.DEFINE_integer('total_epochs', 50,
                      'Total epochs')
 
 flags.DEFINE_integer('start_state', 1,
                      'Start state')
 
-flags.DEFINE_integer('end_state', 5,
+flags.DEFINE_integer('end_state', 2,
                      'End state')
 
-flags.DEFINE_float('learning_rate', 0.0001,
+flags.DEFINE_float('learning_rate', 0.001,
                    'Learning Rate')
 
 flags.DEFINE_string('aug_method', 'fast',
                     'Augmentation Method')
+
+flags.DEFINE_string('dataset', data_utils.ORCHIDS52_V1_TFRECORD,
+                    'Dataset')
+
+flags.DEFINE_string('model', utils.MOBILENET_V2_140_ORCHIDS52,
+                    'Model')
 
 
 def main(unused_argv):
@@ -43,8 +50,8 @@ def main(unused_argv):
     data_path = os.environ['DATA_DIR'] if 'DATA_DIR' in os.environ else '/Volumes/Data/_dataset/_orchids_dataset'
     data_dir = os.path.join(data_path, 'orchids52_data')
     checkpoint_path = os.path.join(workspace_path, 'orchids-models', 'orchids2019')
-    load_dataset = dataset_mapping[data_utils.ORCHIDS52_V1_TFRECORD]
-    create_model = utils.nets_mapping[utils.MOBILENET_V2_140_ORCHIDS52]
+    load_dataset = dataset_mapping[FLAGS.dataset]
+    create_model = utils.nets_mapping[FLAGS.model]
 
     if not tf.io.gfile.exists(checkpoint_path):
         tf.io.gfile.mkdir(checkpoint_path)
@@ -85,11 +92,14 @@ def main(unused_argv):
 
         model.summary()
 
-        train_model.fit(initial_epoch=epoch,
-                        epoches=FLAGS.total_epochs,
-                        train_ds=train_ds,
-                        validate_ds=validate_ds,
-                        checkpoint_path=checkpoint_path)
+        history_fine = train_model.fit(initial_epoch=epoch,
+                                       epoches=FLAGS.total_epochs,
+                                       train_ds=train_ds,
+                                       validate_ds=validate_ds,
+                                       checkpoint_path=checkpoint_path)
+
+        with open('trainHistory.pack', 'wb') as handle:  # saving the history of the model
+            dump(history_fine.history, handle)
 
         print('Test accuracy: ')
         train_model.evaluate(datasets=test_ds)

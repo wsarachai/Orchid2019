@@ -205,7 +205,9 @@ class TrainClassifier:
             if checkpoint_path:
                 if val_accuracy < logs['accuracy'].numpy() or val_loss > logs['loss'].numpy():
                     self.model.save_model_weights(checkpoint_path, epoch)
-        return history
+        return {
+            'history': history
+        }
 
     def evaluate(self, datasets):
         logs = None
