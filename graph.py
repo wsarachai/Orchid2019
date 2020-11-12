@@ -12,6 +12,9 @@ flags = tf.compat.v1.flags
 logging = tf.compat.v1.logging
 FLAGS = flags.FLAGS
 
+flags.DEFINE_string('file', 'trainHistory',
+                    'Train history')
+
 flags.DEFINE_integer('total_epochs', 100,
                      'Total epochs')
 
@@ -21,7 +24,7 @@ def main(unused_argv):
     max_s = 0
     min_lost = 1
     min_s = 0
-    history = load(open('trainHistoryOld-v2-2', 'rb'))
+    history = load(open(FLAGS.file, 'rb'))
 
     acc = history['accuracy']
     val_acc = history['val_accuracy']

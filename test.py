@@ -13,9 +13,6 @@ flags = tf.compat.v1.flags
 logging = tf.compat.v1.logging
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('tf_record_dir', '/Volumes/Data/_dataset/_orchids_dataset/orchids52_data/v1/tf-records',
-                    'TF record data directory')
-
 flags.DEFINE_boolean('exp_decay', False,
                      'Exponential decay learning rate')
 

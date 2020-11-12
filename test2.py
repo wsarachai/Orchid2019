@@ -4,8 +4,8 @@ from __future__ import print_function
 
 import os
 import tensorflow as tf
-
 import lib_utils
+from pickle import dump
 from data import data_utils, orchids52_dataset
 from data.data_utils import dataset_mapping
 from lib_utils import start
@@ -14,9 +14,6 @@ from nets import utils
 flags = tf.compat.v1.flags
 logging = tf.compat.v1.logging
 FLAGS = flags.FLAGS
-
-flags.DEFINE_string('tf_record_dir', '/Volumes/Data/_dataset/_orchids_dataset/orchids52_data/v1/tf-records',
-                    'TF record data directory')
 
 flags.DEFINE_boolean('exp_decay', False,
                      'Exponential decay learning rate')
@@ -72,6 +69,9 @@ def main(unused_argv):
         history_fine = model.fit(train_ds,
                                  epochs=total_epochs,
                                  validation_data=validate_ds)
+
+        with open('trainHistory', 'wb') as handle:  # saving the history of the model
+            dump(history_fine.history, handle)
 
         loss, accuracy = model.evaluate(test_ds)
         print('Test accuracy :', accuracy)
