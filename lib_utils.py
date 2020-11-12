@@ -100,7 +100,7 @@ class TrainClassifier:
         regularization_loss = 0.
         with tf.GradientTape() as tape:
             predictions = self.model(inputs, training=True)
-            if self.model.boundary_loss:
+            if hasattr(self.model, 'boundary_loss'):
                 boundary_loss = self.model.boundary_loss(inputs, training=True)
             train_loss = self.loss_fn(labels, predictions)
             train_loss = tf.reduce_sum(train_loss) * (1. / self.batch_size)
@@ -117,10 +117,10 @@ class TrainClassifier:
         self.accuracy_metric.update_state(labels, predictions)
 
         return {
-            'train_loss': self.train_loss_metric.result(),
-            'regularization_loss': self.regularization_loss_metric.result(),
-            'boundary_loss': self.boundary_loss_metric.result(),
-            'total_loss': self.total_loss_metric.result(),
+            'train_loss': train_loss,
+            'regularization_loss': regularization_loss,
+            'boundary_loss': boundary_loss,
+            'total_loss': total_loss,
             'accuracy': self.accuracy_metric.result()
         }
 
@@ -147,11 +147,18 @@ class TrainClassifier:
             epoches,
             train_ds,
             validate_ds,
-            test_ds,
-            batch_size,
-            checkpoint_path):
+            checkpoint_path=None):
         logs = None
-        target = train_ds.size // batch_size
+        history = {
+            'train_loss': [],
+            'regularization_loss': [],
+            'boundary_loss': [],
+            'total_loss': [],
+            'accuracy': [],
+            'validation_loss': [],
+            'validation_accuracy': []
+        }
+        target = train_ds.size // self.batch_size
         progbar = tf.keras.utils.Progbar(
             target, width=30, verbose=1, interval=0.05,
             stateful_metrics={'train_loss', 'regularization_loss', 'boundary_loss', 'total_loss', 'accuracy'},
@@ -166,7 +173,7 @@ class TrainClassifier:
             seen = 0
 
             for inputs, labels in train_ds:
-                if inputs.shape.as_list()[0] == batch_size:
+                if inputs.shape.as_list()[0] == self.batch_size:
                     logs = self.train_step(inputs, labels)
                     logs = copy.copy(logs) if logs else {}
                     num_steps = logs.pop('num_steps', 1)
@@ -179,28 +186,31 @@ class TrainClassifier:
                 #         b2=inputs.shape.as_list()[0]
                 #     ))
 
+            history['train_loss'].append(self.train_loss_metric.result())
+            history['regularization_loss'].append(self.regularization_loss_metric.result())
+            history['boundary_loss'].append(self.boundary_loss_metric.result())
+            history['total_loss'].append(self.total_loss_metric.result())
+            history['accuracy'].append(self.accuracy_metric.result())
+
             self.reset_metric()
 
             for inputs, labels in validate_ds:
                 if inputs.shape.as_list()[0] == self.batch_size:
                     logs = self.evaluate_step(inputs, labels)
             logs = copy.copy(logs) if logs else {}
+            history['validation_loss'].append(logs['loss'])
+            history['validation_accuracy'].append(logs['accuracy'])
             print(', val_loss: {:.3f}, val_accuracy: {:.3f}'.format(logs['loss'], logs['accuracy']))
 
-            if epoch % 20 == 0:
-                for inputs, labels in test_ds:
-                    if inputs.shape.as_list()[0] == self.batch_size:
-                        logs = self.evaluate_step(inputs, labels)
-                logs = copy.copy(logs) if logs else {}
-                print('\ntest_loss: {:.3f}, test_accuracy: {:.3f}'.format(logs['loss'], logs['accuracy']))
+            if checkpoint_path:
+                if val_accuracy < logs['accuracy'].numpy() or val_loss > logs['loss'].numpy():
+                    self.model.save_model_weights(checkpoint_path, epoch)
+        return history
 
-            if val_accuracy < logs['accuracy'].numpy() or val_loss > logs['loss'].numpy():
-                self.model.save_model_weights(checkpoint_path, epoch)
-
-    def evaluate(self, datasets, batch_size):
+    def evaluate(self, datasets):
         logs = None
         for inputs, labels in datasets:
-            if inputs.shape.as_list()[0] == batch_size:
+            if inputs.shape.as_list()[0] == self.batch_size:
                 logs = self.evaluate_step(inputs, labels)
         logs = copy.copy(logs) if logs else {}
         print('loss: {:.3f}, accuracy: {:.3f}'.format(logs['loss'], logs['accuracy']))

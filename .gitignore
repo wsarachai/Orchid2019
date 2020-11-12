@@ -134,3 +134,4 @@ dmypy.json
 *.out
 *.txt
 *.pack
+.DS_Store

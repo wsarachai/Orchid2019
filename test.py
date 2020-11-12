@@ -4,10 +4,12 @@ from __future__ import print_function
 
 import os
 import tensorflow as tf
-import matplotlib.pyplot as plt
-from data import data_utils
+import lib_utils
+from pickle import dump
+from data import data_utils, orchids52_dataset
 from data.data_utils import dataset_mapping
 from lib_utils import start
+from nets import utils
 
 flags = tf.compat.v1.flags
 logging = tf.compat.v1.logging
@@ -19,13 +21,13 @@ flags.DEFINE_boolean('exp_decay', False,
 flags.DEFINE_integer('batch_size', 32,
                      'Batch size')
 
-flags.DEFINE_integer('total_epochs', 100,
+flags.DEFINE_integer('total_epochs', 50,
                      'Total epochs')
 
 flags.DEFINE_integer('start_state', 1,
                      'Start state')
 
-flags.DEFINE_integer('end_state', 5,
+flags.DEFINE_integer('end_state', 2,
                      'End state')
 
 flags.DEFINE_float('learning_rate', 0.001,
@@ -37,69 +39,41 @@ flags.DEFINE_string('aug_method', 'fast',
 
 def main(unused_argv):
     logging.debug(unused_argv)
-    num_classes = 52
-    data_path = os.environ['DATA_DIR'] or '/Volumes/Data/_dataset/_orchids_dataset'
+    data_path = os.environ['DATA_DIR'] if 'DATA_DIR' in os.environ else '/Volumes/Data/_dataset/_orchids_dataset'
     data_dir = os.path.join(data_path, 'orchids52_data')
     load_dataset = dataset_mapping[data_utils.ORCHIDS52_V1_TFRECORD]
+    create_model = utils.nets_mapping[utils.MOBILENET_V2_140]
 
-    train_ds = load_dataset(split="train",
-                            batch_size=FLAGS.batch_size,
-                            root_path=data_dir,
-                            aug_method=FLAGS.aug_method)
-    validate_ds = load_dataset(split="validate", batch_size=FLAGS.batch_size, root_path=data_dir)
-    test_ds = load_dataset(split="test", batch_size=FLAGS.batch_size, root_path=data_dir)
+    for train_step in range(FLAGS.start_state, FLAGS.end_state):
+        train_ds = load_dataset(split="train",
+                                batch_size=FLAGS.batch_size,
+                                root_path=data_dir,
+                                aug_method=FLAGS.aug_method)
+        validate_ds = load_dataset(split="validate", batch_size=FLAGS.batch_size, root_path=data_dir)
+        test_ds = load_dataset(split="test", batch_size=FLAGS.batch_size, root_path=data_dir)
 
-    # for images, _ in train_ds.take(1):
-    #     for i in range(9):
-    #         ax = plt.subplot(3, 3, i + 1)
-    #         plt.imshow(images[i].numpy().astype("uint8"))
-    #         plt.title(str(i))
-    #         plt.axis("off")
-    #     plt.show()
+        model = create_model(num_classes=orchids52_dataset.NUM_OF_CLASSES,
+                             training=True,
+                             batch_size=FLAGS.batch_size)
 
-    IMG_SHAPE = (224, 224, 3)
-    base_model = tf.keras.applications.MobileNetV2(input_shape=IMG_SHAPE,
-                                                   alpha=1.4,
-                                                   include_top=False,
-                                                   weights='imagenet')
+        learning_rate = lib_utils.config_learning_rate(FLAGS.learning_rate,
+                                                       FLAGS.exp_decay)
 
-    global_average_layer = tf.keras.layers.GlobalAveragePooling2D()
-    prediction_layer = tf.keras.layers.Dense(num_classes, activation='linear')
+        model.compile(loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
+                      optimizer=tf.keras.optimizers.RMSprop(learning_rate=learning_rate),
+                      metrics=['accuracy'])
 
-    data_augmentation = tf.keras.Sequential([
-        tf.keras.layers.experimental.preprocessing.RandomFlip('horizontal'),
-        tf.keras.layers.experimental.preprocessing.RandomRotation(0.2),
-    ])
+        model.summary()
 
-    preprocess_input = tf.keras.applications.mobilenet_v2.preprocess_input
+        history_fine = model.fit(train_ds,
+                                 epochs=FLAGS.total_epochs,
+                                 validation_data=validate_ds)
 
-    inputs = tf.keras.Input(shape=IMG_SHAPE)
-    x = data_augmentation(inputs)
-    x = preprocess_input(x)
-    x = base_model(x, training=False)
-    x = global_average_layer(x)
-    x = tf.keras.layers.Dropout(0.2)(x)
-    outputs = prediction_layer(x)
-    model = tf.keras.Model(inputs, outputs)
+        with open('trainHistory.pack', 'wb') as handle:  # saving the history of the model
+            dump(history_fine.history, handle)
 
-    # Freeze all the layers except for dense layer
-    for layer in base_model.layers:
-        layer.trainable = False
-
-    base_learning_rate = 0.0001
-    model.compile(loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
-                  optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
-                  metrics=['accuracy'])
-
-    model.summary()
-    total_epochs = 50
-
-    history_fine = model.fit(train_ds,
-                             epochs=total_epochs,
-                             validation_data=validate_ds)
-
-    loss, accuracy = model.evaluate(test_ds)
-    print('Test accuracy :', accuracy)
+        loss, accuracy = model.evaluate(test_ds)
+        print('Test accuracy :', accuracy)
 
 
 if __name__ == '__main__':

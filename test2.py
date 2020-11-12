@@ -59,15 +59,16 @@ def main(unused_argv):
         learning_rate = lib_utils.config_learning_rate(FLAGS.learning_rate,
                                                        FLAGS.exp_decay)
 
-        model.compile(loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
-                      optimizer=tf.keras.optimizers.RMSprop(learning_rate=learning_rate),
-                      metrics=['accuracy'])
-
         model.summary()
 
-        history_fine = model.fit(train_ds,
-                                 epochs=FLAGS.total_epochs,
-                                 validation_data=validate_ds)
+        train_model = lib_utils.TrainClassifier(model=model,
+                                                learning_rate=learning_rate,
+                                                batch_size=FLAGS.batch_size)
+
+        history_fine = train_model.fit(initial_epoch=1,
+                                       epoches=FLAGS.total_epochs,
+                                       train_ds=train_ds,
+                                       validate_ds=validate_ds)
 
         with open('trainHistory.pack', 'wb') as handle:  # saving the history of the model
             dump(history_fine.history, handle)

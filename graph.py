@@ -20,28 +20,14 @@ flags.DEFINE_integer('total_epochs', 100,
 
 
 def main(unused_argv):
-    max_val = 0
-    max_s = 0
-    min_lost = 1
-    min_s = 0
-    history = load(open(FLAGS.file, 'rb'))
+    file_to_load = '{}.pack'.format(FLAGS.file)
+    history = load(open(file_to_load, 'rb'))
 
     acc = history['accuracy']
     val_acc = history['val_accuracy']
     loss = history['loss']
     val_loss = history['val_loss']
-    epochs_range = range(len(val_acc))
-
-    for i in epochs_range:
-        if val_acc[i] > max_val:
-            max_val = val_acc[i]
-            max_s = i
-        if val_loss[i] < min_lost:
-            min_lost = val_loss[i]
-            min_s = i
-
-    logging.info('max validate {}: {:.2f}, loss: {:.2f}'.format(max_s, max_val, val_loss[max_s]))
-    logging.info('min loss {}: {:.2f}, validate: {:.2f}'.format(min_s, min_lost, val_acc[min_s]))
+    epochs_range = range(len(acc))
 
     plt.figure(figsize=(8, 8))
     plt.subplot(1, 2, 1)
@@ -55,8 +41,7 @@ def main(unused_argv):
     plt.plot(epochs_range, val_loss, label='Validation Loss')
     plt.legend(loc='upper right')
     plt.title('Training and Validation Loss')
-    #plt.show()
-    plt.savefig("pretrain2.png")
+    plt.savefig('{}.png'.format(FLAGS.file))
 
 
 if __name__ == '__main__':

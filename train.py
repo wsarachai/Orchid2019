@@ -89,12 +89,10 @@ def main(unused_argv):
                         epoches=FLAGS.total_epochs,
                         train_ds=train_ds,
                         validate_ds=validate_ds,
-                        test_ds=test_ds,
-                        batch_size=batch_size,
                         checkpoint_path=checkpoint_path)
 
         print('Test accuracy: ')
-        train_model.evaluate(datasets=test_ds, batch_size=batch_size)
+        train_model.evaluate(datasets=test_ds)
 
         model_path = os.path.join(checkpoint_path, str(train_step))
         if not tf.io.gfile.exists(model_path):
