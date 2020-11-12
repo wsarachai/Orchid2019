@@ -22,7 +22,7 @@ flags.DEFINE_boolean('exp_decay', False,
 flags.DEFINE_integer('batch_size', 32,
                      'Batch size')
 
-flags.DEFINE_integer('total_epochs', 100,
+flags.DEFINE_integer('total_epochs', 50,
                      'Total epochs')
 
 flags.DEFINE_integer('start_state', 1,
