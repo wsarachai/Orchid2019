@@ -74,8 +74,7 @@ class TrainClassifier:
     def __init__(self, model, learning_rate, batch_size):
         self.model = model
         self.optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate)
-        self.loss_fn = tf.keras.losses.BinaryCrossentropy(from_logits=True,
-                                                          reduction=tf.keras.losses.Reduction.NONE)
+        self.loss_fn = tf.keras.losses.BinaryCrossentropy(from_logits=True)
         self.train_loss_metric = tf.keras.metrics.Mean(name='train_loss')
         self.regularization_loss_metric = tf.keras.metrics.Mean(name='regularization_loss')
         self.boundary_loss_metric = tf.keras.metrics.Mean(name='boundary_loss')
@@ -96,14 +95,11 @@ class TrainClassifier:
     @tf.function
     def train_step(self, inputs, labels):
         boundary_loss = 0.
-        train_loss = 0.
-        regularization_loss = 0.
         with tf.GradientTape() as tape:
             predictions = self.model(inputs, training=True)
             if hasattr(self.model, 'boundary_loss'):
                 boundary_loss = self.model.boundary_loss(inputs, training=True)
             train_loss = self.loss_fn(labels, predictions)
-            train_loss = tf.reduce_sum(train_loss) * (1. / self.batch_size)
             regularization_loss = tf.reduce_sum(self.model.losses)
             total_loss = regularization_loss + train_loss + boundary_loss
 
@@ -161,9 +157,9 @@ class TrainClassifier:
         }
         target = train_ds.size // self.batch_size
         is_run_from_bash = kwargs.pop('bash') if 'bash' in kwargs else False
-        verbose = 2 if is_run_from_bash else 1
+        finalize = False if not is_run_from_bash else True
         progbar = tf.keras.utils.Progbar(
-            target, width=30, verbose=verbose, interval=0.05,
+            target, width=30, verbose=1, interval=0.05,
             stateful_metrics={'train_loss', 'regularization_loss', 'boundary_loss', 'total_loss', 'accuracy'},
             unit_name='step'
         )
@@ -181,7 +177,7 @@ class TrainClassifier:
                     logs = copy.copy(logs) if logs else {}
                     num_steps = logs.pop('num_steps', 1)
                     seen += num_steps
-                    progbar.update(seen, list(logs.items()), finalize=True)
+                    progbar.update(seen, list(logs.items()), finalize=finalize)
                 # else:
                 #     logging.error('\n{epoch}: Error batch size {b1} != {b2}.'.format(
                 #         epoch=epoch,

@@ -20,6 +20,7 @@ flags.DEFINE_integer('total_epochs', 100,
 
 
 def main(unused_argv):
+    logging.debug(unused_argv)
     file_to_load = '{}.pack'.format(FLAGS.file)
     history = load(open(file_to_load, 'rb'))
 
@@ -33,26 +34,30 @@ def main(unused_argv):
     num_of_data = len(accuracy)
     epochs_range = range(num_of_data)
 
-    plt.figure(figsize=(8, 10), dpi=300)
-    plt.subplot(3, 1, 1)
-    plt.plot(epochs_range, accuracy, label='Training Accuracy')
-    plt.plot(epochs_range, validation_accuracy, label='Validation Accuracy')
-    plt.legend(loc='lower right')
-    plt.title('Training and Validation Accuracy')
+    fig, axs = plt.subplots(3, 1, figsize=(10, 10), dpi=300)
 
-    plt.subplot(3, 1, 2)
-    plt.plot(epochs_range, train_loss, label='Training Loss')
-    plt.plot(epochs_range, validation_loss, label='Validation Loss')
-    plt.legend(loc='upper right')
-    plt.title('Training and Validation Loss')
+    axs[0].plot(epochs_range, accuracy, label='Training Accuracy')
+    axs[0].plot(epochs_range, validation_accuracy, label='Validation Accuracy')
+    axs[0].set_xlim(0, num_of_data)
+    axs[0].set_xlabel('Epochs')
+    axs[0].set_ylabel('Accuracy')
+    axs[0].grid(True)
 
-    plt.subplot(3, 1, 3)
-    plt.plot(epochs_range, regularization_loss, label='Regularization Loss')
-    plt.plot(epochs_range, boundary_loss, label='Boundary Loss')
-    #plt.plot(epochs_range, total_loss, label='Total Loss')
-    plt.legend(loc='center right')
-    plt.title('Regularization and Boundary Loss')
+    axs[1].plot(epochs_range, train_loss, label='Training Loss')
+    axs[1].plot(epochs_range, validation_loss, label='Validation Loss')
+    axs[1].set_xlim(0, num_of_data)
+    axs[1].set_xlabel('Epochs')
+    axs[1].set_ylabel('Loss')
+    axs[1].grid(True)
 
+    axs[2].plot(epochs_range, regularization_loss, label='Regularization Loss')
+    axs[2].plot(epochs_range, boundary_loss, label='Boundary Loss')
+    axs[2].set_xlim(0, num_of_data)
+    axs[2].set_xlabel('Epochs')
+    axs[2].set_ylabel('Loss')
+    axs[2].grid(True)
+
+    fig.tight_layout()
     plt.savefig('{}.png'.format(FLAGS.file))
 
 
