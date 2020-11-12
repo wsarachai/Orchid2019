@@ -4,6 +4,8 @@ from __future__ import print_function
 
 import os
 import tensorflow as tf
+
+import lib_utils
 from data import data_utils, orchids52_dataset
 from data.data_utils import dataset_mapping
 from lib_utils import start
@@ -28,7 +30,7 @@ flags.DEFINE_integer('total_epochs', 50,
 flags.DEFINE_integer('start_state', 1,
                      'Start state')
 
-flags.DEFINE_integer('end_state', 5,
+flags.DEFINE_integer('end_state', 2,
                      'End state')
 
 flags.DEFINE_float('learning_rate', 0.001,
@@ -45,39 +47,34 @@ def main(unused_argv):
     load_dataset = dataset_mapping[data_utils.ORCHIDS52_V1_TFRECORD]
     create_model = utils.nets_mapping[utils.MOBILENET_V2_140]
 
-    train_ds = load_dataset(split="train",
-                            batch_size=FLAGS.batch_size,
-                            root_path=data_dir,
-                            aug_method=FLAGS.aug_method)
-    validate_ds = load_dataset(split="validate", batch_size=FLAGS.batch_size, root_path=data_dir)
-    test_ds = load_dataset(split="test", batch_size=FLAGS.batch_size, root_path=data_dir)
+    for train_step in range(FLAGS.start_state, FLAGS.end_state):
+        train_ds = load_dataset(split="train",
+                                batch_size=FLAGS.batch_size,
+                                root_path=data_dir,
+                                aug_method=FLAGS.aug_method)
+        validate_ds = load_dataset(split="validate", batch_size=FLAGS.batch_size, root_path=data_dir)
+        test_ds = load_dataset(split="test", batch_size=FLAGS.batch_size, root_path=data_dir)
 
-    # import matplotlib.pyplot as plt
-    # for images, _ in train_ds.take(1):
-    #     for i in range(9):
-    #         ax = plt.subplot(3, 3, i + 1)
-    #         plt.imshow(images[i].numpy().astype("uint8"))
-    #         plt.title(str(i))
-    #         plt.axis("off")
-    #     plt.show()
+        model = create_model(num_classes=orchids52_dataset.NUM_OF_CLASSES,
+                             training=True,
+                             batch_size=FLAGS.batch_size)
 
-    model = create_model(num_classes=orchids52_dataset.NUM_OF_CLASSES,
-                         training=True,
-                         batch_size=FLAGS.batch_size)
+        learning_rate = lib_utils.config_learning_rate(FLAGS.learning_rate,
+                                                       FLAGS.exp_decay)
 
-    model.compile(loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
-                  optimizer=tf.keras.optimizers.RMSprop(lr=FLAGS.learning_rate),
-                  metrics=['accuracy'])
+        model.compile(loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
+                      optimizer=tf.keras.optimizers.RMSprop(learning_rate=learning_rate),
+                      metrics=['accuracy'])
 
-    model.summary()
-    total_epochs = 50
+        model.summary()
+        total_epochs = 50
 
-    history_fine = model.fit(train_ds,
-                             epochs=total_epochs,
-                             validation_data=validate_ds)
+        history_fine = model.fit(train_ds,
+                                 epochs=total_epochs,
+                                 validation_data=validate_ds)
 
-    loss, accuracy = model.evaluate(test_ds)
-    print('Test accuracy :', accuracy)
+        loss, accuracy = model.evaluate(test_ds)
+        print('Test accuracy :', accuracy)
 
 
 if __name__ == '__main__':

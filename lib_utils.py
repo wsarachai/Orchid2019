@@ -5,6 +5,7 @@ from __future__ import print_function
 import os
 import copy
 import pathlib
+import nets
 import tensorflow as tf
 
 logging = tf.compat.v1.logging
@@ -50,6 +51,22 @@ def start(start_fn):
     if len(physical_devices) > 0:
         config = tf.config.experimental.set_memory_growth(physical_devices[0], True)
     tf.compat.v1.app.run(start_fn)
+
+
+def config_learning_rate(learning_rate=0.001,
+                         exp_decay=False,
+                         **kwargs):
+    training_step = kwargs.pop('training_step') if 'training_step' in kwargs else ''
+    if exp_decay:
+        learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(
+            initial_learning_rate=learning_rate,
+            decay_steps=10,
+            decay_rate=0.96
+        )
+    else:
+        if training_step in [nets.utils.TRAIN_STEP4, nets.utils.TRAIN_V2_STEP2]:
+            learning_rate = 0.00001
+    return learning_rate
 
 
 class TrainClassifier:

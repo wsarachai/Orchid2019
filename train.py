@@ -10,7 +10,6 @@ from data import data_utils, orchids52_dataset
 from data.data_utils import dataset_mapping
 from lib_utils import start, latest_checkpoint
 from nets import utils
-from nets.utils import TRAIN_V2_STEP2, TRAIN_TEMPLATE, TRAIN_STEP4
 
 flags = tf.compat.v1.flags
 logging = tf.compat.v1.logging
@@ -63,24 +62,19 @@ def main(unused_argv):
         validate_ds = load_dataset(split="validate", batch_size=batch_size, root_path=data_dir)
         test_ds = load_dataset(split="test", batch_size=batch_size, root_path=data_dir)
 
-        training_step = TRAIN_TEMPLATE.format(step=train_step)
+        training_step = utils.TRAIN_TEMPLATE.format(step=train_step)
         model = create_model(num_classes=orchids52_dataset.NUM_OF_CLASSES,
                              training=True,
                              batch_size=batch_size,
                              step=training_step)
 
-        if FLAGS.exp_decay:
-            base_learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(
-                initial_learning_rate=FLAGS.learning_rate,
-                decay_steps=10,
-                decay_rate=0.96
-            )
-        else:
-            base_learning_rate = FLAGS.learning_rate
-            if training_step in [TRAIN_STEP4, TRAIN_V2_STEP2]:
-                base_learning_rate = 0.00001
+        learning_rate = lib_utils.config_learning_rate(FLAGS.learning_rate,
+                                                       FLAGS.exp_decay,
+                                                       training_step=training_step)
 
-        train_model = lib_utils.TrainClassifier(model=model, learning_rate=base_learning_rate, batch_size=batch_size)
+        train_model = lib_utils.TrainClassifier(model=model,
+                                                learning_rate=learning_rate,
+                                                batch_size=batch_size)
 
         latest, epoch = latest_checkpoint(checkpoint_path, training_step)
         if latest:
