@@ -25,8 +25,8 @@ flags.DEFINE_boolean('exp_decay', False,
 flags.DEFINE_integer('batch_size', 32,
                      'Batch size')
 
-flags.DEFINE_integer('total_epochs', 50,
-                     'Total epochs')
+flags.DEFINE_string('total_epochs', '100,200,200,200',
+                    'Total epochs')
 
 flags.DEFINE_integer('start_state', 1,
                      'Start state')
@@ -59,7 +59,10 @@ def main(unused_argv):
     if not tf.io.gfile.exists(checkpoint_path):
         os.makedirs(checkpoint_path)
 
-    for train_step in range(FLAGS.start_state, FLAGS.end_state):
+    total_epochs = [int(e) for e in FLAGS.total_epochs.split(',')]
+    num_state = FLAGS.end_state - FLAGS.start_state
+    assert(num_state == len(total_epochs))
+    for idx, train_step in enumerate(range(FLAGS.start_state, FLAGS.end_state)):
         if train_step == 1:
             batch_size = FLAGS.batch_size
         else:
@@ -96,7 +99,7 @@ def main(unused_argv):
         model.summary()
 
         history_fine = train_model.fit(initial_epoch=epoch,
-                                       epoches=FLAGS.total_epochs,
+                                       epoches=total_epochs[idx],
                                        train_ds=train_ds,
                                        validate_ds=validate_ds,
                                        checkpoint_path=checkpoint_path,

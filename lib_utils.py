@@ -165,7 +165,7 @@ class TrainClassifier:
         )
         val_accuracy = 0.0
         val_loss = 1.0
-        for epoch in range(initial_epoch, epoches):
+        for epoch in range(initial_epoch, epoches+1):
             print('\nEpoch: {}/{}'.format(epoch, epoches))
 
             self.reset_metric()
