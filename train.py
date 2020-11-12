@@ -49,9 +49,9 @@ def main(unused_argv):
     workspace_path = os.environ['WORKSPACE'] if 'WORKSPACE' in os.environ else '/Volumes/Data/tmp'
     data_path = os.environ['DATA_DIR'] if 'DATA_DIR' in os.environ else '/Volumes/Data/_dataset/_orchids_dataset'
     data_dir = os.path.join(data_path, 'orchids52_data')
-    checkpoint_path = os.path.join(workspace_path, 'orchids-models', 'orchids2019')
     load_dataset = dataset_mapping[FLAGS.dataset]
     create_model = utils.nets_mapping[FLAGS.model]
+    checkpoint_path = os.path.join(workspace_path, 'orchids-models', 'orchids2019', FLAGS.model)
 
     if not tf.io.gfile.exists(checkpoint_path):
         os.makedirs(checkpoint_path)
