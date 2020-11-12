@@ -102,7 +102,7 @@ def main(unused_argv):
                                        checkpoint_path=checkpoint_path,
                                        bash=FLAGS.bash)
 
-        with open('trainHistory.pack', 'wb') as handle:  # saving the history of the model
+        with open('{}-history.pack'.format(training_step), 'wb') as handle:  # saving the history of the model
             dump(history_fine['history'], handle)
 
         print('Test accuracy: ')
