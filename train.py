@@ -16,6 +16,9 @@ flags = tf.compat.v1.flags
 logging = tf.compat.v1.logging
 FLAGS = flags.FLAGS
 
+flags.DEFINE_boolean('bash', False,
+                     'Execute from bash')
+
 flags.DEFINE_boolean('exp_decay', False,
                      'Exponential decay learning rate')
 
@@ -96,7 +99,8 @@ def main(unused_argv):
                                        epoches=FLAGS.total_epochs,
                                        train_ds=train_ds,
                                        validate_ds=validate_ds,
-                                       checkpoint_path=checkpoint_path)
+                                       checkpoint_path=checkpoint_path,
+                                       bash=FLAGS.bash)
 
         with open('trainHistory.pack', 'wb') as handle:  # saving the history of the model
             dump(history_fine['history'], handle)

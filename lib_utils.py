@@ -147,7 +147,8 @@ class TrainClassifier:
             epoches,
             train_ds,
             validate_ds,
-            checkpoint_path=None):
+            checkpoint_path=None,
+            **kwargs):
         logs = None
         history = {
             'train_loss': [],
@@ -159,8 +160,10 @@ class TrainClassifier:
             'validation_accuracy': []
         }
         target = train_ds.size // self.batch_size
+        is_run_from_bash = kwargs.pop('bash') if 'bash' in kwargs else False
+        verbose = 2 if is_run_from_bash else 1
         progbar = tf.keras.utils.Progbar(
-            target, width=30, verbose=1, interval=0.05,
+            target, width=30, verbose=verbose, interval=0.05,
             stateful_metrics={'train_loss', 'regularization_loss', 'boundary_loss', 'total_loss', 'accuracy'},
             unit_name='step'
         )
@@ -178,7 +181,7 @@ class TrainClassifier:
                     logs = copy.copy(logs) if logs else {}
                     num_steps = logs.pop('num_steps', 1)
                     seen += num_steps
-                    progbar.update(seen, list(logs.items()), finalize=False)
+                    progbar.update(seen, list(logs.items()), finalize=True)
                 # else:
                 #     logging.error('\n{epoch}: Error batch size {b1} != {b2}.'.format(
                 #         epoch=epoch,
