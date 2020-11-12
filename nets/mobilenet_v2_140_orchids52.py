@@ -144,19 +144,19 @@ def create_orchid_mobilenet_v2_14(num_classes,
     branch_base_model = None
     boundary_loss = None
     branches_prediction_models = []
+    step = kwargs.pop('step') if 'step' in kwargs else ''
+
     data_augmentation = keras.Sequential([
         keras.layers.experimental.preprocessing.RandomFlip('horizontal'),
         keras.layers.experimental.preprocessing.RandomRotation(0.2),
     ])
     preprocess_input = keras.applications.mobilenet_v2.preprocess_input
-    batch_size = kwargs.pop('batch_size') if 'batch_size' in kwargs else 32
-    step = kwargs.pop('step') if 'step' in kwargs else ''
 
     inputs = keras.Input(shape=IMG_SHAPE_224)
-    inputs = data_augmentation(inputs, training=training)
-    inputs = preprocess_input(inputs)
+    aug_inputs = data_augmentation(inputs, training=training)
+    preprocess_inputs = preprocess_input(aug_inputs)
 
-    stn_base_model = create_mobilenet_v2(input_tensor=IMG_SHAPE_224,
+    stn_base_model = create_mobilenet_v2(input_shape=IMG_SHAPE_224,
                                          alpha=1.4,
                                          include_top=False,
                                          weights='imagenet',
@@ -179,10 +179,12 @@ def create_orchid_mobilenet_v2_14(num_classes,
             stn_dense
         ])
 
-        h_fc = stn_module(inputs)
+        stn_fc = stn_module(preprocess_inputs)
 
-        stn_inputs, bound_err = pre_spatial_transformer_network(inputs,
-                                                                h_fc,
+        batch_size = kwargs.pop('batch_size') if 'batch_size' in kwargs else 32
+        stn_output, bound_err = pre_spatial_transformer_network(preprocess_inputs,
+                                                                stn_fc,
+                                                                batch_size=batch_size,
                                                                 width=default_image_size,
                                                                 height=default_image_size,
                                                                 scales=scales)
@@ -193,7 +195,7 @@ def create_orchid_mobilenet_v2_14(num_classes,
             boundary_loss = keras.Model(inputs, tf.keras.losses.MSE(bound_err, bound_std))
 
         all_images = []
-        for img in stn_inputs:
+        for img in stn_output:
             all_images.append(img)
 
         branch_base_model = create_mobilenet_v2(input_shape=IMG_SHAPE_224,
@@ -239,10 +241,13 @@ def create_orchid_mobilenet_v2_14(num_classes,
             outputs = main_net
 
     else:
-        prediction_layer = nets.utils.create_predict_module(num_classes=num_classes, name='t1')
+        prediction_layer = nets.utils.create_predict_module(num_classes=num_classes,
+                                                            name='mobilenet_v2_14_orchids52',
+                                                            activation='softmax')
         branches_prediction_models.append(prediction_layer)
-        x = stn_base_model(inputs, training=training)
-        outputs = prediction_layer(x, training=training)
+
+        stn_output = stn_base_model(preprocess_inputs, training=training)
+        outputs = prediction_layer(stn_output, training=training)
 
     model = Orchids52Mobilenet140STN(inputs, outputs,
                                      base_model=stn_base_model,

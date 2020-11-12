@@ -217,11 +217,12 @@ def spatial_transformer_network(input_fmap, theta, out_dims=None, **kwargs):
 
 def pre_spatial_transformer_network(input_map,
                                     theta,
+                                    batch_size,
                                     width,
                                     height,
                                     scales=None):
     # grab input dimensions
-    batch_size, _w = theta.shape
+    _, _w = theta.shape
     out_size = (width, height)
 
     thetas = []
