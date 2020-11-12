@@ -16,7 +16,7 @@ from stn import pre_spatial_transformer_network
 logging = tf.compat.v1.logging
 
 
-class Orchids52Mobilenet140(keras.Model):
+class Orchids52Mobilenet140STN(nets.mobilenet_v2_140.Orchids52Mobilenet140):
     def __init__(self, inputs, outputs,
                  base_model,
                  stn_dense,
@@ -25,18 +25,17 @@ class Orchids52Mobilenet140(keras.Model):
                  boundary_loss,
                  training,
                  step):
-        super(Orchids52Mobilenet140, self).__init__(inputs, outputs, trainable=training)
-        self.base_model = base_model
+        super(Orchids52Mobilenet140STN, self).__init__(inputs, outputs,
+                                                       base_model,
+                                                       predict_models,
+                                                       training,
+                                                       step)
         self.stn_dense = stn_dense
-        self.predict_models = predict_models
         self.branch_model = branch_model
         self.boundary_loss = boundary_loss
-        self.training = training
-        self.step = step
 
     def set_mobilenet_training_status(self, trainable):
-        if self.base_model:
-            self.base_model.trainable = trainable
+        super(Orchids52Mobilenet140STN, self).set_mobilenet_training_status(trainable)
         if self.branch_model:
             self.branch_model.trainable = trainable
 
@@ -57,19 +56,10 @@ class Orchids52Mobilenet140(keras.Model):
             self.set_mobilenet_training_status(True)
 
     def save_model_weights(self, filepath, epoch, overwrite=True, save_format=None):
-        model_path = os.path.join(filepath, self.step)
-        if not tf.io.gfile.exists(model_path):
-            tf.io.gfile.mkdir(model_path)
-        super(Orchids52Mobilenet140, self).save_weights(filepath=get_checkpoint_file(model_path, epoch),
-                                                        overwrite=overwrite,
-                                                        save_format=save_format)
-        if self.base_model:
-            base_model_path = os.path.join(filepath, 'base_model')
-            if not tf.io.gfile.exists(base_model_path):
-                tf.io.gfile.mkdir(base_model_path)
-            self.base_model.save_weights(filepath=get_checkpoint_file(base_model_path, epoch),
-                                         overwrite=overwrite,
-                                         save_format=save_format)
+        super(Orchids52Mobilenet140STN, self).save_model_weights(filepath=filepath,
+                                                                 epoch=epoch,
+                                                                 overwrite=overwrite,
+                                                                 save_format=save_format)
         if self.branch_model:
             branch_model_path = os.path.join(filepath, 'branch_model')
             if not tf.io.gfile.exists(branch_model_path):
@@ -88,31 +78,6 @@ class Orchids52Mobilenet140(keras.Model):
                 m.save_weights(filepath=get_checkpoint_file(model_path, epoch),
                                overwrite=overwrite,
                                save_format=save_format)
-
-    def save(self,
-             filepath,
-             overwrite=True,
-             include_optimizer=True,
-             save_format=None,
-             signatures=None,
-             options=None):
-        model_path = os.path.join(filepath, 'model')
-        if not tf.io.gfile.exists(model_path):
-            tf.io.gfile.mkdir(model_path)
-        super(Orchids52Mobilenet140, self).save(filepath=model_path,
-                                                overwrite=overwrite,
-                                                include_optimizer=include_optimizer,
-                                                save_format=save_format,
-                                                signatures=signatures,
-                                                options=options)
-
-    def load_model_step1(self, filepath, epoch, by_name=False, skip_mismatch=False):
-        predict_model_path = os.path.join(filepath, 'predict_model', '00')
-        if tf.io.gfile.exists(predict_model_path):
-            for m in self.predict_models:
-                m.load_weights(filepath=get_checkpoint_file(predict_model_path, epoch),
-                               by_name=by_name,
-                               skip_mismatch=skip_mismatch)
 
     def load_model_step2(self, filepath, epoch, by_name=False, skip_mismatch=False):
         base_model_path = os.path.join(filepath, 'base_model')
@@ -154,7 +119,7 @@ class Orchids52Mobilenet140(keras.Model):
             self.load_model_step3(checkpoint_path, epoch, by_name, skip_mismatch)
         elif self.step == nets.utils.TRAIN_STEP4:
             latest, _ = latest_checkpoint(checkpoint_path, nets.utils.TRAIN_STEP3)
-            super(Orchids52Mobilenet140, self).load_weights(
+            super(Orchids52Mobilenet140STN, self).load_weights(
                 filepath=latest,
                 by_name=by_name,
                 skip_mismatch=skip_mismatch)
@@ -164,17 +129,10 @@ class Orchids52Mobilenet140(keras.Model):
             filepath = os.path.join(checkpoint_path, self.step)
             filepath = get_checkpoint_file(filepath, epoch=epoch)
             if tf.io.gfile.exists(filepath):
-                super(Orchids52Mobilenet140, self).load_weights(
+                super(Orchids52Mobilenet140STN, self).load_weights(
                     filepath=filepath,
                     by_name=by_name,
                     skip_mismatch=skip_mismatch)
-
-    def resume_model_weights(self, filepath, by_name=False, skip_mismatch=False):
-        self.config_layers(self.step)
-        if not hasattr(filepath, 'endswith'):
-            filepath = str(filepath)
-        super(Orchids52Mobilenet140, self).load_weights(
-            filepath=filepath, by_name=by_name, skip_mismatch=skip_mismatch)
 
 
 def create_orchid_mobilenet_v2_14(num_classes,
@@ -254,7 +212,8 @@ def create_orchid_mobilenet_v2_14(num_classes,
 
         all_predicts = []
         for i, net in enumerate(all_logits):
-            branches_prediction = nets.utils.create_predict_module(num_classes=num_classes, name='t2_{i:02d}'.format(i=i))
+            branches_prediction = nets.utils.create_predict_module(num_classes=num_classes,
+                                                                   name='t2_{i:02d}'.format(i=i))
             x = branches_prediction(net)
             branches_prediction_models.append(branches_prediction)
             all_predicts.append(x)
@@ -273,8 +232,8 @@ def create_orchid_mobilenet_v2_14(num_classes,
                         values=[c_t, net],
                         name='t2_concat_{i:02d}'.format(i=i))
                     c_t = keras.layers.Dense(num_classes,
-                                       name='t2_Dense_{i:02d}'.format(i=i)
-                                       )(input_and_hstate_concatenated)
+                                             name='t2_Dense_{i:02d}'.format(i=i)
+                                             )(input_and_hstate_concatenated)
                     main_net = main_net + c_t
                 else:
                     main_net = net
@@ -287,14 +246,14 @@ def create_orchid_mobilenet_v2_14(num_classes,
         x = stn_base_model(inputs)
         outputs = predict_model(x)
 
-    model = Orchids52Mobilenet140(inputs, outputs,
-                                  base_model=stn_base_model,
-                                  stn_dense=stn_dense,
-                                  predict_models=branches_prediction_models,
-                                  branch_model=branch_base_model,
-                                  boundary_loss=boundary_loss,
-                                  training=training,
-                                  step=step)
+    model = Orchids52Mobilenet140STN(inputs, outputs,
+                                     base_model=stn_base_model,
+                                     stn_dense=stn_dense,
+                                     predict_models=branches_prediction_models,
+                                     branch_model=branch_base_model,
+                                     boundary_loss=boundary_loss,
+                                     training=training,
+                                     step=step)
     return model
 
 
@@ -303,4 +262,5 @@ def _handle_boundary_loss(name, variable, error_fn):
         with tf.name_scope(name + '/boundary_loss'):
             regularization = error_fn(v)
         return regularization
+
     return functools.partial(_loss_for_boundary, variable)

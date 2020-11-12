@@ -54,7 +54,7 @@ def main(unused_argv):
     create_model = utils.nets_mapping[FLAGS.model]
 
     if not tf.io.gfile.exists(checkpoint_path):
-        tf.io.gfile.mkdir(checkpoint_path)
+        os.makedirs(checkpoint_path)
 
     for train_step in range(FLAGS.start_state, FLAGS.end_state):
         if train_step == 1:
