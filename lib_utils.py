@@ -97,7 +97,7 @@ class TrainClassifier:
         boundary_loss = 0.
         with tf.GradientTape() as tape:
             predictions = self.model(inputs, training=True)
-            if hasattr(self.model, 'boundary_loss'):
+            if hasattr(self.model, 'boundary_loss') and self.model.boundary_loss:
                 boundary_loss = self.model.boundary_loss(inputs, training=True)
             train_loss = self.loss_fn(labels, predictions)
             regularization_loss = tf.reduce_sum(self.model.losses)
