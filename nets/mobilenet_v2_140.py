@@ -110,7 +110,6 @@ class Orchids52Mobilenet140(object):
 
     def set_prediction_training_status(self, trainable):
         if self.predict_models:
-            self.predict_models.trainable = trainable
             for p in self.predict_models:
                 p.trainable = trainable
 
