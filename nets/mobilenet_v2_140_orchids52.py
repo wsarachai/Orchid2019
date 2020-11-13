@@ -248,6 +248,9 @@ def create_orchid_mobilenet_v2_14(num_classes,
 
                 with tf.name_scope('branches'):
                     branches_block = BranchesBlock(num_classes=num_classes)
+                    branch_base_model = branches_block.branch_base_model
+                    branches_prediction_models = branches_block.branches_prediction_models
+
                     logits = branches_block(stn_output)
 
                 with tf.name_scope('estimate_block'):
@@ -270,8 +273,8 @@ def create_orchid_mobilenet_v2_14(num_classes,
                                              base_model=stn_base_model,
                                              stn_dense=stn_dense,
                                              estimate_block=estimate_block,
-                                             predict_models=branches_block.branches_prediction_models,
-                                             branch_model=branches_block.branch_base_model,
+                                             predict_models=branches_prediction_models,
+                                             branch_model=branch_base_model,
                                              boundary_loss=boundary_loss,
                                              training=training,
                                              step=step)
