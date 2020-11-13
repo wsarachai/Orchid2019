@@ -4,38 +4,23 @@ from __future__ import print_function
 
 import os
 import copy
-import pathlib
 import nets
 import tensorflow as tf
 
 logging = tf.compat.v1.logging
-CHECK_FILE = 'cp-{epoch:04d}'
 
 
-def get_checkpoint_file(checkpoint_dir, epoch):
-    return os.path.join(checkpoint_dir, CHECK_FILE.format(epoch=epoch))
+def get_checkpoint_file(checkpoint_dir, name):
+    if isinstance(name, int):
+        return os.path.join(checkpoint_dir, 'cp-{name:04d}'.format(name=name))
+    else:
+        return os.path.join(checkpoint_dir, 'cp-{name}'.format(name=name))
 
 
 def get_step_number(checkpoint_dir):
     idx = checkpoint_dir.index('.')
     step = int(checkpoint_dir[:idx][-4:])
     return step
-
-
-def latest_checkpoint(checkpoint_dir, train_step):
-    checkpoint_dir = os.path.join(checkpoint_dir, '{train_step}'.format(train_step=train_step))
-    file_path = pathlib.Path(checkpoint_dir)
-    file_list = list(file_path.glob('*.index'))
-
-    if len(file_list) > 0:
-        max_step = -1
-        for file in file_list:
-            step = get_step_number(file.name)
-            if max_step < step:
-                max_step = step
-                file_path = get_checkpoint_file(checkpoint_dir, max_step)
-        return file_path, max_step
-    return None, 0
 
 
 def apply_with_random_selector(x, func, num_cases):
@@ -69,12 +54,20 @@ def config_learning_rate(learning_rate=0.001,
     return learning_rate
 
 
+def config_optimizer(learning_rate, **kwargs):
+    optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate)
+    return optimizer
+
+
+def config_loss(**kwargs):
+    loss_fn = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+    return loss_fn
+
+
 class TrainClassifier:
 
-    def __init__(self, model, learning_rate, batch_size):
+    def __init__(self, model, batch_size):
         self.model = model
-        self.optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate)
-        self.loss_fn = tf.keras.losses.BinaryCrossentropy(from_logits=True)
         self.train_loss_metric = tf.keras.metrics.Mean(name='train_loss')
         self.regularization_loss_metric = tf.keras.metrics.Mean(name='regularization_loss')
         self.boundary_loss_metric = tf.keras.metrics.Mean(name='boundary_loss')
@@ -82,9 +75,7 @@ class TrainClassifier:
         self.accuracy_metric = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
         self.batch_size = batch_size
 
-        self.model.compile(optimizer=self.optimizer,
-                           loss=self.loss_fn,
-                           metrics=[
+        self.model.compile(metrics=[
                                self.train_loss_metric,
                                self.regularization_loss_metric,
                                self.boundary_loss_metric,
@@ -96,15 +87,15 @@ class TrainClassifier:
     def train_step(self, inputs, labels):
         boundary_loss = 0.
         with tf.GradientTape() as tape:
-            predictions = self.model(inputs, training=True)
+            predictions = self.model.process_step(inputs, training=True)
             if hasattr(self.model, 'boundary_loss') and self.model.boundary_loss:
                 boundary_loss = self.model.boundary_loss(inputs, training=True)
-            train_loss = self.loss_fn(labels, predictions)
-            regularization_loss = tf.reduce_sum(self.model.losses)
+            train_loss = self.model.get_loss(labels, predictions)
+            regularization_loss = tf.reduce_sum(self.model.get_regularization_loss())
             total_loss = regularization_loss + train_loss + boundary_loss
 
-        gradients = tape.gradient(total_loss, self.model.trainable_variables)
-        self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
+        gradients = tape.gradient(total_loss, self.model.get_trainable_variables())
+        self.model.optimizer.apply_gradients(zip(gradients, self.model.get_trainable_variables()))
 
         self.train_loss_metric.update_state(train_loss)
         self.regularization_loss_metric.update_state(regularization_loss)
@@ -122,8 +113,8 @@ class TrainClassifier:
 
     @tf.function
     def evaluate_step(self, inputs, labels):
-        predictions = self.model(inputs, training=False)
-        total_loss = self.loss_fn(labels, predictions)
+        predictions = self.model.process_step(inputs, training=False)
+        total_loss = self.model.get_loss(labels, predictions)
         self.total_loss_metric.update_state(total_loss)
         self.accuracy_metric.update_state(labels, predictions)
         return {
@@ -165,7 +156,7 @@ class TrainClassifier:
         )
         val_accuracy = 0.0
         val_loss = 1.0
-        for epoch in range(initial_epoch, epoches+1):
+        for epoch in range(initial_epoch, epoches + 1):
             print('\nEpoch: {}/{}'.format(epoch, epoches))
 
             self.reset_metric()
@@ -204,7 +195,7 @@ class TrainClassifier:
 
             if checkpoint_path:
                 if val_accuracy < logs['accuracy'].numpy() or val_loss > logs['loss'].numpy():
-                    self.model.save_model_weights(checkpoint_path, epoch)
+                    self.model.save_model_variables()
         return {
             'history': history
         }

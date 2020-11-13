@@ -9,7 +9,6 @@ import lib_utils
 from pickle import dump
 from data import data_utils, orchids52_dataset
 from data.data_utils import dataset_mapping
-from lib_utils import start, latest_checkpoint
 from nets import utils
 
 flags = tf.compat.v1.flags
@@ -76,27 +75,26 @@ def main(unused_argv):
         test_ds = load_dataset(split="test", batch_size=batch_size, root_path=data_dir)
 
         training_step = utils.TRAIN_TEMPLATE.format(step=train_step)
-        model = create_model(num_classes=orchids52_dataset.NUM_OF_CLASSES,
-                             training=True,
-                             batch_size=batch_size,
-                             step=training_step)
 
         learning_rate = lib_utils.config_learning_rate(FLAGS.learning_rate,
                                                        FLAGS.exp_decay,
                                                        training_step=training_step)
+        optimizer = lib_utils.config_optimizer(learning_rate, training_step=training_step)
+        loss_fn = lib_utils.config_loss()
 
+        model = create_model(num_classes=orchids52_dataset.NUM_OF_CLASSES,
+                             optimizer=optimizer,
+                             loss_fn=loss_fn,
+                             training=True,
+                             batch_size=batch_size,
+                             step=training_step)
+
+        model.config_checkpoint(checkpoint_path)
         train_model = lib_utils.TrainClassifier(model=model,
-                                                learning_rate=learning_rate,
                                                 batch_size=batch_size)
 
+        epoch = model.restore_model_variables()
         model.summary()
-
-        latest, epoch = latest_checkpoint(checkpoint_path, training_step)
-        if latest:
-            model.resume_model_weights(latest)
-        else:
-            model.load_model_weights(checkpoint_path, epoch)
-            epoch = 1
 
         history_fine = train_model.fit(initial_epoch=epoch,
                                        epoches=total_epochs[idx],
@@ -119,4 +117,4 @@ def main(unused_argv):
 
 if __name__ == '__main__':
     tf.config.experimental_run_functions_eagerly(True)
-    start(main)
+    lib_utils.start(main)

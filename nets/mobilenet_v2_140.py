@@ -11,23 +11,98 @@ import tensorflow.keras as keras
 from nets.mobilenet_v2 import create_mobilenet_v2, IMG_SHAPE_224
 
 
-class Orchids52Mobilenet140(keras.Model):
+class Orchids52Mobilenet140(object):
     def __init__(self, inputs, outputs,
+                 optimizer,
+                 loss_fn,
                  base_model,
                  predict_models,
                  training,
                  step):
-        super(Orchids52Mobilenet140, self).__init__(inputs, outputs, trainable=training)
+        super(Orchids52Mobilenet140, self).__init__()
+        self.model = keras.Model(inputs, outputs, trainable=training)
+        self.optimizer = optimizer
+        self.loss_fn = loss_fn
         self.base_model = base_model
         self.predict_models = predict_models
         self.training = training
         self.step = step
 
-    def call(self, inputs, training=None, mask=None):
-        return super(Orchids52Mobilenet140, self).call(inputs, training, mask)
+        self.checkpoint = None
+        self.checkpoint_manager = None
+        self.predict_models_checkpoints = []
+        self.predict_models_checkpoint_managers = []
 
-    def get_config(self):
-        return super(Orchids52Mobilenet140, self).get_config()
+    def compile(self, metrics):
+        self.model.compile(optimizer=self.optimizer,
+                           loss=self.loss_fn,
+                           metrics=metrics)
+
+    def process_step(self, inputs, training=False):
+        return self.model(inputs, training=training)
+
+    def get_loss(self, labels, predictions):
+        return self.loss_fn(labels, predictions)
+
+    def get_regularization_loss(self):
+        return self.model.losses
+
+    def get_trainable_variables(self):
+        return self.model.trainable_variables
+
+    def summary(self):
+        self.model.summary()
+
+    def config_checkpoint(self, checkpoint_path):
+        assert (self.optimizer is not None
+                and self.predict_models is not None)
+        self.checkpoint = tf.train.Checkpoint(
+            optimizer=self.optimizer,
+            model=self.model)
+        checkpoint_prefix = os.path.join(checkpoint_path, self.step)
+        self.checkpoint_manager = tf.train.CheckpointManager(
+            self.checkpoint, directory=checkpoint_prefix, max_to_keep=5)
+
+        predict_models_path = os.path.join(checkpoint_prefix, 'predict_layers')
+        for idx, model in enumerate(self.predict_models):
+            ck = tf.train.Checkpoint(optimizer=self.optimizer, model=model)
+            self.predict_models_checkpoints.append(ck)
+            predict_models_checkpoint_prefix = lib_utils.get_checkpoint_file(predict_models_path, idx)
+            self.predict_models_checkpoint_managers.append(tf.train.CheckpointManager(
+                ck, directory=predict_models_checkpoint_prefix, max_to_keep=5))
+
+    def save_model_variables(self):
+        self.checkpoint_manager.save()
+        for p_ck in self.predict_models_checkpoint_managers:
+            p_ck.save()
+
+    def restore_model_variables(self):
+        latest_checkpoint = self.checkpoint_manager.latest_checkpoint
+        if latest_checkpoint:
+            status = self.checkpoint.restore(latest_checkpoint)
+            status.assert_existing_objects_matched()
+            step = int(latest_checkpoint[latest_checkpoint.index('ckpt-'):][5])
+            self.config_layers()
+            return step
+        else:
+            self.load_model_variables()
+            self.config_layers()
+            return 1
+
+    def config_layers(self):
+        import nets
+        if self.step == nets.utils.TRAIN_STEP1:
+            self.set_mobilenet_training_status(False)
+
+    def load_model_variables(self):
+        if self.step == nets.utils.TRAIN_STEP1:
+            self.load_model_step1()
+
+    def load_model_step1(self):
+        for idx, p_ck_mgr in enumerate(self.predict_models_checkpoint_managers):
+            if p_ck_mgr.latest_checkpoint:
+                status = self.predict_models_checkpoints[idx].restore(p_ck_mgr.latest_checkpoint)
+                status.assert_existing_objects_matched()
 
     def set_mobilenet_training_status(self, trainable):
         if self.base_model:
@@ -39,26 +114,6 @@ class Orchids52Mobilenet140(keras.Model):
             for p in self.predict_models:
                 p.trainable = trainable
 
-    def config_layers(self, step):
-        import nets
-        if step == nets.utils.TRAIN_STEP1:
-            self.set_mobilenet_training_status(False)
-
-    def save_model_weights(self, filepath, epoch, overwrite=True, save_format=None):
-        model_path = os.path.join(filepath, self.step)
-        if not tf.io.gfile.exists(model_path):
-            os.makedirs(model_path)
-        super(Orchids52Mobilenet140, self).save_weights(filepath=lib_utils.get_checkpoint_file(model_path, epoch),
-                                                        overwrite=overwrite,
-                                                        save_format=save_format)
-        if self.base_model:
-            base_model_path = os.path.join(filepath, 'base_model')
-            if not tf.io.gfile.exists(base_model_path):
-                os.makedirs(base_model_path)
-            self.base_model.save_weights(filepath=lib_utils.get_checkpoint_file(base_model_path, epoch),
-                                         overwrite=overwrite,
-                                         save_format=save_format)
-
     def save(self,
              filepath,
              overwrite=True,
@@ -69,39 +124,24 @@ class Orchids52Mobilenet140(keras.Model):
         model_path = os.path.join(filepath, 'model')
         if not tf.io.gfile.exists(model_path):
             tf.io.gfile.mkdir(model_path)
-        super(Orchids52Mobilenet140, self).save(filepath=model_path,
-                                                overwrite=overwrite,
-                                                include_optimizer=include_optimizer,
-                                                save_format=save_format,
-                                                signatures=signatures,
-                                                options=options)
+        self.model.save(filepath=model_path,
+                        overwrite=overwrite,
+                        include_optimizer=include_optimizer,
+                        save_format=save_format,
+                        signatures=signatures,
+                        options=options)
 
-    def load_model_step1(self, filepath, epoch, by_name=False, skip_mismatch=False):
-        predict_model_path = os.path.join(filepath, 'predict_model', '00')
-        if tf.io.gfile.exists(predict_model_path):
-            for m in self.predict_models:
-                m.load_weights(filepath=lib_utils.get_checkpoint_file(predict_model_path, epoch),
-                               by_name=by_name,
-                               skip_mismatch=skip_mismatch)
-
-    def load_model_weights(self,
-                           checkpoint_path,
-                           epoch,
-                           by_name=False,
-                           skip_mismatch=False):
-        self.config_layers(self.step)
-        if self.step == nets.utils.TRAIN_STEP1:
-            self.load_model_step1(checkpoint_path, epoch, by_name, skip_mismatch)
-
-    def resume_model_weights(self, filepath, by_name=False, skip_mismatch=False):
-        self.config_layers(self.step)
+    def resume_model_variables(self, filepath, by_name=False, skip_mismatch=False):
+        self.config_layers()
         if not hasattr(filepath, 'endswith'):
             filepath = str(filepath)
-        super(Orchids52Mobilenet140, self).load_weights(
+        self.model.load_weights(
             filepath=filepath, by_name=by_name, skip_mismatch=skip_mismatch)
 
 
 def create_mobilenet_v2_14(num_classes,
+                           optimizer,
+                           loss_fn,
                            training=False,
                            **kwargs):
     step = kwargs.pop('step') if 'step' in kwargs else ''
@@ -127,6 +167,8 @@ def create_mobilenet_v2_14(num_classes,
     outputs = prediction_layer(x, training=training)
 
     model = Orchids52Mobilenet140(inputs, outputs,
+                                  optimizer=optimizer,
+                                  loss_fn=loss_fn,
                                   base_model=base_model,
                                   predict_models=[prediction_layer],
                                   training=training,

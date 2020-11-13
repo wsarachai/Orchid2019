@@ -3,13 +3,11 @@ from __future__ import division
 from __future__ import print_function
 
 import functools
-import os
 import nets
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
 from tensorflow.python.keras import Sequential
-from lib_utils import get_checkpoint_file, latest_checkpoint
 from nets.mobilenet_v2 import default_image_size, create_mobilenet_v2, IMG_SHAPE_224
 from stn import pre_spatial_transformer_network
 
@@ -18,6 +16,8 @@ logging = tf.compat.v1.logging
 
 class Orchids52Mobilenet140STN(nets.mobilenet_v2_140.Orchids52Mobilenet140):
     def __init__(self, inputs, outputs,
+                 optimizer,
+                 loss_fn,
                  base_model,
                  stn_dense,
                  predict_models,
@@ -26,6 +26,8 @@ class Orchids52Mobilenet140STN(nets.mobilenet_v2_140.Orchids52Mobilenet140):
                  training,
                  step):
         super(Orchids52Mobilenet140STN, self).__init__(inputs, outputs,
+                                                       optimizer,
+                                                       loss_fn,
                                                        base_model,
                                                        predict_models,
                                                        training,
@@ -39,103 +41,59 @@ class Orchids52Mobilenet140STN(nets.mobilenet_v2_140.Orchids52Mobilenet140):
         if self.branch_model:
             self.branch_model.trainable = trainable
 
-    def config_layers(self, step):
+    def config_layers(self):
         import nets
-        if step == nets.utils.TRAIN_STEP1:
+        if self.step == nets.utils.TRAIN_STEP1:
             self.set_mobilenet_training_status(False)
-        elif step == nets.utils.TRAIN_STEP2:
+        elif self.step == nets.utils.TRAIN_STEP2:
             self.set_mobilenet_training_status(False)
             self.set_prediction_training_status(False)
-        elif step == nets.utils.TRAIN_STEP3:
+        elif self.step == nets.utils.TRAIN_STEP3:
             self.set_mobilenet_training_status(False)
             self.set_prediction_training_status(False)
             self.stn_dense.trainable = False
-        elif step == nets.utils.TRAIN_V2_STEP1:
+        elif self.step == nets.utils.TRAIN_V2_STEP1:
             self.set_mobilenet_training_status(False)
-        elif step == nets.utils.TRAIN_V2_STEP2:
+        elif self.step == nets.utils.TRAIN_V2_STEP2:
             self.set_mobilenet_training_status(True)
 
-    def save_model_weights(self, filepath, epoch, overwrite=True, save_format=None):
-        super(Orchids52Mobilenet140STN, self).save_model_weights(filepath=filepath,
-                                                                 epoch=0,
-                                                                 overwrite=overwrite,
-                                                                 save_format=save_format)
-        if self.branch_model:
-            branch_model_path = os.path.join(filepath, 'branch_model')
-            if not tf.io.gfile.exists(branch_model_path):
-                tf.io.gfile.mkdir(branch_model_path)
-            self.branch_model.save_weights(filepath=get_checkpoint_file(branch_model_path, 0),
-                                           overwrite=overwrite,
-                                           save_format=save_format)
-        if self.predict_models:
-            predict_model_path = os.path.join(filepath, 'predict_model')
-            if not tf.io.gfile.exists(predict_model_path):
-                tf.io.gfile.mkdir(predict_model_path)
-            for k, m in enumerate(self.predict_models):
-                model_path = os.path.join(predict_model_path, '{:02d}'.format(k))
-                if not tf.io.gfile.exists(model_path):
-                    tf.io.gfile.mkdir(model_path)
-                m.save_weights(filepath=get_checkpoint_file(model_path, 0),
-                               overwrite=overwrite,
-                               save_format=save_format)
+    def load_model_step2(self):
+        for idx, p_ck_mgr in enumerate(self.predict_models_checkpoint_managers):
+            if p_ck_mgr.latest_checkpoint:
+                status = self.predict_models_checkpoints[idx].restore(p_ck_mgr.latest_checkpoint)
+                status.assert_existing_objects_matched()
 
-    def load_model_step2(self, filepath, epoch, by_name=False, skip_mismatch=False):
-        base_model_path = os.path.join(filepath, 'base_model')
-        self.base_model.load_weights(filepath=get_checkpoint_file(base_model_path, epoch),
-                                     by_name=by_name,
-                                     skip_mismatch=skip_mismatch)
-        predict_model_path = os.path.join(filepath, 'predict_model', '00')
-        for m in self.predict_models:
-            m.load_weights(filepath=get_checkpoint_file(predict_model_path, epoch),
-                           by_name=by_name,
-                           skip_mismatch=skip_mismatch)
+    def load_model_step3(self):
+        for idx, p_ck_mgr in enumerate(self.predict_models_checkpoint_managers):
+            if p_ck_mgr.latest_checkpoint:
+                status = self.predict_models_checkpoints[idx].restore(p_ck_mgr.latest_checkpoint)
+                status.assert_existing_objects_matched()
 
-    def load_model_step3(self, filepath, epoch, by_name=False, skip_mismatch=False):
-        base_model_path = os.path.join(filepath, 'base_model')
-        self.base_model.load_weights(filepath=get_checkpoint_file(base_model_path, epoch),
-                                     by_name=by_name,
-                                     skip_mismatch=skip_mismatch)
-        base_model_path = os.path.join(filepath, 'branch_model')
-        self.branch_model.load_weights(filepath=get_checkpoint_file(base_model_path, epoch),
-                                       by_name=by_name,
-                                       skip_mismatch=skip_mismatch)
-        for k, m in enumerate(self.predict_models):
-            predict_model_path = os.path.join(filepath, 'predict_model', '{:02d}'.format(k))
-            m.load_weights(filepath=get_checkpoint_file(predict_model_path, epoch),
-                           by_name=by_name,
-                           skip_mismatch=skip_mismatch)
+    def load_model_step4(self):
+        latest_checkpoint = self.checkpoint_manager.latest_checkpoint
+        if latest_checkpoint:
+            status = self.checkpoint.restore(latest_checkpoint)
+            status.assert_existing_objects_matched()
 
-    def load_model_weights(self,
-                           checkpoint_path,
-                           epoch,
-                           by_name=False,
-                           skip_mismatch=False):
-        self.config_layers(self.step)
+    def load_model_v2_step2(self):
+        pass
+
+    def load_model_variables(self):
         if self.step == nets.utils.TRAIN_STEP1:
-            self.load_model_step1(checkpoint_path, epoch, by_name, skip_mismatch)
+            self.load_model_step1()
         elif self.step == nets.utils.TRAIN_STEP2:
-            self.load_model_step2(checkpoint_path, epoch, by_name, skip_mismatch)
+            self.load_model_step2()
         elif self.step == nets.utils.TRAIN_STEP3:
-            self.load_model_step3(checkpoint_path, epoch, by_name, skip_mismatch)
+            self.load_model_step3()
         elif self.step == nets.utils.TRAIN_STEP4:
-            latest, _ = latest_checkpoint(checkpoint_path, nets.utils.TRAIN_STEP3)
-            super(Orchids52Mobilenet140STN, self).load_weights(
-                filepath=latest,
-                by_name=by_name,
-                skip_mismatch=skip_mismatch)
+            self.load_model_step4()
         elif self.step == nets.utils.TRAIN_V2_STEP2:
-            self.load_model_v2_step2(checkpoint_path, epoch, by_name, skip_mismatch)
-        else:
-            filepath = os.path.join(checkpoint_path, self.step)
-            filepath = get_checkpoint_file(filepath, epoch=epoch)
-            if tf.io.gfile.exists(filepath):
-                super(Orchids52Mobilenet140STN, self).load_weights(
-                    filepath=filepath,
-                    by_name=by_name,
-                    skip_mismatch=skip_mismatch)
+            self.load_model_v2_step2()
 
 
 def create_orchid_mobilenet_v2_14(num_classes,
+                                  optimizer,
+                                  loss_fn,
                                   training=False,
                                   **kwargs):
     import nets
@@ -224,7 +182,8 @@ def create_orchid_mobilenet_v2_14(num_classes,
 
         if step == nets.utils.TRAIN_STEP2:
             outputs = tf.add_n(all_predicts, name='{}_add_n'.format(model_name))
-            outputs = tf.divide(outputs, len(all_predicts), name='{}_div'.format(model_name))
+            num_of_predicts = tf.convert_to_tensor(len(all_predicts), dtype=tf.float32, name='num_of_predicts')
+            outputs = tf.divide(outputs, num_of_predicts, name='{}_div'.format(model_name))
         else:
             # estimation block
             c_t = None
@@ -254,6 +213,8 @@ def create_orchid_mobilenet_v2_14(num_classes,
         outputs = prediction_layer(stn_output, training=training)
 
     model = Orchids52Mobilenet140STN(inputs, outputs,
+                                     optimizer=optimizer,
+                                     loss_fn=loss_fn,
                                      base_model=stn_base_model,
                                      stn_dense=stn_dense,
                                      predict_models=branches_prediction_models,
