@@ -31,5 +31,5 @@ def create_predict_module(num_classes, name, activation='linear'):
         keras.layers.GlobalAveragePooling2D(name='{}_global'.format(name)),
         keras.layers.Dropout(0.2, name='{}_droupout'.format(name)),
         keras.layers.Dense(num_classes, activation=activation, name='{}_fc'.format(name))
-    ])
+    ], name='{}_prediction_layer'.format(name))
     return module

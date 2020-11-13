@@ -33,6 +33,12 @@ class Orchids52Mobilenet140(keras.Model):
         if self.base_model:
             self.base_model.trainable = trainable
 
+    def set_prediction_training_status(self, trainable):
+        if self.predict_models:
+            self.predict_models.trainable = trainable
+            for p in self.predict_models:
+                p.trainable = trainable
+
     def config_layers(self, step):
         import nets
         if step == nets.utils.TRAIN_STEP1:

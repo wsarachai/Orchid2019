@@ -89,14 +89,14 @@ def main(unused_argv):
                                                 learning_rate=learning_rate,
                                                 batch_size=batch_size)
 
+        model.summary()
+
         latest, epoch = latest_checkpoint(checkpoint_path, training_step)
         if latest:
             model.resume_model_weights(latest)
         else:
             model.load_model_weights(checkpoint_path, epoch)
             epoch = 1
-
-        model.summary()
 
         history_fine = train_model.fit(initial_epoch=epoch,
                                        epoches=total_epochs[idx],

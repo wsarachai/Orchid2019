@@ -45,11 +45,11 @@ class Orchids52Mobilenet140STN(nets.mobilenet_v2_140.Orchids52Mobilenet140):
             self.set_mobilenet_training_status(False)
         elif step == nets.utils.TRAIN_STEP2:
             self.set_mobilenet_training_status(False)
-            self.predict_models.trainable = False
+            self.set_prediction_training_status(False)
         elif step == nets.utils.TRAIN_STEP3:
             self.set_mobilenet_training_status(False)
+            self.set_prediction_training_status(False)
             self.stn_dense.trainable = False
-            self.predict_models.trainable = False
         elif step == nets.utils.TRAIN_V2_STEP1:
             self.set_mobilenet_training_status(False)
         elif step == nets.utils.TRAIN_V2_STEP2:
@@ -145,14 +145,16 @@ def create_orchid_mobilenet_v2_14(num_classes,
     boundary_loss = None
     branches_prediction_models = []
     step = kwargs.pop('step') if 'step' in kwargs else ''
+    batch_size = kwargs.pop('batch_size') if 'batch_size' in kwargs else 32
+    model_name = 'orchids52-en'
 
     data_augmentation = keras.Sequential([
         keras.layers.experimental.preprocessing.RandomFlip('horizontal'),
         keras.layers.experimental.preprocessing.RandomRotation(0.2),
-    ])
+    ], name='{}_data-augmentation'.format(model_name))
     preprocess_input = keras.applications.mobilenet_v2.preprocess_input
 
-    inputs = keras.Input(shape=IMG_SHAPE_224)
+    inputs = keras.Input(shape=IMG_SHAPE_224, name='{}_input'.format(model_name), batch_size=batch_size)
     aug_inputs = data_augmentation(inputs, training=training)
     preprocess_inputs = preprocess_input(aug_inputs)
 
@@ -172,16 +174,15 @@ def create_orchid_mobilenet_v2_14(num_classes,
             keras.layers.Dense(128, name='t2_stn_dense_128'),
             keras.layers.Dropout(rate=0.2, name='t2_stn_dropout'),
             keras.layers.Dense(fc_num, activation='tanh', activity_regularizer='l2', name='t1_dense_6')
-        ])
+        ], name='{}_stn_dense'.format(model_name))
 
         stn_module = Sequential([
             stn_base_model,
             stn_dense
-        ])
+        ], name='{}_stn_module'.format(model_name))
 
         stn_fc = stn_module(preprocess_inputs)
 
-        batch_size = kwargs.pop('batch_size') if 'batch_size' in kwargs else 32
         stn_output, bound_err = pre_spatial_transformer_network(preprocess_inputs,
                                                                 stn_fc,
                                                                 batch_size=batch_size,
@@ -191,8 +192,11 @@ def create_orchid_mobilenet_v2_14(num_classes,
 
         if training:
             _len = bound_err.shape[0]
-            bound_std = tf.constant(np.full(_len, 0.00, dtype=np.float32))
-            boundary_loss = keras.Model(inputs, tf.keras.losses.MSE(bound_err, bound_std))
+            bound_std = tf.constant(np.full(_len, 0.00, dtype=np.float32),
+                                    name='{}_bound_std'.format(model_name))
+            boundary_loss = keras.Model(inputs,
+                                        tf.keras.losses.MSE(bound_err, bound_std),
+                                        name='{}_mse'.format(model_name))
 
         all_images = []
         for img in stn_output:
@@ -213,14 +217,14 @@ def create_orchid_mobilenet_v2_14(num_classes,
         all_predicts = []
         for i, net in enumerate(all_logits):
             branches_prediction = nets.utils.create_predict_module(num_classes=num_classes,
-                                                                   name='t2_{i:02d}'.format(i=i))
+                                                                   name='{n}_t2_{i:02d}'.format(n=model_name, i=i))
             x = branches_prediction(net)
             branches_prediction_models.append(branches_prediction)
             all_predicts.append(x)
 
         if step == nets.utils.TRAIN_STEP2:
-            outputs = tf.add_n(all_predicts)
-            outputs = tf.divide(outputs, len(all_predicts))
+            outputs = tf.add_n(all_predicts, name='{}_add_n'.format(model_name))
+            outputs = tf.divide(outputs, len(all_predicts), name='{}_div'.format(model_name))
         else:
             # estimation block
             c_t = None
@@ -230,9 +234,9 @@ def create_orchid_mobilenet_v2_14(num_classes,
                     input_and_hstate_concatenated = tf.concat(
                         axis=1,
                         values=[c_t, net],
-                        name='t2_concat_{i:02d}'.format(i=i))
+                        name='{n}_t2_concat_{i:02d}'.format(n=model_name, i=i))
                     c_t = keras.layers.Dense(num_classes,
-                                             name='t2_Dense_{i:02d}'.format(i=i)
+                                             name='{n}_t2_Dense_{i:02d}'.format(n=model_name, i=i)
                                              )(input_and_hstate_concatenated)
                     main_net = main_net + c_t
                 else:
