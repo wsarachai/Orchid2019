@@ -26,10 +26,13 @@ nets_mapping = {
 }
 
 
-def create_predict_module(num_classes, name, activation='linear'):
+def create_predict_module(num_classes,
+                          name='prediction_layer',
+                          activation='linear',
+                          dropout_ratio=0.8):
     module = Sequential([
-        keras.layers.GlobalAveragePooling2D(name='{}_global'.format(name)),
-        keras.layers.Dropout(0.2, name='{}_droupout'.format(name)),
-        keras.layers.Dense(num_classes, activation=activation, name='{}_fc'.format(name))
-    ], name='{}_prediction_layer'.format(name))
+        keras.layers.GlobalAveragePooling2D(),
+        keras.layers.Dropout(dropout_ratio),
+        keras.layers.Dense(num_classes, activation=activation, name='fc-{}'.format(num_classes))
+    ], name=name)
     return module

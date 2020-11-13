@@ -75,13 +75,7 @@ class TrainClassifier:
         self.accuracy_metric = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
         self.batch_size = batch_size
 
-        self.model.compile(metrics=[
-                               self.train_loss_metric,
-                               self.regularization_loss_metric,
-                               self.boundary_loss_metric,
-                               self.total_loss_metric,
-                               self.accuracy_metric
-                           ])
+        self.model.compile()
 
     @tf.function
     def train_step(self, inputs, labels):

@@ -27,16 +27,16 @@ class Orchids52Mobilenet140(object):
         self.predict_models = predict_models
         self.training = training
         self.step = step
+        self.max_to_keep = 5
 
         self.checkpoint = None
         self.checkpoint_manager = None
         self.predict_models_checkpoints = []
         self.predict_models_checkpoint_managers = []
 
-    def compile(self, metrics):
+    def compile(self):
         self.model.compile(optimizer=self.optimizer,
-                           loss=self.loss_fn,
-                           metrics=metrics)
+                           loss=self.loss_fn)
 
     def process_step(self, inputs, training=False):
         return self.model(inputs, training=training)
@@ -61,7 +61,7 @@ class Orchids52Mobilenet140(object):
             model=self.model)
         checkpoint_prefix = os.path.join(checkpoint_path, self.step)
         self.checkpoint_manager = tf.train.CheckpointManager(
-            self.checkpoint, directory=checkpoint_prefix, max_to_keep=5)
+            self.checkpoint, directory=checkpoint_prefix, max_to_keep=self.max_to_keep)
 
         predict_models_path = os.path.join(checkpoint_prefix, 'predict_layers')
         for idx, model in enumerate(self.predict_models):
@@ -69,7 +69,7 @@ class Orchids52Mobilenet140(object):
             self.predict_models_checkpoints.append(ck)
             predict_models_checkpoint_prefix = lib_utils.get_checkpoint_file(predict_models_path, idx)
             self.predict_models_checkpoint_managers.append(tf.train.CheckpointManager(
-                ck, directory=predict_models_checkpoint_prefix, max_to_keep=5))
+                ck, directory=predict_models_checkpoint_prefix, max_to_keep=self.max_to_keep))
 
     def save_model_variables(self):
         self.checkpoint_manager.save()

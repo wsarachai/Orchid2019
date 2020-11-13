@@ -116,5 +116,5 @@ def main(unused_argv):
 
 
 if __name__ == '__main__':
-    tf.config.experimental_run_functions_eagerly(True)
+    #tf.config.experimental_run_functions_eagerly(True)
     lib_utils.start(main)
