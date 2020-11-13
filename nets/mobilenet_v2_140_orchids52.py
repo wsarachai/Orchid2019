@@ -43,16 +43,16 @@ class Orchids52Mobilenet140STN(nets.mobilenet_v2_140.Orchids52Mobilenet140):
 
     def config_checkpoint(self, checkpoint_path):
         super(Orchids52Mobilenet140STN, self).config_checkpoint(checkpoint_path)
-        assert (self.stn_dense is not None)
-        self.stn_dense_checkpoint = tf.train.Checkpoint(
-            optimizer=self.optimizer,
-            model=self.stn_dense)
-        checkpoint_prefix = os.path.join(checkpoint_path, self.step)
-        stn_dense_models_path = os.path.join(checkpoint_prefix, 'stn_dense_layers')
-        self.stn_dense_checkpoint_manager = tf.train.CheckpointManager(
-            self.stn_dense_checkpoint,
-            directory=stn_dense_models_path,
-            max_to_keep=self.max_to_keep)
+        if self.stn_dense:
+            self.stn_dense_checkpoint = tf.train.Checkpoint(
+                optimizer=self.optimizer,
+                model=self.stn_dense)
+            checkpoint_prefix = os.path.join(checkpoint_path, self.step)
+            stn_dense_models_path = os.path.join(checkpoint_prefix, 'stn_dense_layers')
+            self.stn_dense_checkpoint_manager = tf.train.CheckpointManager(
+                self.stn_dense_checkpoint,
+                directory=stn_dense_models_path,
+                max_to_keep=self.max_to_keep)
 
     def save_model_variables(self):
         super(Orchids52Mobilenet140STN, self).save_model_variables()
