@@ -100,7 +100,6 @@ def main(unused_argv):
                                        epoches=total_epochs[idx],
                                        train_ds=train_ds,
                                        validate_ds=validate_ds,
-                                       checkpoint_path=checkpoint_path,
                                        bash=FLAGS.bash)
 
         with open('{}-history.pack'.format(training_step), 'wb') as handle:  # saving the history of the model

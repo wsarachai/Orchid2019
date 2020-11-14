@@ -39,25 +39,25 @@ class Orchids52Mobilenet140STN(nets.mobilenet_v2_140.Orchids52Mobilenet140):
         self.estimate_block = estimate_block
         self.boundary_loss = boundary_loss
         self.stn_dense_checkpoint = None
-        self.stn_dense_checkpoint_manager = None
 
     def config_checkpoint(self, checkpoint_path):
         super(Orchids52Mobilenet140STN, self).config_checkpoint(checkpoint_path)
         if self.stn_dense:
-            self.stn_dense_checkpoint = tf.train.Checkpoint(
+            stn_dense_checkpoint = tf.train.Checkpoint(
                 optimizer=self.optimizer,
                 model=self.stn_dense)
-            checkpoint_prefix = os.path.join(checkpoint_path, self.step)
-            stn_dense_models_path = os.path.join(checkpoint_prefix, 'stn_dense_layers')
-            self.stn_dense_checkpoint_manager = tf.train.CheckpointManager(
-                self.stn_dense_checkpoint,
-                directory=stn_dense_models_path,
+            checkpoint_prefix = os.path.join(checkpoint_path, self.step, 'stn_dense_layer')
+            stn_dense_checkpoint_manager = tf.train.CheckpointManager(
+                stn_dense_checkpoint,
+                directory=checkpoint_prefix,
                 max_to_keep=self.max_to_keep)
+            self.stn_dense_checkpoint = (stn_dense_checkpoint, stn_dense_checkpoint_manager)
 
     def save_model_variables(self):
         super(Orchids52Mobilenet140STN, self).save_model_variables()
         if self.stn_dense:
-            self.stn_dense_checkpoint.save()
+            _, stn_dense_checkpoint_manager = self.stn_dense_checkpoint
+            stn_dense_checkpoint_manager.save()
 
     def set_mobilenet_training_status(self, trainable):
         super(Orchids52Mobilenet140STN, self).set_mobilenet_training_status(trainable)
@@ -65,7 +65,6 @@ class Orchids52Mobilenet140STN(nets.mobilenet_v2_140.Orchids52Mobilenet140):
             self.branch_model.trainable = trainable
 
     def config_layers(self):
-        import nets
         if self.step == nets.utils.TRAIN_STEP1:
             self.set_mobilenet_training_status(False)
         elif self.step == nets.utils.TRAIN_STEP2:
@@ -82,15 +81,15 @@ class Orchids52Mobilenet140STN(nets.mobilenet_v2_140.Orchids52Mobilenet140):
 
     def load_model_step2(self):
         self.load_model_step1()
-        if self.stn_dense_checkpoint_manager.latest_checkpoint:
-            status = self.stn_dense_checkpoint.restore(
-                self.stn_dense_checkpoint_manager.latest_checkpoint)
+        _, stn_dense_checkpoint_manager = self.stn_dense_checkpoint
+        if stn_dense_checkpoint_manager.latest_checkpoint:
+            status = self.stn_dense_checkpoint.restore(stn_dense_checkpoint_manager.latest_checkpoint)
             status.assert_existing_objects_matched()
 
     def load_model_step3(self):
-        latest_checkpoint = self.checkpoint_manager.latest_checkpoint
-        if latest_checkpoint:
-            status = self.checkpoint.restore(latest_checkpoint)
+        checkpoint, checkpoint_manager = self.checkpoint
+        if checkpoint_manager.latest_checkpoint:
+            status = checkpoint.restore(checkpoint_manager.latest_checkpoint)
             status.assert_existing_objects_matched()
 
     def load_model_step4(self):
@@ -112,9 +111,9 @@ class Orchids52Mobilenet140STN(nets.mobilenet_v2_140.Orchids52Mobilenet140):
             self.load_model_v2_step2()
 
 
-class BranchesBlock(keras.layers.Layer):
+class BrancheBlock(keras.layers.Layer):
     def __init__(self, num_classes):
-        super(BranchesBlock, self).__init__()
+        super(BrancheBlock, self).__init__()
         self.branch_base_model = create_mobilenet_v2(input_shape=IMG_SHAPE_224,
                                                      alpha=1.4,
                                                      include_top=False,
@@ -187,98 +186,95 @@ def create_orchid_mobilenet_v2_14(num_classes,
     branches_prediction_models = []
     step = kwargs.pop('step') if 'step' in kwargs else ''
     batch_size = kwargs.pop('batch_size') if 'batch_size' in kwargs else 32
-    model_name = 'orchids52-en'
 
-    with tf.Graph().as_default():
-        with tf.name_scope(model_name):
-            data_augmentation = keras.Sequential([
-                keras.layers.experimental.preprocessing.RandomFlip('horizontal'),
-                keras.layers.experimental.preprocessing.RandomRotation(0.2),
-            ], name='data-augmentation')
-            preprocess_input = keras.applications.mobilenet_v2.preprocess_input
+    data_augmentation = keras.Sequential([
+        keras.layers.experimental.preprocessing.RandomFlip('horizontal'),
+        keras.layers.experimental.preprocessing.RandomRotation(0.2),
+    ], name='data-augmentation')
+    preprocess_input = keras.applications.mobilenet_v2.preprocess_input
 
-            inputs = keras.Input(shape=IMG_SHAPE_224, name='input_224_224_3', batch_size=batch_size)
-            aug_inputs = data_augmentation(inputs, training=training)
-            preprocess_inputs = preprocess_input(aug_inputs)
+    inputs = keras.Input(shape=IMG_SHAPE_224, name='input_224_224_3', batch_size=batch_size)
+    aug_inputs = data_augmentation(inputs, training=training)
+    preprocess_inputs = preprocess_input(aug_inputs)
 
-            stn_base_model = create_mobilenet_v2(input_shape=IMG_SHAPE_224,
-                                                 alpha=1.4,
-                                                 include_top=False,
-                                                 weights='imagenet',
-                                                 sub_name='01')
+    stn_base_model = create_mobilenet_v2(input_shape=IMG_SHAPE_224,
+                                         alpha=1.4,
+                                         include_top=False,
+                                         weights='imagenet',
+                                         sub_name='01')
 
-            if step != nets.utils.TRAIN_STEP1:
-                with tf.name_scope('stn'):
-                    scales = [0.8, 0.6]
-                    element_size = 3  # [x, y, scale]
-                    fc_num = element_size * len(scales)
+    if step != nets.utils.TRAIN_STEP1:
+        #with tf.name_scope('stn'):
+        scales = [0.8, 0.6]
+        element_size = 3  # [x, y, scale]
+        fc_num = element_size * len(scales)
 
-                    stn_dense = Sequential([
-                        keras.layers.Conv2D(128, [1, 1], activation='relu', name="t2_stn_conv2d_resize_128"),
-                        keras.layers.Flatten(name='t2_stn_flatten'),
-                        keras.layers.Dense(128, name='t2_stn_dense_128'),
-                        keras.layers.Dropout(rate=0.2, name='t2_stn_dropout'),
-                        keras.layers.Dense(fc_num, activation='tanh', activity_regularizer='l2', name='t1_dense_6')
-                    ], name='stn_dense')
+        stn_dense = Sequential([
+            keras.layers.Conv2D(128, [1, 1], activation='relu', name="t2_stn_conv2d_resize_128"),
+            keras.layers.Flatten(name='t2_stn_flatten'),
+            keras.layers.Dense(128, name='t2_stn_dense_128'),
+            keras.layers.Dropout(rate=0.2, name='t2_stn_dropout'),
+            keras.layers.Dense(fc_num, activation='tanh', activity_regularizer='l2', name='t1_dense_6')
+        ], name='stn_dense')
 
-                    localization_network = Sequential([
-                        stn_base_model,
-                        stn_dense
-                    ], name='localization_network')
+        localization_network = Sequential([
+            stn_base_model,
+            stn_dense
+        ], name='localization_network')
 
-                    loc_output = localization_network(preprocess_inputs)
+        loc_output = localization_network(preprocess_inputs)
 
-                    with tf.name_scope('transformer_network'):
-                        stn_output, bound_err = pre_spatial_transformer_network(preprocess_inputs,
-                                                                                loc_output,
-                                                                                batch_size=batch_size,
-                                                                                width=default_image_size,
-                                                                                height=default_image_size,
-                                                                                scales=scales)
+        #with tf.name_scope('transformer_network'):
+        stn_output, bound_err = pre_spatial_transformer_network(preprocess_inputs,
+                                                                loc_output,
+                                                                batch_size=batch_size,
+                                                                width=default_image_size,
+                                                                height=default_image_size,
+                                                                scales=scales)
 
-                        if training:
-                            with tf.name_scope('boundary_loss'):
-                                _len = bound_err.shape[0]
-                                bound_std = tf.constant(np.full(_len, 0.00, dtype=np.float32),
-                                                        name='bound_std')
-                                boundary_loss = keras.Model(inputs,
-                                                            tf.keras.losses.MSE(bound_err, bound_std),
-                                                            name='mse')
-                    stn_output = tf.stack([inputs, stn_output[0], stn_output[1]], axis=0)
+        if training:
+            with tf.name_scope('boundary_loss'):
+                _len = bound_err.shape[0]
+                bound_std = tf.constant(np.full(_len, 0.00, dtype=np.float32),
+                                        name='bound_std')
+                boundary_loss = keras.Model(inputs,
+                                            tf.keras.losses.MSE(bound_err, bound_std),
+                                            name='mse')
+        stn_output = tf.stack([inputs, stn_output[0], stn_output[1]], axis=0)
 
-                with tf.name_scope('branches'):
-                    branches_block = BranchesBlock(num_classes=num_classes)
-                    branch_base_model = branches_block.branch_base_model
-                    branches_prediction_models = branches_block.branches_prediction_models
+        #with tf.name_scope('branches'):
+        branches_block = BrancheBlock(num_classes=num_classes)
+        branch_base_model = branches_block.branch_base_model
+        branches_prediction_models = branches_block.branches_prediction_models
 
-                    logits = branches_block(stn_output)
+        logits = branches_block(stn_output)
 
-                with tf.name_scope('estimate_block'):
-                    if step == nets.utils.TRAIN_STEP2:
-                        outputs = tf.reduce_mean(logits, axis=0)
-                    else:
-                        estimate_block = EstimationBlock(num_classes=num_classes, batch_size=batch_size)
-                        outputs = estimate_block(logits)
+        #with tf.name_scope('estimate_block'):
+        if step == nets.utils.TRAIN_STEP2:
+            outputs = tf.reduce_mean(logits, axis=0)
+        else:
+            estimate_block = EstimationBlock(num_classes=num_classes, batch_size=batch_size)
+            outputs = estimate_block(logits)
 
-            else:
-                prediction_layer = nets.utils.create_predict_module(num_classes=num_classes,
-                                                                    activation='softmax')
-                branches_prediction_models.append(prediction_layer)
-                stn_output = stn_base_model(preprocess_inputs, training=training)
-                outputs = prediction_layer(stn_output, training=training)
+    else:
+        prediction_layer = nets.utils.create_predict_module(num_classes=num_classes,
+                                                            activation='softmax')
+        branches_prediction_models.append(prediction_layer)
+        stn_output = stn_base_model(preprocess_inputs, training=training)
+        outputs = prediction_layer(stn_output, training=training)
 
-            model = Orchids52Mobilenet140STN(inputs, outputs,
-                                             optimizer=optimizer,
-                                             loss_fn=loss_fn,
-                                             base_model=stn_base_model,
-                                             stn_dense=stn_dense,
-                                             estimate_block=estimate_block,
-                                             predict_models=branches_prediction_models,
-                                             branch_model=branch_base_model,
-                                             boundary_loss=boundary_loss,
-                                             training=training,
-                                             step=step)
-            return model
+    model = Orchids52Mobilenet140STN(inputs, outputs,
+                                     optimizer=optimizer,
+                                     loss_fn=loss_fn,
+                                     base_model=stn_base_model,
+                                     stn_dense=stn_dense,
+                                     estimate_block=estimate_block,
+                                     predict_models=branches_prediction_models,
+                                     branch_model=branch_base_model,
+                                     boundary_loss=boundary_loss,
+                                     training=training,
+                                     step=step)
+    return model
 
 
 def _handle_boundary_loss(name, variable, error_fn):

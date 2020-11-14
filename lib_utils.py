@@ -77,7 +77,6 @@ class TrainClassifier:
 
         self.model.compile()
 
-    @tf.function
     def train_step(self, inputs, labels):
         boundary_loss = 0.
         with tf.GradientTape() as tape:
@@ -99,13 +98,12 @@ class TrainClassifier:
 
         return {
             'train_loss': train_loss,
-            'regularization_loss': regularization_loss,
-            'boundary_loss': boundary_loss,
+            'reg_loss': regularization_loss,
+            'b_loss': boundary_loss,
             'total_loss': total_loss,
             'accuracy': self.accuracy_metric.result()
         }
 
-    @tf.function
     def evaluate_step(self, inputs, labels):
         predictions = self.model.process_step(inputs, training=False)
         total_loss = self.model.get_loss(labels, predictions)
@@ -128,24 +126,22 @@ class TrainClassifier:
             epoches,
             train_ds,
             validate_ds,
-            checkpoint_path=None,
             **kwargs):
-        logs = None
         history = {
             'train_loss': [],
-            'regularization_loss': [],
-            'boundary_loss': [],
+            'reg_loss': [],
+            'b_loss': [],
             'total_loss': [],
             'accuracy': [],
-            'validation_loss': [],
-            'validation_accuracy': []
+            'val_loss': [],
+            'val_accuracy': []
         }
         target = train_ds.size // self.batch_size
         is_run_from_bash = kwargs.pop('bash') if 'bash' in kwargs else False
         finalize = False if not is_run_from_bash else True
         progbar = tf.keras.utils.Progbar(
             target, width=30, verbose=1, interval=0.05,
-            stateful_metrics={'train_loss', 'regularization_loss', 'boundary_loss', 'total_loss', 'accuracy'},
+            stateful_metrics={'train_loss', 'reg_loss', 'b_loss', 'total_loss', 'accuracy'},
             unit_name='step'
         )
         val_accuracy = 0.0
@@ -171,25 +167,27 @@ class TrainClassifier:
                 #     ))
 
             history['train_loss'].append(self.train_loss_metric.result().numpy())
-            history['regularization_loss'].append(self.regularization_loss_metric.result().numpy())
-            history['boundary_loss'].append(self.boundary_loss_metric.result().numpy())
+            history['reg_loss'].append(self.regularization_loss_metric.result().numpy())
+            history['b_loss'].append(self.boundary_loss_metric.result().numpy())
             history['total_loss'].append(self.total_loss_metric.result().numpy())
             history['accuracy'].append(self.accuracy_metric.result().numpy())
 
             self.reset_metric()
 
+            logs = None
             for inputs, labels in validate_ds:
                 if inputs.shape.as_list()[0] == self.batch_size:
                     logs = self.evaluate_step(inputs, labels)
 
             logs = copy.copy(logs) if logs else {}
-            history['validation_loss'].append(logs['loss'].numpy())
-            history['validation_accuracy'].append(logs['accuracy'].numpy())
+            history['val_loss'].append(logs['loss'].numpy())
+            history['val_accuracy'].append(logs['accuracy'].numpy())
             print(', val_loss: {:.3f}, val_accuracy: {:.3f}'.format(logs['loss'], logs['accuracy']))
 
-            if checkpoint_path:
-                if val_accuracy < logs['accuracy'].numpy() or val_loss > logs['loss'].numpy():
-                    self.model.save_model_variables()
+            if val_accuracy < logs['accuracy'].numpy() or val_loss > logs['loss'].numpy():
+                val_accuracy = logs['accuracy'].numpy()
+                val_loss = logs['loss'].numpy()
+                self.model.save_model_variables()
         return {
             'history': history
         }
