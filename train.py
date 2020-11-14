@@ -5,6 +5,7 @@ from __future__ import print_function
 import os
 import tensorflow as tf
 import lib_utils
+from datetime import datetime
 
 from pickle import dump
 from data import data_utils, orchids52_dataset
@@ -107,7 +108,8 @@ def main(unused_argv):
                                        bash=FLAGS.bash,
                                        save_best_only=FLAGS.save_best_only)
 
-        with open('{}-history.pack'.format(training_step), 'wb') as handle:  # saving the history of the model
+        timestamp = datetime.now().timestamp()
+        with open('{}-history-{}.pack'.format(training_step, timestamp), 'wb') as handle:  # saving the history of the model
             dump(history_fine['history'], handle)
 
         print('Test accuracy: ')

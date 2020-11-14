@@ -198,7 +198,6 @@ def create_orchid_mobilenet_v2_14(num_classes,
         sub_name='01')
 
     processed_inputs = preprocess_layer(inputs, training=training)
-    mobilenet_logits = stn_base_model(processed_inputs)
 
     if step != nets.utils.TRAIN_STEP1:
         # with tf.name_scope('stn'):
@@ -219,11 +218,11 @@ def create_orchid_mobilenet_v2_14(num_classes,
             stn_dense
         ], name='localization_network')
 
-        loc_output = localization_network(mobilenet_logits)
+        loc_output = localization_network(processed_inputs)
 
         # with tf.name_scope('transformer_network'):
         stn_output, bound_err = pre_spatial_transformer_network(
-            mobilenet_logits,
+            processed_inputs,
             loc_output,
             batch_size=batch_size,
             width=nets.mobilenet_v2.default_image_size,
@@ -259,6 +258,7 @@ def create_orchid_mobilenet_v2_14(num_classes,
             num_classes=num_classes,
             activation='softmax')
         branches_prediction_models.append(prediction_layer)
+        mobilenet_logits = stn_base_model(processed_inputs)
         outputs = prediction_layer(mobilenet_logits, training=training)
 
     model = Orchids52Mobilenet140STN(inputs, outputs,
