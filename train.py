@@ -58,6 +58,7 @@ def main(unused_argv):
     if not tf.io.gfile.exists(checkpoint_path):
         os.makedirs(checkpoint_path)
 
+    model = None
     total_epochs = [int(e) for e in FLAGS.total_epochs.split(',')]
     num_state = FLAGS.end_state - FLAGS.start_state
     assert(num_state == len(total_epochs))
@@ -108,10 +109,8 @@ def main(unused_argv):
         print('Test accuracy: ')
         train_model.evaluate(datasets=test_ds)
 
-        model_path = os.path.join(checkpoint_path, str(train_step))
-        if not tf.io.gfile.exists(model_path):
-            tf.io.gfile.mkdir(model_path)
-        model.save(model_path)
+    if model:
+        model.save(checkpoint_path)
 
 
 if __name__ == '__main__':
