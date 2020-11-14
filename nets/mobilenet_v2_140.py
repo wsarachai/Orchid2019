@@ -87,7 +87,7 @@ class Orchids52Mobilenet140(object):
         try:
             _, checkpoint_manager = self.checkpoint
             index = checkpoint_manager.latest_checkpoint.index('ckpt-')
-            step = checkpoint_manager.latest_checkpoint[index:][5]
+            step = checkpoint_manager.latest_checkpoint[index:][5:]
             step = int(step)
         except NameError:
             return 1
