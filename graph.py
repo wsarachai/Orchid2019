@@ -25,12 +25,12 @@ def main(unused_argv):
     history = load(open(file_to_load, 'rb'))
 
     train_loss = history['train_loss']
-    regularization_loss = history['regularization_loss']
-    boundary_loss = history['boundary_loss']
+    regularization_loss = history['reg_loss']
+    boundary_loss = history['b_loss']
     total_loss = history['total_loss']
     accuracy = history['accuracy']
-    validation_loss = history['validation_loss']
-    validation_accuracy = history['validation_accuracy']
+    validation_loss = history['val_loss']
+    validation_accuracy = history['val_accuracy']
     num_of_data = len(accuracy)
     epochs_range = range(num_of_data)
 
