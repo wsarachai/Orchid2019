@@ -90,7 +90,13 @@ class Orchids52Mobilenet140STN(nets.mobilenet_v2_140.Orchids52Mobilenet140):
         self.load_model_step2()
 
     def load_model_step4(self):
-        checkpoint, checkpoint_manager = self.checkpoint
+        assert(self.checkpoint_path is not None)
+
+        checkpoint, _ = self.checkpoint
+        checkpoint_prefix = os.path.join(self.checkpoint_path,
+                                         nets.utils.TRAIN_TEMPLATE.format(step=3))
+        checkpoint_manager = tf.train.CheckpointManager(
+            checkpoint, directory=checkpoint_prefix, max_to_keep=self.max_to_keep)
         if checkpoint_manager.latest_checkpoint:
             status = checkpoint.restore(checkpoint_manager.latest_checkpoint)
             status.assert_existing_objects_matched()

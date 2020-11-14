@@ -29,6 +29,7 @@ class Orchids52Mobilenet140(object):
         self.step = step
         self.max_to_keep = 5
 
+        self.checkpoint_path = None
         self.checkpoint = None
         self.prediction_layer_checkpoints = []
 
@@ -53,6 +54,8 @@ class Orchids52Mobilenet140(object):
 
     def config_checkpoint(self, checkpoint_path):
         assert (self.optimizer is not None and self.predict_layers is not None)
+
+        self.checkpoint_path = checkpoint_path
         checkpoint = tf.train.Checkpoint(optimizer=self.optimizer, model=self.model)
         checkpoint_prefix = os.path.join(checkpoint_path, self.step)
         checkpoint_manager = tf.train.CheckpointManager(
