@@ -116,9 +116,13 @@ class Orchids52Mobilenet140(object):
             self.load_model_step1()
 
     def load_model_step1(self):
+        latest_checkpoint = None
         for checkpoint, checkpoint_manager in self.prediction_layer_checkpoints:
             if checkpoint_manager.latest_checkpoint:
-                status = checkpoint.restore(checkpoint_manager.latest_checkpoint)
+                # save latest checkpoint, it will reused later on init of pretrain 2 and 3
+                latest_checkpoint = checkpoint_manager.latest_checkpoint
+            if latest_checkpoint:
+                status = checkpoint.restore(latest_checkpoint)
                 status.assert_existing_objects_matched()
 
     def set_mobilenet_training_status(self, trainable):
