@@ -21,6 +21,9 @@ flags.DEFINE_boolean('bash', False,
 flags.DEFINE_boolean('exp_decay', False,
                      'Exponential decay learning rate')
 
+flags.DEFINE_boolean('save_best_only', False,
+                     'Save the checkpoint only best result.')
+
 flags.DEFINE_integer('batch_size', 32,
                      'Batch size')
 
@@ -101,7 +104,8 @@ def main(unused_argv):
                                        epoches=total_epochs[idx],
                                        train_ds=train_ds,
                                        validate_ds=validate_ds,
-                                       bash=FLAGS.bash)
+                                       bash=FLAGS.bash,
+                                       save_best_only=FLAGS.save_best_only)
 
         with open('{}-history.pack'.format(training_step), 'wb') as handle:  # saving the history of the model
             dump(history_fine['history'], handle)

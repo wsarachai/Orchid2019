@@ -138,6 +138,7 @@ class TrainClassifier:
         }
         target = train_ds.size // self.batch_size
         is_run_from_bash = kwargs.pop('bash') if 'bash' in kwargs else False
+        save_best_only = kwargs.pop('save_best_only') if 'save_best_only' in kwargs else False
         finalize = False if not is_run_from_bash else True
         progbar = tf.keras.utils.Progbar(
             target, width=30, verbose=1, interval=0.05,
@@ -184,7 +185,9 @@ class TrainClassifier:
             history['val_accuracy'].append(logs['accuracy'].numpy())
             print(', val_loss: {:.3f}, val_accuracy: {:.3f}'.format(logs['loss'], logs['accuracy']))
 
-            if val_accuracy < logs['accuracy'].numpy() or val_loss > logs['loss'].numpy():
+            if save_best_only\
+                    and val_accuracy < logs['accuracy'].numpy()\
+                    or val_loss > logs['loss'].numpy():
                 val_accuracy = logs['accuracy'].numpy()
                 val_loss = logs['loss'].numpy()
                 self.model.save_model_variables()
