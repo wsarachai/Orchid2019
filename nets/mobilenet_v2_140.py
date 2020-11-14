@@ -104,7 +104,7 @@ class Orchids52Mobilenet140(object):
         if not loaded_successfully:
             self.load_model_variables()
         else:
-            step = self.get_step_number_from_latest_checkpoint()
+            step = self.get_step_number_from_latest_checkpoint() + 1
         self.config_layers()
         return step
 
