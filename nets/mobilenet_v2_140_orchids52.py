@@ -46,7 +46,7 @@ class Orchids52Mobilenet140STN(nets.mobilenet_v2_140.Orchids52Mobilenet140):
             stn_dense_checkpoint = tf.train.Checkpoint(
                 optimizer=self.optimizer,
                 model=self.stn_dense)
-            checkpoint_prefix = os.path.join(checkpoint_path, self.step, 'stn_dense_layer')
+            checkpoint_prefix = os.path.join(checkpoint_path, 'stn_dense_layer')
             stn_dense_checkpoint_manager = tf.train.CheckpointManager(
                 stn_dense_checkpoint,
                 directory=checkpoint_prefix,

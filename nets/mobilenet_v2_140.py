@@ -59,7 +59,7 @@ class Orchids52Mobilenet140(object):
             checkpoint, directory=checkpoint_prefix, max_to_keep=self.max_to_keep)
         self.checkpoint = (checkpoint, checkpoint_manager)
 
-        predict_layers_path = os.path.join(checkpoint_prefix, 'predict_layers')
+        predict_layers_path = os.path.join(checkpoint_path, 'predict_layers')
         for idx, predict_layer in enumerate(self.predict_layers):
             checkpoint = tf.train.Checkpoint(optimizer=self.optimizer, model=predict_layer)
             prediction_layer_prefix = lib_utils.get_checkpoint_file(predict_layers_path, idx)
