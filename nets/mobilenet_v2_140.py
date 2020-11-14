@@ -9,8 +9,6 @@ import lib_utils
 import tensorflow as tf
 import tensorflow.keras as keras
 
-from nets.mobilenet_v2 import create_mobilenet_v2, IMG_SHAPE_224
-
 
 class Orchids52Mobilenet140(object):
     def __init__(self, inputs, outputs,
@@ -156,7 +154,7 @@ class Orchids52Mobilenet140(object):
 
 
 class PreprocessLayer(keras.layers.Layer):
-    def __init__(self, num_classes, mode='horizontal', factor=0.2):
+    def __init__(self, mode='horizontal', factor=0.2):
         super(PreprocessLayer, self).__init__()
         self.data_augmentation = keras.Sequential([
             keras.layers.experimental.preprocessing.RandomFlip(mode),
@@ -195,12 +193,13 @@ def create_mobilenet_v2_14(num_classes,
                            **kwargs):
     step = kwargs.pop('step') if 'step' in kwargs else nets.utils.TRAIN_TEMPLATE.format(1)
 
-    inputs = keras.Input(shape=IMG_SHAPE_224)
-    preprocess_layer = PreprocessLayer(num_classes=num_classes)
-    mobilenet = create_mobilenet_v2(input_shape=IMG_SHAPE_224,
-                                    alpha=1.4,
-                                    include_top=False,
-                                    weights='imagenet')
+    inputs = keras.Input(shape=nets.mobilenet_v2.IMG_SHAPE_224)
+    preprocess_layer = PreprocessLayer()
+    mobilenet = nets.mobilenet_v2.create_mobilenet_v2(
+        input_shape=nets.mobilenet_v2.IMG_SHAPE_224,
+        alpha=1.4,
+        include_top=False,
+        weights='imagenet')
     prediction_layer = PredictionLayer(num_classes=num_classes,
                                        activation='softmax')
 

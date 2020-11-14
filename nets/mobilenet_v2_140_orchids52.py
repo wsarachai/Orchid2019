@@ -187,24 +187,17 @@ def create_orchid_mobilenet_v2_14(num_classes,
     step = kwargs.pop('step') if 'step' in kwargs else ''
     batch_size = kwargs.pop('batch_size') if 'batch_size' in kwargs else 32
 
-    data_augmentation = keras.Sequential([
-        keras.layers.experimental.preprocessing.RandomFlip('horizontal'),
-        keras.layers.experimental.preprocessing.RandomRotation(0.2),
-    ], name='data-augmentation')
-    preprocess_input = keras.applications.mobilenet_v2.preprocess_input
-
-    inputs = keras.Input(shape=nets.mobilenet_v2.IMG_SHAPE_224,
-                         name='input_224_224_3',
-                         batch_size=batch_size)
-    aug_inputs = data_augmentation(inputs, training=training)
-    preprocess_inputs = preprocess_input(aug_inputs)
-
+    inputs = keras.Input(shape=nets.mobilenet_v2.IMG_SHAPE_224)
+    preprocess_layer = nets.mobilenet_v2_140.PreprocessLayer()
     stn_base_model = nets.mobilenet_v2.create_mobilenet_v2(
         input_shape=nets.mobilenet_v2.IMG_SHAPE_224,
         alpha=1.4,
         include_top=False,
         weights='imagenet',
         sub_name='01')
+
+    processed_inputs = preprocess_layer(inputs, training=training)
+    mobilenet_logits = stn_base_model(processed_inputs)
 
     if step != nets.utils.TRAIN_STEP1:
         # with tf.name_scope('stn'):
@@ -225,11 +218,11 @@ def create_orchid_mobilenet_v2_14(num_classes,
             stn_dense
         ], name='localization_network')
 
-        loc_output = localization_network(preprocess_inputs)
+        loc_output = localization_network(mobilenet_logits)
 
         # with tf.name_scope('transformer_network'):
         stn_output, bound_err = pre_spatial_transformer_network(
-            preprocess_inputs,
+            mobilenet_logits,
             loc_output,
             batch_size=batch_size,
             width=nets.mobilenet_v2.default_image_size,
@@ -265,8 +258,7 @@ def create_orchid_mobilenet_v2_14(num_classes,
             num_classes=num_classes,
             activation='softmax')
         branches_prediction_models.append(prediction_layer)
-        stn_output = stn_base_model(preprocess_inputs, training=training)
-        outputs = prediction_layer(stn_output, training=training)
+        outputs = prediction_layer(mobilenet_logits, training=training)
 
     model = Orchids52Mobilenet140STN(inputs, outputs,
                                      optimizer=optimizer,
