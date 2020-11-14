@@ -55,7 +55,10 @@ class Orchids52Mobilenet140(object):
         assert (self.optimizer is not None and self.predict_layers is not None)
 
         self.checkpoint_path = checkpoint_path
-        checkpoint = tf.train.Checkpoint(optimizer=self.optimizer, model=self.model)
+        checkpoint = tf.train.Checkpoint(
+            step=tf.Variable(1),
+            optimizer=self.optimizer,
+            model=self.model)
         checkpoint_prefix = os.path.join(checkpoint_path, self.step)
         checkpoint_manager = tf.train.CheckpointManager(
             checkpoint, directory=checkpoint_prefix, max_to_keep=self.max_to_keep)
@@ -63,7 +66,10 @@ class Orchids52Mobilenet140(object):
 
         predict_layers_path = os.path.join(checkpoint_path, 'predict_layers')
         for idx, predict_layer in enumerate(self.predict_layers):
-            checkpoint = tf.train.Checkpoint(optimizer=self.optimizer, model=predict_layer)
+            checkpoint = tf.train.Checkpoint(
+                step=tf.Variable(1),
+                optimizer=self.optimizer,
+                model=predict_layer)
             prediction_layer_prefix = lib_utils.get_checkpoint_file(predict_layers_path, idx)
             predict_layers_checkpoint_managers = tf.train.CheckpointManager(
                 checkpoint, directory=prediction_layer_prefix, max_to_keep=self.max_to_keep)

@@ -93,10 +93,10 @@ def main(unused_argv):
                              batch_size=batch_size,
                              step=training_step)
 
-        model.config_checkpoint(checkpoint_path)
         train_model = lib_utils.TrainClassifier(model=model,
                                                 batch_size=batch_size)
 
+        model.config_checkpoint(checkpoint_path)
         epoch = model.restore_model_variables()
         model.summary()
 
