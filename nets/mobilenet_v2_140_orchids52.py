@@ -81,19 +81,19 @@ class Orchids52Mobilenet140STN(nets.mobilenet_v2_140.Orchids52Mobilenet140):
 
     def load_model_step2(self):
         self.load_model_step1()
-        _, stn_dense_checkpoint_manager = self.stn_dense_checkpoint
+        stn_dense_checkpoint, stn_dense_checkpoint_manager = self.stn_dense_checkpoint
         if stn_dense_checkpoint_manager.latest_checkpoint:
-            status = self.stn_dense_checkpoint.restore(stn_dense_checkpoint_manager.latest_checkpoint)
+            status = stn_dense_checkpoint.restore(stn_dense_checkpoint_manager.latest_checkpoint)
             status.assert_existing_objects_matched()
 
     def load_model_step3(self):
+        self.load_model_step2()
+
+    def load_model_step4(self):
         checkpoint, checkpoint_manager = self.checkpoint
         if checkpoint_manager.latest_checkpoint:
             status = checkpoint.restore(checkpoint_manager.latest_checkpoint)
             status.assert_existing_objects_matched()
-
-    def load_model_step4(self):
-        self.load_model_step3()
 
     def load_model_v2_step2(self):
         pass
