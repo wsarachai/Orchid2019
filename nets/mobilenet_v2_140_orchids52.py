@@ -9,7 +9,6 @@ import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
 from tensorflow.python.keras import Sequential
-from nets.mobilenet_v2 import default_image_size, create_mobilenet_v2, IMG_SHAPE_224
 from stn import pre_spatial_transformer_network
 
 logging = tf.compat.v1.logging
@@ -90,7 +89,7 @@ class Orchids52Mobilenet140STN(nets.mobilenet_v2_140.Orchids52Mobilenet140):
         self.load_model_step2()
 
     def load_model_step4(self):
-        assert(self.checkpoint_path is not None)
+        assert (self.checkpoint_path is not None)
 
         checkpoint, _ = self.checkpoint
         checkpoint_prefix = os.path.join(self.checkpoint_path,
@@ -117,27 +116,22 @@ class Orchids52Mobilenet140STN(nets.mobilenet_v2_140.Orchids52Mobilenet140):
             self.load_model_v2_step2()
 
 
-class BrancheBlock(keras.layers.Layer):
+class BranchBlock(keras.layers.Layer):
     def __init__(self, num_classes):
-        super(BrancheBlock, self).__init__()
-        self.branch_base_model = create_mobilenet_v2(input_shape=IMG_SHAPE_224,
-                                                     alpha=1.4,
-                                                     include_top=False,
-                                                     weights='imagenet',
-                                                     sub_name='02')
+        super(BranchBlock, self).__init__()
+        self.branch_base_model = nets.mobilenet_v2.create_mobilenet_v2(
+            input_shape=nets.mobilenet_v2.IMG_SHAPE_224,
+            alpha=1.4,
+            include_top=False,
+            weights='imagenet',
+            sub_name='02')
         self.branches_prediction_models = [
-            nets.utils.create_predict_module(
-                num_classes=num_classes,
-                name='prediction_layer-1',
-                activation='softmax'),
-            nets.utils.create_predict_module(
-                num_classes=num_classes,
-                name='prediction_layer-2',
-                activation='softmax'),
-            nets.utils.create_predict_module(
-                num_classes=num_classes,
-                name='prediction_layer-3',
-                activation='softmax')
+            nets.mobilenet_v2_140.PredictionLayer(num_classes=num_classes,
+                                                  activation='softmax'),
+            nets.mobilenet_v2_140.PredictionLayer(num_classes=num_classes,
+                                                  activation='softmax'),
+            nets.mobilenet_v2_140.PredictionLayer(num_classes=num_classes,
+                                                  activation='softmax')
         ]
 
     def call(self, inputs, **kwargs):
@@ -199,18 +193,21 @@ def create_orchid_mobilenet_v2_14(num_classes,
     ], name='data-augmentation')
     preprocess_input = keras.applications.mobilenet_v2.preprocess_input
 
-    inputs = keras.Input(shape=IMG_SHAPE_224, name='input_224_224_3', batch_size=batch_size)
+    inputs = keras.Input(shape=nets.mobilenet_v2.IMG_SHAPE_224,
+                         name='input_224_224_3',
+                         batch_size=batch_size)
     aug_inputs = data_augmentation(inputs, training=training)
     preprocess_inputs = preprocess_input(aug_inputs)
 
-    stn_base_model = create_mobilenet_v2(input_shape=IMG_SHAPE_224,
-                                         alpha=1.4,
-                                         include_top=False,
-                                         weights='imagenet',
-                                         sub_name='01')
+    stn_base_model = nets.mobilenet_v2.create_mobilenet_v2(
+        input_shape=nets.mobilenet_v2.IMG_SHAPE_224,
+        alpha=1.4,
+        include_top=False,
+        weights='imagenet',
+        sub_name='01')
 
     if step != nets.utils.TRAIN_STEP1:
-        #with tf.name_scope('stn'):
+        # with tf.name_scope('stn'):
         scales = [0.8, 0.6]
         element_size = 3  # [x, y, scale]
         fc_num = element_size * len(scales)
@@ -230,13 +227,14 @@ def create_orchid_mobilenet_v2_14(num_classes,
 
         loc_output = localization_network(preprocess_inputs)
 
-        #with tf.name_scope('transformer_network'):
-        stn_output, bound_err = pre_spatial_transformer_network(preprocess_inputs,
-                                                                loc_output,
-                                                                batch_size=batch_size,
-                                                                width=default_image_size,
-                                                                height=default_image_size,
-                                                                scales=scales)
+        # with tf.name_scope('transformer_network'):
+        stn_output, bound_err = pre_spatial_transformer_network(
+            preprocess_inputs,
+            loc_output,
+            batch_size=batch_size,
+            width=nets.mobilenet_v2.default_image_size,
+            height=nets.mobilenet_v2.default_image_size,
+            scales=scales)
 
         if training:
             with tf.name_scope('boundary_loss'):
@@ -248,14 +246,14 @@ def create_orchid_mobilenet_v2_14(num_classes,
                                             name='mse')
         stn_output = tf.stack([inputs, stn_output[0], stn_output[1]], axis=0)
 
-        #with tf.name_scope('branches'):
-        branches_block = BrancheBlock(num_classes=num_classes)
+        # with tf.name_scope('branches'):
+        branches_block = BranchBlock(num_classes=num_classes)
         branch_base_model = branches_block.branch_base_model
         branches_prediction_models = branches_block.branches_prediction_models
 
         logits = branches_block(stn_output)
 
-        #with tf.name_scope('estimate_block'):
+        # with tf.name_scope('estimate_block'):
         if step == nets.utils.TRAIN_STEP2:
             outputs = tf.reduce_mean(logits, axis=0)
         else:
@@ -263,8 +261,9 @@ def create_orchid_mobilenet_v2_14(num_classes,
             outputs = estimate_block(logits)
 
     else:
-        prediction_layer = nets.utils.create_predict_module(num_classes=num_classes,
-                                                            activation='softmax')
+        prediction_layer = nets.mobilenet_v2_140.PredictionLayer(
+            num_classes=num_classes,
+            activation='softmax')
         branches_prediction_models.append(prediction_layer)
         stn_output = stn_base_model(preprocess_inputs, training=training)
         outputs = prediction_layer(stn_output, training=training)

@@ -3,6 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 import os
+
 import nets
 import lib_utils
 import tensorflow as tf
@@ -110,7 +111,6 @@ class Orchids52Mobilenet140(object):
         return step
 
     def config_layers(self):
-        import nets
         if self.step == nets.utils.TRAIN_STEP1:
             self.set_mobilenet_training_status(False)
 
@@ -155,32 +155,58 @@ class Orchids52Mobilenet140(object):
                         options=options)
 
 
+class PreprocessLayer(keras.layers.Layer):
+    def __init__(self, num_classes, mode='horizontal', factor=0.2):
+        super(PreprocessLayer, self).__init__()
+        self.data_augmentation = keras.Sequential([
+            keras.layers.experimental.preprocessing.RandomFlip(mode),
+            keras.layers.experimental.preprocessing.RandomRotation(factor),
+        ])
+        self.preprocess_input = keras.applications.mobilenet_v2.preprocess_input
+
+    def call(self, inputs, **kwargs):
+        training = kwargs.pop('training')
+        inputs = self.data_augmentation(inputs, training=training)
+        inputs = self.preprocess_input(inputs)
+        return inputs
+
+
+class PredictionLayer(keras.layers.Layer):
+    def __init__(self, num_classes, activation='linear', dropout_ratio=0.2):
+        super(PredictionLayer, self).__init__()
+        self.global_average_pooling = keras.layers.GlobalAveragePooling2D()
+        self.dropout = keras.layers.Dropout(dropout_ratio)
+        self.dense = keras.layers.Dense(num_classes,
+                                        activation=activation,
+                                        name='dense-{}'.format(num_classes))
+
+    def call(self, inputs, **kwargs):
+        training = kwargs.pop('training')
+        inputs = self.global_average_pooling(inputs, training=training)
+        inputs = self.dropout(inputs, training=training)
+        inputs = self.dense(inputs, training=training)
+        return inputs
+
+
 def create_mobilenet_v2_14(num_classes,
                            optimizer,
                            loss_fn,
                            training=False,
                            **kwargs):
-    step = kwargs.pop('step') if 'step' in kwargs else ''
-    data_augmentation = keras.Sequential([
-        keras.layers.experimental.preprocessing.RandomFlip('horizontal'),
-        keras.layers.experimental.preprocessing.RandomRotation(0.2),
-    ])
-    preprocess_input = keras.applications.mobilenet_v2.preprocess_input
-    prediction_layer = nets.utils.create_predict_module(num_classes=num_classes,
-                                                        name='mobilenet_v2_14',
-                                                        activation='softmax')
+    step = kwargs.pop('step') if 'step' in kwargs else nets.utils.TRAIN_TEMPLATE.format(1)
 
     inputs = keras.Input(shape=IMG_SHAPE_224)
-    x = data_augmentation(inputs, training=training)
-    x = preprocess_input(x)
-
+    preprocess_layer = PreprocessLayer(num_classes=num_classes)
     mobilenet = create_mobilenet_v2(input_shape=IMG_SHAPE_224,
                                     alpha=1.4,
                                     include_top=False,
                                     weights='imagenet')
+    prediction_layer = PredictionLayer(num_classes=num_classes,
+                                       activation='softmax')
 
-    x = mobilenet(x, training=training)
-    outputs = prediction_layer(x, training=training)
+    processed_inputs = preprocess_layer(inputs, training=training)
+    mobilenet_logits = mobilenet(processed_inputs, training=training)
+    outputs = prediction_layer(mobilenet_logits, training=training)
 
     model = Orchids52Mobilenet140(inputs, outputs,
                                   optimizer=optimizer,

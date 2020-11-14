@@ -24,15 +24,3 @@ nets_mapping = {
     MOBILENET_V2_140: create_mobilenet_v2_14,
     MOBILENET_V2_140_ORCHIDS52: create_orchid_mobilenet_v2_14
 }
-
-
-def create_predict_module(num_classes,
-                          name='prediction_layer',
-                          activation='linear',
-                          dropout_ratio=0.8):
-    module = Sequential([
-        keras.layers.GlobalAveragePooling2D(),
-        keras.layers.Dropout(dropout_ratio),
-        keras.layers.Dense(num_classes, activation=activation, name='fc-{}'.format(num_classes))
-    ], name=name)
-    return module
