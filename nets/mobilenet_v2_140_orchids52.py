@@ -238,12 +238,12 @@ class SpatialTransformerNetwork(keras.layers.Layer):
                 x_t_flat = -x_t_flat / scale
                 y_t_flat = -y_t_flat / scale
 
-            # bound_err_x = tf.maximum(0.0, (tf.abs(x_t_flat) + scale) - 1.0)
-            # bound_err_y = tf.maximum(0.0, (tf.abs(y_t_flat) + scale) - 1.0)
-            # bound_err_scale = tf.maximum(0.0, scale - 1.0)
-            # bound_err.append(bound_err_x)
-            # bound_err.append(bound_err_y)
-            # bound_err.append(bound_err_scale)
+            bound_err_x = tf.maximum(0.0, (tf.abs(x_t_flat) + scale) - 1.0)
+            bound_err_y = tf.maximum(0.0, (tf.abs(y_t_flat) + scale) - 1.0)
+            bound_err_scale = tf.maximum(0.0, scale - 1.0)
+            bound_err.append(bound_err_x)
+            bound_err.append(bound_err_y)
+            bound_err.append(bound_err_scale)
 
             parameters = tf.concat((scale, x_zero, x_t_flat,
                                     y_zero, scale, y_t_flat), axis=1)
@@ -251,14 +251,14 @@ class SpatialTransformerNetwork(keras.layers.Layer):
             parameters = tf.reshape(parameters, [self.batch_size, 1, 2, 3])
             thetas.append(parameters)
 
-        # bound_err = tf.squeeze(tf.concat(bound_err, axis=0), [1])
+        bound_err = tf.squeeze(tf.concat(bound_err, axis=0), [1])
 
         h_trans = [self.image_input]
         for i in range(len(thetas)):
             _theta = thetas[i][:, 0, :, :]
             h_trans.append(stn.spatial_transformer_network(self.image_input, _theta, self.output_dims))
         h_trans = tf.stack(h_trans, axis=0)
-        return h_trans#, bound_err
+        return h_trans, bound_err
 
 
 def create_orchid_mobilenet_v2_14(num_classes,
