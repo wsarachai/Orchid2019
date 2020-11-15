@@ -114,7 +114,7 @@ def main(unused_argv):
         timestamp = datetime.now().strftime("%m-%d-%Y-%H-%M-%S")
         history_path = os.path.join(
             checkpoint_path,
-            '{}-history-{}.pack'.format(training_step, timestamp))
+            '{}-history-{}.pack'.format(timestamp, training_step))
         with open(history_path, 'wb') as handle:
             dump(history_fine['history'], handle)
 
