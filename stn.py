@@ -261,10 +261,10 @@ def pre_spatial_transformer_network(input_map,
 
     bound_err = tf.squeeze(tf.concat(bound_err, axis=0), [1])
 
-    with tf.name_scope('transformed'):
-        h_trans = []
-        for i in range(len(thetas)):
-            _theta = thetas[i][:, 0, :, :]
-            h_trans.append(spatial_transformer_network(input_map, _theta, out_size))
+    #with tf.name_scope('transformed'):
+    h_trans = []
+    for i in range(len(thetas)):
+        _theta = thetas[i][:, 0, :, :]
+        h_trans.append(spatial_transformer_network(input_map, _theta, out_size))
 
     return h_trans, bound_err

@@ -25,6 +25,9 @@ flags.DEFINE_boolean('exp_decay', False,
 flags.DEFINE_boolean('save_best_only', False,
                      'Save the checkpoint only best result.')
 
+flags.DEFINE_boolean('save_model', False,
+                     'Save the model on each state.')
+
 flags.DEFINE_integer('batch_size', 32,
                      'Batch size')
 
@@ -115,7 +118,7 @@ def main(unused_argv):
         print('Test accuracy: ')
         train_model.evaluate(datasets=test_ds)
 
-    if model:
+    if FLAGS.save_model and model:
         model.save(checkpoint_path)
 
 
