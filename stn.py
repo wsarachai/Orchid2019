@@ -58,8 +58,8 @@ def bilinear_sampler(img, x, y):
     # rescale x and y to [0, W-1/H-1]
     x = tf.cast(x, 'float32')
     y = tf.cast(y, 'float32')
-    x = 0.5 * ((x + 1.0) * tf.cast(max_x-1, 'float32'))
-    y = 0.5 * ((y + 1.0) * tf.cast(max_y-1, 'float32'))
+    x = 0.5 * ((x + 1.0) * tf.cast(max_x - 1, 'float32'))
+    y = 0.5 * ((y + 1.0) * tf.cast(max_y - 1, 'float32'))
 
     # grab 4 nearest corner points for each (x_i, y_i)
     x0 = tf.cast(tf.floor(x), 'int32')
@@ -86,10 +86,10 @@ def bilinear_sampler(img, x, y):
     y1 = tf.cast(y1, 'float32')
 
     # calculate deltas
-    wa = (x1-x) * (y1-y)
-    wb = (x1-x) * (y-y0)
-    wc = (x-x0) * (y1-y)
-    wd = (x-x0) * (y-y0)
+    wa = (x1 - x) * (y1 - y)
+    wb = (x1 - x) * (y - y0)
+    wc = (x - x0) * (y1 - y)
+    wd = (x - x0) * (y - y0)
 
     # add dimension for addition
     wa = tf.expand_dims(wa, axis=3)
@@ -98,7 +98,7 @@ def bilinear_sampler(img, x, y):
     wd = tf.expand_dims(wd, axis=3)
 
     # compute output
-    out = tf.add_n([wa*Ia, wb*Ib, wc*Ic, wd*Id])
+    out = tf.add_n([wa * Ia, wb * Ib, wc * Ic, wd * Id])
 
     return out
 
@@ -215,12 +215,13 @@ def spatial_transformer_network(input_fmap, theta, out_dims=None, **kwargs):
     return out_fmap
 
 
-def pre_spatial_transformer_network(input_map,
-                                    theta,
-                                    batch_size,
-                                    width,
-                                    height,
-                                    scales=None):
+def pre_spatial_transformer_network(
+        input_map,
+        theta,
+        batch_size,
+        width,
+        height,
+        scales=None):
     # grab input dimensions
     _, _w = theta.shape
     out_size = (width, height)
@@ -261,10 +262,10 @@ def pre_spatial_transformer_network(input_map,
 
     bound_err = tf.squeeze(tf.concat(bound_err, axis=0), [1])
 
-    #with tf.name_scope('transformed'):
-    h_trans = []
+    # with tf.name_scope('transformed'):
+    h_trans = [input_map]
     for i in range(len(thetas)):
         _theta = thetas[i][:, 0, :, :]
         h_trans.append(spatial_transformer_network(input_map, _theta, out_size))
 
-    return h_trans, bound_err
+    return tf.stack(h_trans, axis=0), bound_err

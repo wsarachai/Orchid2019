@@ -111,8 +111,11 @@ def main(unused_argv):
                                        bash=FLAGS.bash,
                                        save_best_only=FLAGS.save_best_only)
 
-        timestamp = datetime.now().timestamp()
-        with open('{}-history-{}.pack'.format(training_step, timestamp), 'wb') as handle:  # saving the history of the model
+        timestamp = datetime.now().strftime("%m-%d-%Y-%H-%M-%S")
+        history_path = os.path.join(
+            checkpoint_path,
+            '{}-history-{}.pack'.format(training_step, timestamp))
+        with open(history_path, 'wb') as handle:
             dump(history_fine['history'], handle)
 
         print('Test accuracy: ')
@@ -123,5 +126,4 @@ def main(unused_argv):
 
 
 if __name__ == '__main__':
-    #tf.config.experimental_run_functions_eagerly(True)
     lib_utils.start(main)

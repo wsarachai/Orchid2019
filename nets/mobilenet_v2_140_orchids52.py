@@ -202,65 +202,6 @@ class EstimationBlock(keras.layers.Layer):
         return main_net
 
 
-class SpatialTransformerNetwork(keras.layers.Layer):
-    def __init__(self, image_input,
-                 loc_output_dims,
-                 batch_size,
-                 scales,
-                 width=nets.mobilenet_v2.default_image_size,
-                 height=nets.mobilenet_v2.default_image_size):
-        super(SpatialTransformerNetwork, self).__init__()
-        self.image_input = image_input
-        self.loc_output_dims = loc_output_dims
-        self.batch_size = batch_size
-        self.scales = scales
-        self.output_dims = (width, height)
-
-    def call(self, inputs, **kwargs):
-        thetas = []
-        bound_err = []
-        range_values = range(0, self.loc_output_dims, 3)
-        for idx, i in enumerate(range_values):
-            x_zero = tf.constant(np.full((self.batch_size, 1), 0.00, dtype=np.float32))
-            y_zero = tf.constant(np.full((self.batch_size, 1), 0.00, dtype=np.float32))
-
-            if self.scales is None:
-                scale = tf.constant(np.full((self.batch_size, 1), 1.00, dtype=np.float32))
-                x_t_flat = tf.constant(np.full((self.batch_size, 1), 0.00, dtype=np.float32))
-                y_t_flat = tf.constant(np.full((self.batch_size, 1), 0.00, dtype=np.float32))
-            else:
-                x_t_flat = tf.slice(inputs, [0, i], [self.batch_size, 1])
-                y_t_flat = tf.slice(inputs, [0, i + 1], [self.batch_size, 1])
-
-                scale = tf.slice(inputs, [0, i + 2], [self.batch_size, 1])
-                scale = tf.exp(scale) * self.scales[idx]
-
-                x_t_flat = -x_t_flat / scale
-                y_t_flat = -y_t_flat / scale
-
-            bound_err_x = tf.maximum(0.0, (tf.abs(x_t_flat) + scale) - 1.0)
-            bound_err_y = tf.maximum(0.0, (tf.abs(y_t_flat) + scale) - 1.0)
-            bound_err_scale = tf.maximum(0.0, scale - 1.0)
-            bound_err.append(bound_err_x)
-            bound_err.append(bound_err_y)
-            bound_err.append(bound_err_scale)
-
-            parameters = tf.concat((scale, x_zero, x_t_flat,
-                                    y_zero, scale, y_t_flat), axis=1)
-
-            parameters = tf.reshape(parameters, [self.batch_size, 1, 2, 3])
-            thetas.append(parameters)
-
-        bound_err = tf.squeeze(tf.concat(bound_err, axis=0), [1])
-
-        h_trans = [self.image_input]
-        for i in range(len(thetas)):
-            _theta = thetas[i][:, 0, :, :]
-            h_trans.append(stn.spatial_transformer_network(self.image_input, _theta, self.output_dims))
-        h_trans = tf.stack(h_trans, axis=0)
-        return h_trans, bound_err
-
-
 def create_orchid_mobilenet_v2_14(num_classes,
                                   optimizer,
                                   loss_fn,
@@ -306,12 +247,14 @@ def create_orchid_mobilenet_v2_14(num_classes,
 
         loc_output = localization_network(processed_inputs)
 
-        # with tf.name_scope('transformer_network'):
-        stn_layer = SpatialTransformerNetwork(image_input=processed_inputs,
-                                              loc_output_dims=loc_output_dims,
-                                              batch_size=batch_size,
-                                              scales=scales)
-        stn_output, bound_err = stn_layer(loc_output)
+        # TODO: Change this function to keras layer
+        stn_output, bound_err = stn.pre_spatial_transformer_network(
+            input_map=processed_inputs,
+            theta=loc_output,
+            batch_size=batch_size,
+            width=nets.mobilenet_v2.default_image_size,
+            height=nets.mobilenet_v2.default_image_size,
+            scales=scales)
 
         if training:
             with tf.name_scope('boundary_loss'):
@@ -329,7 +272,7 @@ def create_orchid_mobilenet_v2_14(num_classes,
 
         logits = branches_block(stn_output)
 
-        # with tf.name_scope('estimate_block'):
+        # # with tf.name_scope('estimate_block'):
         if step == nets.utils.TRAIN_STEP2:
             outputs = tf.reduce_mean(logits, axis=0)
         else:
