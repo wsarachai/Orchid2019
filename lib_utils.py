@@ -183,7 +183,7 @@ class TrainClassifier:
             logs = copy.copy(logs) if logs else {}
             history['val_loss'].append(logs['loss'].numpy())
             history['val_accuracy'].append(logs['accuracy'].numpy())
-            print(', val_loss: {:.3f}, val_accuracy: {:.3f}'.format(logs['loss'], logs['accuracy']))
+            print('\nValidation: val_loss: {:.3f}, val_accuracy: {:.3f}\n'.format(logs['loss'], logs['accuracy']))
 
             if save_best_only and val_accuracy < logs['accuracy'].numpy() or val_loss > logs['loss'].numpy():
                 val_accuracy = logs['accuracy'].numpy()
@@ -201,4 +201,4 @@ class TrainClassifier:
             if inputs.shape.as_list()[0] == self.batch_size:
                 logs = self.evaluate_step(inputs, labels)
         logs = copy.copy(logs) if logs else {}
-        print('loss: {:.3f}, accuracy: {:.3f}'.format(logs['loss'], logs['accuracy']))
+        print('loss: {:.3f}, accuracy: {:.3f}\n'.format(logs['loss'], logs['accuracy']))

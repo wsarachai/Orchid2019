@@ -3,7 +3,6 @@ from __future__ import division
 from __future__ import print_function
 
 import os
-import functools
 import nets
 import stn
 import numpy as np
@@ -118,8 +117,14 @@ class Orchids52Mobilenet140STN(nets.mobilenet_v2_140.Orchids52Mobilenet140):
 
 
 class BranchBlock(keras.layers.Layer):
-    def __init__(self, num_classes):
+    def __init__(self, num_classes,
+                 batch_size,
+                 width=nets.mobilenet_v2.default_image_size,
+                 height=nets.mobilenet_v2.default_image_size):
         super(BranchBlock, self).__init__()
+        self.batch_size = batch_size
+        self.width = width
+        self.height = height
         self.branch_base_model = nets.mobilenet_v2.create_mobilenet_v2(
             input_shape=nets.mobilenet_v2.IMG_SHAPE_224,
             alpha=1.4,
@@ -136,14 +141,30 @@ class BranchBlock(keras.layers.Layer):
         ]
 
     def call(self, inputs, **kwargs):
-        logits = tf.convert_to_tensor([
-            self.sub_process(inputs[i], i) for i in range(0, 3)
-        ], name='logits')
+        inp1 = tf.squeeze(
+            tf.slice(inputs,
+                     [0, 0, 0, 0, 0],
+                     [1, self.batch_size, self.width, self.height, 3]))
+        inp2 = tf.squeeze(
+            tf.slice(inputs,
+                     [1, 0, 0, 0, 0],
+                     [1, self.batch_size, self.width, self.height, 3]))
+        inp3 = tf.squeeze(
+            tf.slice(inputs,
+                     [2, 0, 0, 0, 0],
+                     [1, self.batch_size, self.width, self.height, 3]))
+
+        logits = tf.stack([
+            self.sub_process(inp1, self.branches_prediction_models[0]),
+            self.sub_process(inp2, self.branches_prediction_models[1]),
+            self.sub_process(inp3, self.branches_prediction_models[2])
+        ], axis=0)
+
         return logits
 
-    def sub_process(self, inp, i):
+    def sub_process(self, inp, prediction):
         x = self.branch_base_model(inp, training=False)
-        return self.branches_prediction_models[i](x, training=False)
+        return prediction(x, training=False)
 
 
 class EstimationBlock(keras.layers.Layer):
@@ -151,16 +172,22 @@ class EstimationBlock(keras.layers.Layer):
         super(EstimationBlock, self).__init__()
         self.num_classes = num_classes
         self.batch_size = batch_size
-        self.dense1 = keras.layers.Dense(num_classes, name='t2_Dense_1')
-        self.dense2 = keras.layers.Dense(num_classes, name='t2_Dense_2')
+        self.dense1 = keras.layers.Dense(self.num_classes, name='t2_Dense_1')
+        self.dense2 = keras.layers.Dense(self.num_classes, name='t2_Dense_2')
 
     def call(self, inputs, **kwargs):
-        inp1 = tf.slice(inputs, [0, 0, 0], [1, self.batch_size, self.num_classes])
-        inp2 = tf.slice(inputs, [1, 0, 0], [1, self.batch_size, self.num_classes])
-        inp3 = tf.slice(inputs, [2, 0, 0], [1, self.batch_size, self.num_classes])
-        inp1 = tf.squeeze(inp1)
-        inp2 = tf.squeeze(inp2)
-        inp3 = tf.squeeze(inp3)
+        inp1 = tf.squeeze(
+            tf.slice(inputs,
+                     [0, 0, 0],
+                     [1, self.batch_size, self.num_classes]))
+        inp2 = tf.squeeze(
+            tf.slice(inputs,
+                     [1, 0, 0],
+                     [1, self.batch_size, self.num_classes]))
+        inp3 = tf.squeeze(
+            tf.slice(inputs,
+                     [2, 0, 0],
+                     [1, self.batch_size, self.num_classes]))
 
         main_net = c_t = inp1
 
@@ -211,12 +238,12 @@ class SpatialTransformerNetwork(keras.layers.Layer):
                 x_t_flat = -x_t_flat / scale
                 y_t_flat = -y_t_flat / scale
 
-            bound_err_x = tf.maximum(0.0, (tf.abs(x_t_flat) + scale) - 1.0)
-            bound_err_y = tf.maximum(0.0, (tf.abs(y_t_flat) + scale) - 1.0)
-            bound_err_scale = tf.maximum(0.0, scale - 1.0)
-            bound_err.append(bound_err_x)
-            bound_err.append(bound_err_y)
-            bound_err.append(bound_err_scale)
+            # bound_err_x = tf.maximum(0.0, (tf.abs(x_t_flat) + scale) - 1.0)
+            # bound_err_y = tf.maximum(0.0, (tf.abs(y_t_flat) + scale) - 1.0)
+            # bound_err_scale = tf.maximum(0.0, scale - 1.0)
+            # bound_err.append(bound_err_x)
+            # bound_err.append(bound_err_y)
+            # bound_err.append(bound_err_scale)
 
             parameters = tf.concat((scale, x_zero, x_t_flat,
                                     y_zero, scale, y_t_flat), axis=1)
@@ -224,14 +251,14 @@ class SpatialTransformerNetwork(keras.layers.Layer):
             parameters = tf.reshape(parameters, [self.batch_size, 1, 2, 3])
             thetas.append(parameters)
 
-        bound_err = tf.squeeze(tf.concat(bound_err, axis=0), [1])
+        # bound_err = tf.squeeze(tf.concat(bound_err, axis=0), [1])
 
-        h_trans = []
+        h_trans = [self.image_input]
         for i in range(len(thetas)):
             _theta = thetas[i][:, 0, :, :]
             h_trans.append(stn.spatial_transformer_network(self.image_input, _theta, self.output_dims))
         h_trans = tf.stack(h_trans, axis=0)
-        return h_trans, bound_err
+        return h_trans#, bound_err
 
 
 def create_orchid_mobilenet_v2_14(num_classes,
@@ -294,10 +321,9 @@ def create_orchid_mobilenet_v2_14(num_classes,
                 boundary_loss = keras.Model(inputs,
                                             tf.keras.losses.MSE(bound_err, bound_std),
                                             name='mse')
-        stn_output = tf.stack([inputs, stn_output[0], stn_output[1]], axis=0)
 
         # with tf.name_scope('branches'):
-        branches_block = BranchBlock(num_classes=num_classes)
+        branches_block = BranchBlock(num_classes=num_classes, batch_size=batch_size)
         branch_base_model = branches_block.branch_base_model
         branches_prediction_models = branches_block.branches_prediction_models
 
@@ -315,7 +341,7 @@ def create_orchid_mobilenet_v2_14(num_classes,
             num_classes=num_classes,
             activation='softmax')
         branches_prediction_models.append(prediction_layer)
-        mobilenet_logits = stn_base_model(processed_inputs)
+        mobilenet_logits = stn_base_model(processed_inputs, training=training)
         outputs = prediction_layer(mobilenet_logits, training=training)
 
     model = Orchids52Mobilenet140STN(inputs, outputs,
@@ -330,12 +356,3 @@ def create_orchid_mobilenet_v2_14(num_classes,
                                      training=training,
                                      step=step)
     return model
-
-
-def _handle_boundary_loss(name, variable, error_fn):
-    def _loss_for_boundary(v):
-        with tf.name_scope(name + '/boundary_loss'):
-            regularization = error_fn(v)
-        return regularization
-
-    return functools.partial(_loss_for_boundary, variable)
