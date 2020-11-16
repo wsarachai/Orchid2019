@@ -18,6 +18,14 @@
         "--learning_rate=0.001",
         "--total_epochs=100,100,20,100"
       ]
+    },
+    {
+      "name": "Python: Gen Graph",
+      "type": "python",
+      "request": "launch",
+      "program": "graph.py",
+      "console": "integratedTerminal",
+      "args": ["--file=/Volumes/Data/tmp/orchids-models/orchids2019/mobilenet_v2_140_orchids52/11-15-2020-15-20-31-history-pretrain1"]
     }
   ]
 }
