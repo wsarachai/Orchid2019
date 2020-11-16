@@ -1,0 +1,23 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python: Train",
+      "type": "python",
+      "request": "launch",
+      "program": "train.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--start_state=1",
+        "--end_state=5",
+        "--dataset=orchids52_v1_tf",
+        "--model=mobilenet_v2_140_orchids52",
+        "--learning_rate=0.001",
+        "--total_epochs=100,100,20,100"
+      ]
+    }
+  ]
+}
