@@ -1,4 +1,5 @@
 {
-  "python.pythonPath": "/Users/sarachaii/.virtualenvs/orchid52-2019/bin/python",
+  "python.pythonPath": "/home/watcharin/.conda/envs/tf/bin/python",
+  //"python.pythonPath": "/Users/sarachaii/.virtualenvs/orchid52-2019/bin/python",
   //"python.pythonPath": "/home/keng/anaconda3/envs/tf-gpu/bin/python"
 }
