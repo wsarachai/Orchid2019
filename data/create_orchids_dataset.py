@@ -9,11 +9,10 @@ import pathlib
 import tensorflow as tf
 import numpy as np
 from datetime import datetime
-from data.data_utils import _bytes_feature, _int64_feature
-from data.orchids52_dataset import TRAIN_SIZE_V2, TEST_SIZE_V2, TRAIN_SIZE_V1, TEST_SIZE_V1
+from data import data_utils, orchids52_dataset
 from data.orchids52_dataset_file import get_label
 from lib_utils import start
-from nets.mobilenet_v2 import IMG_SIZE_224
+from nets import mobilenet_v2
 
 ORCHIDS52_DATA_V1 = 'data-v1'
 ORCHIDS52_DATA_V2 = 'data-v2'
@@ -33,7 +32,7 @@ flags.DEFINE_string('data_version', ORCHIDS52_DATA_V1,
                     'The version of dataset')
 
 
-def process_path(file_path, class_names, image_size):
+def process_path(file_path, class_names):
     label = get_label(file_path, class_names)
     img = tf.io.read_file(file_path)
     return img, label
@@ -72,7 +71,7 @@ def _find_image_files_v1(images_dir, image_size):
 
     validate_ds = train_ds.take(train_count // 5)
     train_ds = train_ds.skip(train_count // 5)
-    test_ds = test_ds.take(TEST_SIZE_V1)
+    test_ds = test_ds.take(orchids52_dataset.TEST_SIZE_V1)
 
     logging.info('Total train: {}'.format(tf.data.experimental.cardinality(train_ds).numpy()))
     logging.info('Total validate: {}'.format(tf.data.experimental.cardinality(validate_ds).numpy()))
@@ -98,10 +97,10 @@ def _find_image_files_v2(images_dir, image_size):
 
     all_ds = all_ds.map(_process_path, num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
-    train_ds = all_ds.take(TRAIN_SIZE_V2)
-    test_ds = all_ds.skip(TRAIN_SIZE_V2)
-    validate_ds = test_ds.skip(TEST_SIZE_V2)
-    test_ds = test_ds.take(TEST_SIZE_V2)
+    train_ds = all_ds.take(orchids52_dataset.TRAIN_SIZE_V2)
+    test_ds = all_ds.skip(orchids52_dataset.TRAIN_SIZE_V2)
+    validate_ds = test_ds.skip(orchids52_dataset.TEST_SIZE_V2)
+    test_ds = test_ds.take(orchids52_dataset.TEST_SIZE_V2)
 
     return train_ds, test_ds, validate_ds
 
@@ -112,11 +111,11 @@ def serialize_example(image_buffer, label):
     image_format = b'JPEG'
 
     features_map = {
-        'image/colorspace': _bytes_feature(colorspace),
-        'image/channels': _int64_feature(channels),
-        'image/format': _bytes_feature(image_format),
-        'image/class/label': _bytes_feature(label),
-        'image/image_raw': _bytes_feature(image_buffer)
+        'image/colorspace': data_utils.bytes_feature(colorspace),
+        'image/channels': data_utils.int64_feature(channels),
+        'image/format': data_utils.bytes_feature(image_format),
+        'image/class/label': data_utils.bytes_feature(label),
+        'image/image_raw': data_utils.bytes_feature(image_buffer)
     }
 
     example_proto = tf.train.Example(features=tf.train.Features(feature=features_map))
@@ -167,10 +166,11 @@ def _create_dataset(images_dir,
 
 create_dataset = wrapped_partial(
     _create_dataset,
-    image_size=IMG_SIZE_224)
+    image_size=mobilenet_v2.IMG_SIZE_224)
 
 
 def main(unused_argv):
+    logging.info(unused_argv)
     create_dataset(FLAGS.images_dir, FLAGS.output_directory)
 
 

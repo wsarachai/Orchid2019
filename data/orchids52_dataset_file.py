@@ -7,10 +7,8 @@ import pathlib
 import functools
 import numpy as np
 import tensorflow as tf
-
-from data.orchids52_dataset import TRAIN_SIZE_V1, TEST_SIZE_V1, VALIDATE_SIZE_V1, TRAIN_SIZE_V2, TEST_SIZE_V2, \
-    VALIDATE_SIZE_V2, _preprocess_for_train, _preprocess_for_eval
-from nets.mobilenet_v2 import IMG_SIZE_224
+import nets
+from data import orchids52_dataset
 
 logging = tf.compat.v1.logging
 already_wrap = False
@@ -104,24 +102,24 @@ def _load_dataset(split,
             dataset = dataset.skip(train_size)
             dataset = dataset.take(validate_size)
 
-    check_wrap_process_path(data_dir=image_path, image_size=IMG_SIZE_224)
+    check_wrap_process_path(data_dir=image_path, image_size=nets.mobilenet_v2.IMG_SIZE_224)
     decode_dataset = dataset.map(_process_path, num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
     if split == 'train':
         global preprocess_for_train
         if not preprocess_for_train:
             preprocess_for_train = wrapped_partial(
-                _preprocess_for_train,
+                orchids52_dataset._preprocess_for_train,
                 aug_method=aug_method,
-                image_size=IMG_SIZE_224
+                image_size=nets.mobilenet_v2.IMG_SIZE_224
             )
         decode_dataset = decode_dataset.map(preprocess_for_train)
     else:
         global preprocess_for_eval
         if not preprocess_for_eval:
             preprocess_for_eval = wrapped_partial(
-                _preprocess_for_eval,
-                image_size=IMG_SIZE_224
+                orchids52_dataset._preprocess_for_eval,
+                image_size=nets.mobilenet_v2.IMG_SIZE_224
             )
         decode_dataset = decode_dataset.map(preprocess_for_eval)
 
@@ -138,18 +136,20 @@ def _load_dataset(split,
         elif split == 'validate':
             setattr(dataset, 'size', validate_size)
 
+    setattr(dataset, 'num_of_classes', orchids52_dataset.NUM_OF_CLASSES)
+
     return dataset
 
 
 load_dataset_v1 = wrapped_partial(
     _load_dataset,
-    train_size=TRAIN_SIZE_V1,
-    test_size=TEST_SIZE_V1,
-    validate_size=VALIDATE_SIZE_V1,
+    train_size=orchids52_dataset.TRAIN_SIZE_V1,
+    test_size=orchids52_dataset.TEST_SIZE_V1,
+    validate_size=orchids52_dataset.VALIDATE_SIZE_V1,
     data_dir='v1')
 load_dataset_v2 = wrapped_partial(
     _load_dataset,
-    train_size=TRAIN_SIZE_V2,
-    test_size=TEST_SIZE_V2,
-    validate_size=VALIDATE_SIZE_V2,
+    train_size=orchids52_dataset.TRAIN_SIZE_V2,
+    test_size=orchids52_dataset.TEST_SIZE_V2,
+    validate_size=orchids52_dataset.VALIDATE_SIZE_V2,
     data_dir='v2')

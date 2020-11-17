@@ -4,12 +4,9 @@ from __future__ import print_function
 
 import functools
 import os
-
+import data
+import nets
 import tensorflow as tf
-
-from data.orchids52_dataset import TRAIN_SIZE_V1, TEST_SIZE_V1, VALIDATE_SIZE_V2, TRAIN_SIZE_V2, TEST_SIZE_V2, \
-    VALIDATE_SIZE_V1, _preprocess_for_train, _preprocess_for_eval
-from nets.mobilenet_v2 import IMG_SIZE_224
 
 feature_description = {
     'image/colorspace': tf.io.FixedLenFeature([], tf.string, default_value=''),
@@ -73,17 +70,17 @@ def _load_dataset(split,
         global preprocess_for_train
         if not preprocess_for_train:
             preprocess_for_train = wrapped_partial(
-                _preprocess_for_train,
+                data.orchids52_dataset._preprocess_for_train,
                 aug_method=aug_method,
-                image_size=IMG_SIZE_224
+                image_size=nets.mobilenet_v2.IMG_SIZE_224
             )
         decode_dataset = decode_dataset.map(preprocess_for_train)
     else:
         global preprocess_for_eval
         if not preprocess_for_eval:
             preprocess_for_eval = wrapped_partial(
-                _preprocess_for_eval,
-                image_size=IMG_SIZE_224
+                data.orchids52_dataset._preprocess_for_eval,
+                image_size=nets.mobilenet_v2.IMG_SIZE_224
             )
         decode_dataset = decode_dataset.map(preprocess_for_eval)
 
@@ -100,18 +97,20 @@ def _load_dataset(split,
         elif split == 'validate':
             setattr(decode_dataset, 'size', validate_size)
 
+    setattr(decode_dataset, 'num_of_classes', data.orchids52_dataset.NUM_OF_CLASSES)
+
     return decode_dataset
 
 
 load_dataset_v1 = wrapped_partial(
     _load_dataset,
-    train_size=TRAIN_SIZE_V1,
-    test_size=TEST_SIZE_V1,
-    validate_size=VALIDATE_SIZE_V1,
+    train_size=data.orchids52_dataset.TRAIN_SIZE_V1,
+    test_size=data.orchids52_dataset.TEST_SIZE_V1,
+    validate_size=data.orchids52_dataset.VALIDATE_SIZE_V1,
     data_dir='tf-records/v1')
 load_dataset_v2 = wrapped_partial(
     _load_dataset,
-    train_size=TRAIN_SIZE_V2,
-    test_size=TEST_SIZE_V2,
-    validate_size=VALIDATE_SIZE_V2,
+    train_size=data.orchids52_dataset.TRAIN_SIZE_V2,
+    test_size=data.orchids52_dataset.TEST_SIZE_V2,
+    validate_size=data.orchids52_dataset.VALIDATE_SIZE_V2,
     data_dir='tf-records/v2')

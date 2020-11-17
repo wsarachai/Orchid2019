@@ -4,7 +4,7 @@ from __future__ import print_function
 
 import os
 import tensorflow as tf
-from tensorflow.python.keras import layers
+import tensorflow.keras as keras
 from tensorflow.python.keras import backend
 from tensorflow.python.keras.engine import training
 from tensorflow.python.keras.utils import data_utils
@@ -33,7 +33,7 @@ def _inverted_res_block(name, inputs, expansion, stride, alpha, filters, block_i
 
     if block_id:
         # Expand
-        x = layers.Conv2D(
+        x = keras.layers.Conv2D(
             expansion * in_channels,
             kernel_size=1,
             padding='same',
@@ -42,22 +42,22 @@ def _inverted_res_block(name, inputs, expansion, stride, alpha, filters, block_i
             kernel_regularizer=tf.keras.regularizers.l2(regularizers_l2),
             name=prefix + 'expand')(
             x)
-        x = layers.BatchNormalization(
+        x = keras.layers.BatchNormalization(
             axis=channel_axis,
             epsilon=1e-3,
             momentum=0.999,
             name=prefix + 'expand_BN')(
             x)
-        x = layers.ReLU(6., name=prefix + 'expand_relu')(x)
+        x = keras.layers.ReLU(6., name=prefix + 'expand_relu')(x)
     else:
         prefix = '{}_expanded_conv_'.format(name)
 
     # Depthwise
     if stride == 2:
-        x = layers.ZeroPadding2D(
+        x = keras.layers.ZeroPadding2D(
             padding=imagenet_utils.correct_pad(x, 3),
             name=prefix + 'pad')(x)
-    x = layers.DepthwiseConv2D(
+    x = keras.layers.DepthwiseConv2D(
         kernel_size=3,
         strides=stride,
         activation=None,
@@ -65,17 +65,17 @@ def _inverted_res_block(name, inputs, expansion, stride, alpha, filters, block_i
         padding='same' if stride == 1 else 'valid',
         name=prefix + 'depthwise')(
         x)
-    x = layers.BatchNormalization(
+    x = keras.layers.BatchNormalization(
         axis=channel_axis,
         epsilon=1e-3,
         momentum=0.999,
         name=prefix + 'depthwise_BN')(
         x)
 
-    x = layers.ReLU(6., name=prefix + 'depthwise_relu')(x)
+    x = keras.layers.ReLU(6., name=prefix + 'depthwise_relu')(x)
 
     # Project
-    x = layers.Conv2D(
+    x = keras.layers.Conv2D(
         pointwise_filters,
         kernel_size=1,
         padding='same',
@@ -84,7 +84,7 @@ def _inverted_res_block(name, inputs, expansion, stride, alpha, filters, block_i
         kernel_regularizer=tf.keras.regularizers.l2(regularizers_l2),
         name=prefix + 'project')(
         x)
-    x = layers.BatchNormalization(
+    x = keras.layers.BatchNormalization(
         axis=channel_axis,
         epsilon=1e-3,
         momentum=0.999,
@@ -92,7 +92,7 @@ def _inverted_res_block(name, inputs, expansion, stride, alpha, filters, block_i
         x)
 
     if in_channels == pointwise_filters and stride == 1:
-        return layers.Add(name=prefix + 'add')([inputs, x])
+        return keras.layers.Add(name=prefix + 'add')([inputs, x])
     return x
 
 
@@ -114,13 +114,11 @@ def create_mobilenet_v2(input_shape=None,
                         pooling=None,
                         classes=1000,
                         classifier_activation='softmax',
+                        sub_name='01',
                         **kwargs):
-    if 'layers' in kwargs:
-        global layers
-        layers = kwargs.pop('layers')
-
-    # if kwargs:
-    #     raise ValueError('Unknown argument(s): %s' % (kwargs,))
+    default_size = 224
+    if kwargs:
+        raise ValueError('Unknown argument(s): %s' % (kwargs,))
     if not (weights in {'imagenet', None} or os.path.exists(weights)):
         raise ValueError('The `weights` argument should be either '
                          '`None` (random initialization), `imagenet` '
@@ -197,8 +195,6 @@ def create_mobilenet_v2(input_shape=None,
 
         if rows == cols and rows in [96, 128, 160, 192, 224]:
             default_size = rows
-        else:
-            default_size = 224
 
     input_shape = imagenet_utils.obtain_input_shape(
         input_shape,
@@ -228,27 +224,23 @@ def create_mobilenet_v2(input_shape=None,
                             ' Weights for input shape (224, 224) will be'
                             ' loaded as the default.')
 
-    if 'sub_name' in kwargs:
-        sub_name = kwargs.pop('sub_name')
-        model_name = 'mobilenetv2_%s_%0.2f_%s' % (sub_name, alpha, rows)
-    else:
-        model_name = 'mobilenetv2_%0.2f_%s' % (alpha, rows)
+    model_name = 'mobilenetv2_%s_%0.2f_%s' % (sub_name, alpha, rows)
 
     if input_tensor is None:
-        img_input = layers.Input(name='%s_input' % model_name, shape=input_shape)
+        img_input = keras.layers.Input(name='%s_input' % model_name, shape=input_shape)
     else:
         if not backend.is_keras_tensor(input_tensor):
-            img_input = layers.Input(tensor=input_tensor, shape=input_shape)
+            img_input = keras.layers.Input(tensor=input_tensor, shape=input_shape)
         else:
             img_input = input_tensor
 
     channel_axis = 1 if backend.image_data_format() == 'channels_first' else -1
 
     first_block_filters = _make_divisible(32 * alpha, 8)
-    x = layers.ZeroPadding2D(
+    x = keras.layers.ZeroPadding2D(
         padding=imagenet_utils.correct_pad(img_input, 3),
         name='%s_Conv1_pad' % model_name)(img_input)
-    x = layers.Conv2D(
+    x = keras.layers.Conv2D(
         first_block_filters,
         kernel_size=3,
         strides=(2, 2),
@@ -256,9 +248,9 @@ def create_mobilenet_v2(input_shape=None,
         use_bias=False,
         kernel_regularizer=tf.keras.regularizers.l2(regularizers_l2),
         name='%s_Conv1' % model_name)(x)
-    x = layers.BatchNormalization(
+    x = keras.layers.BatchNormalization(
         axis=channel_axis, epsilon=1e-3, momentum=0.999, name='%s_bn_Conv1' % model_name)(x)
-    x = layers.ReLU(6., name='%s_Conv1_relu' % model_name)(x)
+    x = keras.layers.ReLU(6., name='%s_Conv1_relu' % model_name)(x)
 
     x = _inverted_res_block(model_name,
                             x, filters=16, alpha=alpha, stride=1, expansion=1, block_id=0)
@@ -309,23 +301,23 @@ def create_mobilenet_v2(input_shape=None,
     else:
         last_block_filters = 1280
 
-    x = layers.Conv2D(
+    x = keras.layers.Conv2D(
         last_block_filters, kernel_size=1, use_bias=False, name='%s_Conv_1' % model_name)(x)
-    x = layers.BatchNormalization(
+    x = keras.layers.BatchNormalization(
         axis=channel_axis, epsilon=1e-3, momentum=0.999, name='%s_Conv_1_bn' % model_name)(x)
-    x = layers.ReLU(6., name='%s_out_relu' % model_name)(x)
+    x = keras.layers.ReLU(6., name='%s_out_relu' % model_name)(x)
 
     if include_top:
-        x = layers.GlobalAveragePooling2D()(x)
+        x = keras.layers.GlobalAveragePooling2D()(x)
         imagenet_utils.validate_activation(classifier_activation, weights)
-        x = layers.Dense(classes, activation=classifier_activation,
-                         name='%s_predictions' % model_name)(x)
+        x = keras.layers.Dense(classes, activation=classifier_activation,
+                               name='%s_predictions' % model_name)(x)
 
     else:
         if pooling == 'avg':
-            x = layers.GlobalAveragePooling2D()(x)
+            x = keras.layers.GlobalAveragePooling2D()(x)
         elif pooling == 'max':
-            x = layers.GlobalMaxPooling2D()(x)
+            x = keras.layers.GlobalMaxPooling2D()(x)
 
     # Ensure that the model takes into account
     # any potential predecessors of `input_tensor`.

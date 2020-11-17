@@ -3,17 +3,18 @@ from __future__ import division
 from __future__ import print_function
 
 import os
-import nets
 import stn
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
-from tensorflow.python.keras import Sequential
+import nets
+from nets import mobilenet_v2 as mobilenet
+from nets import mobilenet_v2_140 as mobilenet_140
 
 logging = tf.compat.v1.logging
 
 
-class Orchids52Mobilenet140STN(nets.mobilenet_v2_140.Orchids52Mobilenet140):
+class Orchids52Mobilenet140STN(mobilenet_140.Orchids52Mobilenet140):
     def __init__(self, inputs, outputs,
                  optimizer,
                  loss_fn,
@@ -119,25 +120,25 @@ class Orchids52Mobilenet140STN(nets.mobilenet_v2_140.Orchids52Mobilenet140):
 class BranchBlock(keras.layers.Layer):
     def __init__(self, num_classes,
                  batch_size,
-                 width=nets.mobilenet_v2.default_image_size,
-                 height=nets.mobilenet_v2.default_image_size):
+                 width=mobilenet.default_image_size,
+                 height=mobilenet.default_image_size):
         super(BranchBlock, self).__init__()
         self.batch_size = batch_size
         self.width = width
         self.height = height
-        self.branch_base_model = nets.mobilenet_v2.create_mobilenet_v2(
-            input_shape=nets.mobilenet_v2.IMG_SHAPE_224,
+        self.branch_base_model = mobilenet.create_mobilenet_v2(
+            input_shape=mobilenet.IMG_SHAPE_224,
             alpha=1.4,
             include_top=False,
             weights='imagenet',
             sub_name='02')
         self.branches_prediction_models = [
-            nets.mobilenet_v2_140.PredictionLayer(num_classes=num_classes,
-                                                  activation='softmax'),
-            nets.mobilenet_v2_140.PredictionLayer(num_classes=num_classes,
-                                                  activation='softmax'),
-            nets.mobilenet_v2_140.PredictionLayer(num_classes=num_classes,
-                                                  activation='softmax')
+            mobilenet_140.PredictionLayer(num_classes=num_classes,
+                                          activation='softmax'),
+            mobilenet_140.PredictionLayer(num_classes=num_classes,
+                                          activation='softmax'),
+            mobilenet_140.PredictionLayer(num_classes=num_classes,
+                                          activation='softmax')
         ]
 
     def call(self, inputs, **kwargs):
@@ -215,10 +216,10 @@ def create_orchid_mobilenet_v2_14(num_classes,
     step = kwargs.pop('step') if 'step' in kwargs else ''
     batch_size = kwargs.pop('batch_size') if 'batch_size' in kwargs else 32
 
-    inputs = keras.Input(shape=nets.mobilenet_v2.IMG_SHAPE_224)
-    preprocess_layer = nets.mobilenet_v2_140.PreprocessLayer()
-    stn_base_model = nets.mobilenet_v2.create_mobilenet_v2(
-        input_shape=nets.mobilenet_v2.IMG_SHAPE_224,
+    inputs = keras.Input(shape=mobilenet.IMG_SHAPE_224)
+    preprocess_layer = mobilenet_140.PreprocessLayer()
+    stn_base_model = mobilenet.create_mobilenet_v2(
+        input_shape=mobilenet.IMG_SHAPE_224,
         alpha=1.4,
         include_top=False,
         weights='imagenet',
@@ -232,7 +233,7 @@ def create_orchid_mobilenet_v2_14(num_classes,
         element_size = 3  # [x, y, scale]
         loc_output_dims = element_size * len(scales)
 
-        stn_dense = Sequential([
+        stn_dense = keras.Sequential([
             keras.layers.Conv2D(128, [1, 1], activation='relu', name="t2_stn_conv2d_resize_128"),
             keras.layers.Flatten(name='t2_stn_flatten'),
             keras.layers.Dense(128, name='t2_stn_dense_128'),
@@ -240,7 +241,7 @@ def create_orchid_mobilenet_v2_14(num_classes,
             keras.layers.Dense(loc_output_dims, activation='tanh', activity_regularizer='l2', name='t1_dense_6')
         ], name='stn_dense')
 
-        localization_network = Sequential([
+        localization_network = keras.Sequential([
             stn_base_model,
             stn_dense
         ], name='localization_network')
@@ -252,8 +253,8 @@ def create_orchid_mobilenet_v2_14(num_classes,
             input_map=processed_inputs,
             theta=loc_output,
             batch_size=batch_size,
-            width=nets.mobilenet_v2.default_image_size,
-            height=nets.mobilenet_v2.default_image_size,
+            width=mobilenet.default_image_size,
+            height=mobilenet.default_image_size,
             scales=scales)
 
         if training:
@@ -262,7 +263,7 @@ def create_orchid_mobilenet_v2_14(num_classes,
                 bound_std = tf.constant(np.full(_len, 0.00, dtype=np.float32),
                                         name='bound_std')
                 boundary_loss = keras.Model(inputs,
-                                            tf.keras.losses.MSE(bound_err, bound_std),
+                                            keras.losses.MSE(bound_err, bound_std),
                                             name='mse')
 
         # with tf.name_scope('branches'):
@@ -280,7 +281,7 @@ def create_orchid_mobilenet_v2_14(num_classes,
             outputs = estimate_block(logits)
 
     else:
-        prediction_layer = nets.mobilenet_v2_140.PredictionLayer(
+        prediction_layer = mobilenet_140.PredictionLayer(
             num_classes=num_classes,
             activation='softmax')
         branches_prediction_models.append(prediction_layer)
