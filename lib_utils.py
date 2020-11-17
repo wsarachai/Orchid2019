@@ -195,10 +195,22 @@ class TrainClassifier:
             'history': history
         }
 
-    def evaluate(self, datasets):
+    def evaluate(self, datasets, **kwargs):
         logs = None
+        seen = 0
+        target = datasets.size // self.batch_size
+        is_run_from_bash = kwargs.pop('bash') if 'bash' in kwargs else False
+        finalize = False if not is_run_from_bash else True
+        progbar = tf.keras.utils.Progbar(
+            target, width=30, verbose=1, interval=0.05,
+            stateful_metrics={'loss', 'accuracy'},
+            unit_name='step'
+        )
         for inputs, labels in datasets:
             if inputs.shape.as_list()[0] == self.batch_size:
                 logs = self.evaluate_step(inputs, labels)
+                num_steps = logs.pop('num_steps', 1)
+                seen += num_steps
+                progbar.update(seen, list(logs.items()), finalize=finalize)
         logs = copy.copy(logs) if logs else {}
         print('loss: {:.3f}, accuracy: {:.3f}\n'.format(logs['loss'], logs['accuracy']))

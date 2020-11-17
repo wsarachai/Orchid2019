@@ -5,11 +5,11 @@ from __future__ import print_function
 import os
 import tensorflow as tf
 import lib_utils
+import data
+import nets
 from datetime import datetime
-
 from pickle import dump
-from data import data_utils, orchids52_dataset
-from data.data_utils import dataset_mapping
+from data import data_utils
 from nets import utils
 
 flags = tf.compat.v1.flags
@@ -58,8 +58,8 @@ def main(unused_argv):
     workspace_path = os.environ['WORKSPACE'] if 'WORKSPACE' in os.environ else '/Volumes/Data/tmp'
     data_path = os.environ['DATA_DIR'] if 'DATA_DIR' in os.environ else '/Volumes/Data/_dataset/_orchids_dataset'
     data_dir = os.path.join(data_path, 'orchids52_data')
-    load_dataset = dataset_mapping[FLAGS.dataset]
-    create_model = utils.nets_mapping[FLAGS.model]
+    load_dataset = data.data_utils.dataset_mapping[FLAGS.dataset]
+    create_model = nets.utils.nets_mapping[FLAGS.model]
     checkpoint_path = os.path.join(workspace_path, 'orchids-models', 'orchids2019', FLAGS.model)
 
     if not tf.io.gfile.exists(checkpoint_path):
@@ -84,13 +84,13 @@ def main(unused_argv):
 
         training_step = utils.TRAIN_TEMPLATE.format(step=train_step)
 
-        learning_rate = lib_utils.config_learning_rate(FLAGS.learning_rate,
-                                                       FLAGS.exp_decay,
+        learning_rate = lib_utils.config_learning_rate(learning_rate=FLAGS.learning_rate,
+                                                       exp_decay=FLAGS.exp_decay,
                                                        training_step=training_step)
-        optimizer = lib_utils.config_optimizer(learning_rate, training_step=training_step)
+        optimizer = lib_utils.config_optimizer(learning_rate=learning_rate, training_step=training_step)
         loss_fn = lib_utils.config_loss()
 
-        model = create_model(num_classes=orchids52_dataset.NUM_OF_CLASSES,
+        model = create_model(num_classes=data.orchids52_dataset.NUM_OF_CLASSES,
                              optimizer=optimizer,
                              loss_fn=loss_fn,
                              training=True,

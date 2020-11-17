@@ -20,6 +20,14 @@
       ]
     },
     {
+      "name": "Python: Test",
+      "type": "python",
+      "request": "launch",
+      "program": "run-test.py",
+      "console": "integratedTerminal",
+      "args": []
+    },
+    {
       "name": "Python: Gen Graph",
       "type": "python",
       "request": "launch",
