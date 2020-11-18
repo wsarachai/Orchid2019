@@ -4,13 +4,15 @@ from __future__ import print_function
 
 import tensorflow as tf
 from data import orchids52_dataset_file
+from data import orchids52_dataset_v1_tfrecord
 from data import orchids52_dataset_tfrecord
 
 
 ORCHIDS52_V1_FILE = 'orchids52_v1_file'
-ORCHIDS52_V1_TFRECORD = 'orchids52_v1_tf'
 ORCHIDS52_V2_FILE = 'orchids52_v2_file'
+ORCHIDS52_V1_TFRECORD = 'orchids52_v1_tf'
 ORCHIDS52_V2_TFRECORD = 'orchids52_v2_tf'
+ORCHIDS52_V3_TFRECORD = 'orchids52_v2_tf'
 
 logging = tf.compat.v1.logging
 
@@ -49,7 +51,8 @@ def get_data_files(data_sources):
 
 dataset_mapping = {
     ORCHIDS52_V1_FILE: orchids52_dataset_file.load_dataset_v1,
-    ORCHIDS52_V1_TFRECORD: orchids52_dataset_tfrecord.load_dataset_v1,
     ORCHIDS52_V2_FILE: orchids52_dataset_file.load_dataset_v2,
-    ORCHIDS52_V2_TFRECORD: orchids52_dataset_tfrecord.load_dataset_v2
+    ORCHIDS52_V1_TFRECORD: orchids52_dataset_v1_tfrecord.load_dataset_v1,
+    ORCHIDS52_V2_TFRECORD: orchids52_dataset_tfrecord.load_dataset_v2,
+    ORCHIDS52_V3_TFRECORD: orchids52_dataset_tfrecord.load_dataset_v3
 }
