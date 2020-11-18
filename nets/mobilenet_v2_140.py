@@ -32,9 +32,11 @@ class Orchids52Mobilenet140(object):
         self.checkpoint = None
         self.prediction_layer_checkpoints = []
 
-    def compile(self):
+    def compile(self, metrics):
         self.model.compile(optimizer=self.optimizer,
-                           loss=self.loss_fn)
+                           loss=self.loss_fn,
+                           metrics=metrics,
+                           run_eagerly=True)
 
     def process_step(self, inputs, training=False):
         return self.model(inputs, training=training)

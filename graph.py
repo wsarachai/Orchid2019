@@ -2,11 +2,14 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
+
 import tensorflow as tf
 import matplotlib.pyplot as plt
 from pickle import load
 
 from lib_utils import start
+from nets import utils
 
 flags = tf.compat.v1.flags
 logging = tf.compat.v1.logging
@@ -18,11 +21,27 @@ flags.DEFINE_string('file', 'trainHistory',
 flags.DEFINE_integer('total_epochs', 100,
                      'Total epochs')
 
+flags.DEFINE_string('model', utils.MOBILENET_V2_140_ORCHIDS52,
+                    'Model')
+
 
 def main(unused_argv):
     logging.debug(unused_argv)
     file_to_load = '{}.pack'.format(FLAGS.file)
-    history = load(open(file_to_load, 'rb'))
+    file_to_save = '{}.png'.format(FLAGS.file)
+    workspace_path = os.environ['WORKSPACE'] if 'WORKSPACE' in os.environ else '/Volumes/Data/tmp'
+    history_file = os.path.join(workspace_path,
+                                'orchids-models',
+                                'orchids2019',
+                                FLAGS.model,
+                                file_to_load)
+    output_file = os.path.join(workspace_path,
+                               'orchids-models',
+                               'orchids2019',
+                               FLAGS.model,
+                               file_to_save)
+
+    history = load(open(history_file, 'rb'))
 
     train_loss = history['train_loss']
     regularization_loss = history['reg_loss']
@@ -62,7 +81,7 @@ def main(unused_argv):
     axs[2].grid(True)
 
     fig.tight_layout()
-    plt.savefig('{}.png'.format(FLAGS.file))
+    plt.savefig(output_file)
 
 
 if __name__ == '__main__':

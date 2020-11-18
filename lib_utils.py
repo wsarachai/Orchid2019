@@ -73,9 +73,16 @@ class TrainClassifier:
         self.boundary_loss_metric = tf.keras.metrics.Mean(name='boundary_loss')
         self.total_loss_metric = tf.keras.metrics.Mean(name='total_loss')
         self.accuracy_metric = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
+        self.metrics = [
+            self.train_loss_metric,
+            self.regularization_loss_metric,
+            self.boundary_loss_metric,
+            self.total_loss_metric,
+            self.accuracy_metric,
+        ]
         self.batch_size = batch_size
 
-        self.model.compile()
+        self.model.compile(self.metrics)
 
     def train_step(self, inputs, labels):
         boundary_loss = 0.
