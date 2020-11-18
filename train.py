@@ -72,6 +72,8 @@ def main(unused_argv):
     for idx, train_step in enumerate(range(FLAGS.start_state, FLAGS.end_state)):
         if train_step == 1:
             batch_size = FLAGS.batch_size
+        elif train_step == 4:
+            batch_size = FLAGS.batch_size // 8
         else:
             batch_size = FLAGS.batch_size // 4
 

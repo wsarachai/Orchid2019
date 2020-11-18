@@ -50,13 +50,12 @@ def config_learning_rate(learning_rate=0.001,
         )
     else:
         if training_step in [nets.utils.TRAIN_STEP4, nets.utils.TRAIN_V2_STEP2]:
-            learning_rate = 0.00001
+            learning_rate = 0.000001
     return learning_rate
 
 
 def config_optimizer(learning_rate, **kwargs):
-    optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate)
-    return optimizer
+    return tf.keras.optimizers.RMSprop(learning_rate=learning_rate)
 
 
 def config_loss(**kwargs):
