@@ -179,7 +179,7 @@ class PreprocessLayer(keras.layers.Layer):
 
 
 class PredictionLayer(keras.layers.Layer):
-    def __init__(self, num_classes, shape, activation='linear', dropout_ratio=0.2):
+    def __init__(self, num_classes, shape, activation=None, dropout_ratio=0.2):
         super(PredictionLayer, self).__init__()
         self.global_average_pooling = global_pool(shape=shape)
         self.dropout = keras.layers.Dropout(dropout_ratio)
@@ -191,6 +191,7 @@ class PredictionLayer(keras.layers.Layer):
             activation=activation,
             bias_initializer=tf.zeros_initializer(),
             name='dense-{}'.format(num_classes))
+        self.prediction_fn = keras.layers.Softmax()
 
     def call(self, inputs, **kwargs):
         training = kwargs.pop('training')
@@ -198,6 +199,7 @@ class PredictionLayer(keras.layers.Layer):
         inputs = self.dropout(inputs, training=training)
         inputs = self.dense(inputs, training=training)
         inputs = tf.squeeze(inputs, [1, 2])
+        inputs = self.prediction_fn(inputs, training=training)
         return inputs
 
 
@@ -225,8 +227,7 @@ def create_mobilenet_v2_14(num_classes,
     mobilenet_logits = mobilenet(processed_inputs, training=training)
 
     prediction_layer = PredictionLayer(num_classes=num_classes,
-                                       shape=mobilenet_logits.get_shape().as_list(),
-                                       activation='softmax')
+                                       shape=mobilenet_logits.get_shape().as_list())
 
     outputs = prediction_layer(mobilenet_logits, training=training)
 
