@@ -238,18 +238,17 @@ def create_mobilenet_v2(input_shape=None,
     channel_axis = 1 if backend.image_data_format() == 'channels_first' else -1
 
     first_block_filters = _make_divisible(32 * alpha, 8)
-    # x = keras.layers.ZeroPadding2D(
-    #     padding=imagenet_utils.correct_pad(img_input, 3),
-    #     name='%s_Conv1_pad' % model_name)(img_input)
+    x = keras.layers.ZeroPadding2D(
+        padding=imagenet_utils.correct_pad(img_input, 3),
+        name='%s_Conv1_pad' % model_name)(img_input)
     x = keras.layers.Conv2D(
         first_block_filters,
         kernel_size=3,
         strides=(2, 2),
-        #padding='valid',
-        padding='same',
+        padding='valid',
         use_bias=False,
         kernel_regularizer=tf.keras.regularizers.l2(regularizers_l2),
-        name='%s_Conv1' % model_name)(img_input)
+        name='%s_Conv1' % model_name)(x)
     x = keras.layers.BatchNormalization(
         axis=channel_axis, epsilon=1e-3, momentum=0.999, name='%s_bn_Conv1' % model_name)(x)
     x = keras.layers.ReLU(6., name='%s_Conv1_relu' % model_name)(x)

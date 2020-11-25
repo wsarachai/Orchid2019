@@ -52,6 +52,10 @@ flags.DEFINE_string('dataset', data_utils.ORCHIDS52_V1_TFRECORD,
 flags.DEFINE_string('model', utils.MOBILENET_V2_140_ORCHIDS52,
                     'Model')
 
+flags.DEFINE_string('optimizer', 'rmsprop',
+                    'The name of the optimizer, one of "adadelta", "adagrad", "adam",'
+                    '"ftrl", "momentum", "sgd" or "rmsprop".')
+
 
 def main(unused_argv):
     logging.debug(unused_argv)
@@ -89,7 +93,9 @@ def main(unused_argv):
         learning_rate = lib_utils.config_learning_rate(learning_rate=FLAGS.learning_rate,
                                                        exp_decay=FLAGS.exp_decay,
                                                        training_step=training_step)
-        optimizer = lib_utils.config_optimizer(learning_rate=learning_rate, training_step=training_step)
+        optimizer = lib_utils.config_optimizer(FLAGS.optimizer,
+                                               learning_rate=learning_rate,
+                                               training_step=training_step)
         loss_fn = lib_utils.config_loss()
 
         model = create_model(num_classes=data.orchids52_dataset.NUM_OF_CLASSES,

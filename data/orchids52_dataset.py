@@ -50,7 +50,7 @@ def _preprocess_for_train(image, label_values, aug_method, image_size):
               tf.image.ResizeMethod.GAUSSIAN,
               tf.image.ResizeMethod.MITCHELLCUBIC]
 
-    cast_image = tf.cast(image, dtype=tf.float32)
+    cast_image = tf.image.convert_image_dtype(image, dtype=tf.float32)
 
     def apply_random_selector(x):
         num_cases = len(method)
@@ -84,9 +84,11 @@ def _preprocess_for_eval(image, label_values, image_size):
 
 
 NUM_OF_CLASSES = 52
-TRAIN_SIZE_V1 = 2256
+TRAIN_SIZE_V1 = 2820
 TEST_SIZE_V1 = 739
-VALIDATE_SIZE_V1 = 564
-TRAIN_SIZE_V2 = 2490
-TEST_SIZE_V2 = 855
-VALIDATE_SIZE_V2 = 210
+TRAIN_SIZE_V2 = 2256
+TEST_SIZE_V2 = 739
+VALIDATE_SIZE_V2 = 564
+TRAIN_SIZE_V3 = 2490
+TEST_SIZE_V3 = 855
+VALIDATE_SIZE_V3 = 210

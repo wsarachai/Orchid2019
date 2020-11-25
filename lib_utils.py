@@ -54,8 +54,11 @@ def config_learning_rate(learning_rate=0.001,
     return learning_rate
 
 
-def config_optimizer(learning_rate, **kwargs):
-    return tf.keras.optimizers.RMSprop(learning_rate=learning_rate)
+def config_optimizer(optimizer, learning_rate, **kwargs):
+    if optimizer == "rmsprop":
+        return tf.keras.optimizers.RMSprop(learning_rate=learning_rate)
+    else:
+        return tf.keras.optimizers.SGD(learning_rate=learning_rate)
 
 
 def config_loss(**kwargs):

@@ -34,10 +34,11 @@ class Orchids52Mobilenet140(object):
         self.prediction_layer_checkpoints = []
 
     def compile(self, metrics):
-        self.model.compile(optimizer=self.optimizer,
-                           loss=self.loss_fn,
-                           metrics=metrics,
-                           run_eagerly=True)
+        if self.optimizer and self.loss_fn:
+            self.model.compile(optimizer=self.optimizer,
+                               loss=self.loss_fn,
+                               metrics=metrics,
+                               run_eagerly=True)
 
     def process_step(self, inputs, training=False):
         return self.model(inputs, training=training)
@@ -85,14 +86,95 @@ class Orchids52Mobilenet140(object):
             _, checkpoint_manager = checkpoint
             checkpoint_manager.save()
 
-    def restore_model_from_latest_checkpoint_if_exist(self):
-        checkpoint, checkpoint_manager = self.checkpoint
-        if checkpoint_manager.latest_checkpoint:
-            status = checkpoint.restore(checkpoint_manager.latest_checkpoint)
-            status.assert_existing_objects_matched()
-            return True
+    def load_from_v1(self, latest_checkpoint):
+        # Try reading on v1 data format
+        reader = tf.compat.v1.train.NewCheckpointReader(latest_checkpoint)
+        var_to_shape_map = reader.get_variable_to_shape_map()
+        value_to_load = []
+        key_to_numpy = {}
+        for key in sorted(var_to_shape_map.items()):
+            key_to_numpy.update({key[0]: key[1]})
+
+        keys = [
+            'weights',
+            'depthwise_weights',
+            'BatchNorm/beta',
+            'BatchNorm/gamma',
+            'BatchNorm/moving_mean',
+            'BatchNorm/moving_variance'
+        ]
+        expds = [
+            'expand', 'depthwise', 'project'
+        ]
+
+        for k1 in keys:
+            for _key in key_to_numpy:
+                if _key.startswith('MobilenetV2/Conv/{}'.format(k1)):
+                    key_to_numpy.pop(_key)
+                    value = reader.get_tensor(_key)
+                    value_to_load.append(value)
+                    break
+
+        for i in range(0, 17):
+            for sub in expds:
+                for k2 in keys:
+                    if i == 0:
+                        s_search = 'MobilenetV2/expanded_conv/{}/{}'.format(sub, k2)
+                    else:
+                        s_search = 'MobilenetV2/expanded_conv_{}/{}/{}'.format(i, sub, k2)
+                    for _key in key_to_numpy:
+                        if _key.startswith(s_search):
+                            key_to_numpy.pop(_key)
+                            value = reader.get_tensor(_key)
+                            value_to_load.append(value)
+                            break
+
+        for k1 in keys:
+            for _key in key_to_numpy:
+                if _key.startswith('MobilenetV2/Conv_1/{}'.format(k1)):
+                    key_to_numpy.pop(_key)
+                    value = reader.get_tensor(_key)
+                    value_to_load.append(value)
+                    break
+
+        for s_search in ['MobilenetV2/Logits/Conv2d_1c_1x1/weights',
+                         'MobilenetV2/Logits/Conv2d_1c_1x1/biases']:
+            for _key in key_to_numpy:
+                if _key == s_search:
+                    key_to_numpy.pop(_key)
+                    value = reader.get_tensor(_key)
+                    value_to_load.append(value)
+                    break
+
+        for _key in key_to_numpy:
+            value = reader.get_tensor(_key)
+            value_to_load.append(value)
+
+        return value_to_load
+
+    def restore_model_from_latest_checkpoint_if_exist(self, **kwargs):
+        if self.checkpoint:
+            checkpoint, checkpoint_manager = self.checkpoint
+            if checkpoint_manager.latest_checkpoint:
+                status = checkpoint.restore(checkpoint_manager.latest_checkpoint)
+                status.assert_existing_objects_matched()
+                return True
+            else:
+                return False
         else:
-            return False
+            latest_checkpoint = kwargs.pop('checkpoint_path')
+            if latest_checkpoint:
+                var_loaded = self.load_from_v1(latest_checkpoint)
+                all_vars = self.model.weights
+                for i, var in enumerate(all_vars):
+                    if i == 258:
+                        i = i
+                    saved_var = var_loaded[i]
+                    tf.assert_equal(var.shape, saved_var.shape)
+                    var.assign(saved_var)
+                return True
+            else:
+                return False
 
     def get_step_number_from_latest_checkpoint(self):
         try:
@@ -100,16 +182,16 @@ class Orchids52Mobilenet140(object):
             index = checkpoint_manager.latest_checkpoint.index('ckpt-')
             step = checkpoint_manager.latest_checkpoint[index:][5:]
             step = int(step)
-        except NameError:
+        except:
             return 1
         else:
             return step
 
-    def restore_model_variables(self, load_from_checkpoint_first=True):
+    def restore_model_variables(self, load_from_checkpoint_first=True, checkpoint_path=None):
         step = 1
         loaded_successfully = False
         if load_from_checkpoint_first:
-            loaded_successfully = self.restore_model_from_latest_checkpoint_if_exist()
+            loaded_successfully = self.restore_model_from_latest_checkpoint_if_exist(checkpoint_path=checkpoint_path)
         if not loaded_successfully:
             self.load_model_variables()
         else:
@@ -163,18 +245,31 @@ class Orchids52Mobilenet140(object):
 
 
 class PreprocessLayer(keras.layers.Layer):
-    def __init__(self, mode='horizontal', factor=0.2):
+    def __init__(self):
         super(PreprocessLayer, self).__init__()
-        self.data_augmentation = keras.Sequential([
-            keras.layers.experimental.preprocessing.RandomFlip(mode),
-            keras.layers.experimental.preprocessing.RandomRotation(factor),
-        ])
-        self.preprocess_input = keras.applications.mobilenet_v2.preprocess_input
 
     def call(self, inputs, **kwargs):
         training = kwargs.pop('training')
-        inputs = self.data_augmentation(inputs, training=training)
-        inputs = self.preprocess_input(inputs)
+        central_fraction = kwargs.pop('central_fraction', 0.875)
+
+        # mode = kwargs.pop('mode', 'horizontal')
+        # factor = kwargs.pop('factor', 0.2)
+        # if training:
+        #     data_augmentation = keras.Sequential([
+        #         keras.layers.experimental.preprocessing.RandomFlip(mode),
+        #         keras.layers.experimental.preprocessing.RandomRotation(factor),
+        #     ])
+        #     inputs = data_augmentation(inputs, training=training)
+        #     inputs = tf.image.convert_image_dtype(inputs, dtype=tf.float32)
+
+        if not training:
+            shape = inputs.get_shape().as_list()
+            inputs = tf.image.central_crop(inputs, central_fraction=central_fraction)
+            inputs = tf.image.resize(images=inputs,
+                                     size=(shape[1], shape[2]),
+                                     method=tf.image.ResizeMethod.BILINEAR)
+        inputs = tf.subtract(inputs, 0.5)
+        inputs = tf.multiply(inputs, 2.0)
         return inputs
 
 
@@ -196,7 +291,8 @@ class PredictionLayer(keras.layers.Layer):
     def call(self, inputs, **kwargs):
         training = kwargs.pop('training')
         inputs = self.global_average_pooling(inputs, training=training)
-        inputs = self.dropout(inputs, training=training)
+        if training:
+            inputs = self.dropout(inputs, training=training)
         inputs = self.dense(inputs, training=training)
         inputs = tf.squeeze(inputs, [1, 2])
         inputs = self.prediction_fn(inputs, training=training)
@@ -222,7 +318,7 @@ def create_mobilenet_v2_14(num_classes,
         input_shape=nets.mobilenet_v2.IMG_SHAPE_224,
         alpha=1.4,
         include_top=False,
-        weights='imagenet')
+        weights=None)
     processed_inputs = preprocess_layer(inputs, training=training)
     mobilenet_logits = mobilenet(processed_inputs, training=training)
 

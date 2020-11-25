@@ -141,15 +141,25 @@ def _load_dataset(split,
     return dataset
 
 
-load_dataset_v1 = wrapped_partial(
-    _load_dataset,
-    train_size=orchids52_dataset.TRAIN_SIZE_V1,
-    test_size=orchids52_dataset.TEST_SIZE_V1,
-    validate_size=orchids52_dataset.VALIDATE_SIZE_V1,
-    data_dir='v1')
 load_dataset_v2 = wrapped_partial(
     _load_dataset,
     train_size=orchids52_dataset.TRAIN_SIZE_V2,
     test_size=orchids52_dataset.TEST_SIZE_V2,
     validate_size=orchids52_dataset.VALIDATE_SIZE_V2,
+    data_dir='v1')
+load_dataset_v3 = wrapped_partial(
+    _load_dataset,
+    train_size=orchids52_dataset.TRAIN_SIZE_V3,
+    test_size=orchids52_dataset.TEST_SIZE_V3,
+    validate_size=orchids52_dataset.VALIDATE_SIZE_V3,
     data_dir='v2')
+
+load_dataset_v2.num_of_class = orchids52_dataset.NUM_OF_CLASSES
+load_dataset_v2.train_size = orchids52_dataset.TRAIN_SIZE_V2
+load_dataset_v2.test_size = orchids52_dataset.TEST_SIZE_V2
+load_dataset_v2.validate_size = orchids52_dataset.VALIDATE_SIZE_V2
+
+load_dataset_v3.num_of_class = orchids52_dataset.NUM_OF_CLASSES
+load_dataset_v3.train_size = orchids52_dataset.TRAIN_SIZE_V3
+load_dataset_v3.test_size = orchids52_dataset.TEST_SIZE_V3
+load_dataset_v3.validate_size = orchids52_dataset.VALIDATE_SIZE_V3

@@ -56,7 +56,6 @@ def _load_dataset(split,
                   batch_size,
                   train_size,
                   test_size,
-                  validate_size,
                   repeat=False,
                   aug_method='fast',
                   num_readers=1,
@@ -100,8 +99,6 @@ def _load_dataset(split,
             setattr(decode_dataset, 'size', train_size)
         elif split == 'test':
             setattr(decode_dataset, 'size', test_size)
-        elif split == 'validate':
-            setattr(decode_dataset, 'size', validate_size)
 
     setattr(decode_dataset, 'num_of_classes', data.orchids52_dataset.NUM_OF_CLASSES)
 
@@ -116,5 +113,8 @@ load_dataset_v1 = wrapped_partial(
     _load_dataset,
     train_size=data.orchids52_dataset.TRAIN_SIZE_V1,
     test_size=data.orchids52_dataset.TEST_SIZE_V1,
-    validate_size=data.orchids52_dataset.VALIDATE_SIZE_V1,
     data_dir='tf-records/v1')
+
+load_dataset_v1.num_of_classes = data.orchids52_dataset.NUM_OF_CLASSES
+load_dataset_v1.train_size = data.orchids52_dataset.TRAIN_SIZE_V1
+load_dataset_v1.test_size = data.orchids52_dataset.TEST_SIZE_V1
