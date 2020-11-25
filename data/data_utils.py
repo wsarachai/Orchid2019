@@ -12,7 +12,7 @@ ORCHIDS52_V1_FILE = 'orchids52_v1_file'
 ORCHIDS52_V2_FILE = 'orchids52_v2_file'
 ORCHIDS52_V1_TFRECORD = 'orchids52_v1_tf'
 ORCHIDS52_V2_TFRECORD = 'orchids52_v2_tf'
-ORCHIDS52_V3_TFRECORD = 'orchids52_v2_tf'
+ORCHIDS52_V3_TFRECORD = 'orchids52_v3_tf'
 
 logging = tf.compat.v1.logging
 

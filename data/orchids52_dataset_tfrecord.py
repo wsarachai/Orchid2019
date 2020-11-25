@@ -107,10 +107,10 @@ load_dataset_v2 = wrapped_partial(
     train_size=data.orchids52_dataset.TRAIN_SIZE_V1,
     test_size=data.orchids52_dataset.TEST_SIZE_V1,
     validate_size=data.orchids52_dataset.VALIDATE_SIZE_V1,
-    data_dir='tf-records/v1')
+    data_dir='tf-records/v2')
 load_dataset_v3 = wrapped_partial(
     _load_dataset,
     train_size=data.orchids52_dataset.TRAIN_SIZE_V2,
     test_size=data.orchids52_dataset.TEST_SIZE_V2,
     validate_size=data.orchids52_dataset.VALIDATE_SIZE_V2,
-    data_dir='tf-records/v2')
+    data_dir='tf-records/v3')

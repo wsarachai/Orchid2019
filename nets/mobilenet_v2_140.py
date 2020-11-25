@@ -8,6 +8,7 @@ import nets
 import lib_utils
 import tensorflow as tf
 import tensorflow.keras as keras
+from nets import mobilenet_v2_orchids
 
 
 class Orchids52Mobilenet140(object):
@@ -178,20 +179,32 @@ class PreprocessLayer(keras.layers.Layer):
 
 
 class PredictionLayer(keras.layers.Layer):
-    def __init__(self, num_classes, activation='linear', dropout_ratio=0.2):
+    def __init__(self, num_classes, shape, activation='linear', dropout_ratio=0.2):
         super(PredictionLayer, self).__init__()
-        self.global_average_pooling = keras.layers.GlobalAveragePooling2D()
+        self.global_average_pooling = global_pool(shape=shape)
         self.dropout = keras.layers.Dropout(dropout_ratio)
-        self.dense = keras.layers.Dense(num_classes,
-                                        activation=activation,
-                                        name='dense-{}'.format(num_classes))
+        self.dense = keras.layers.Conv2D(
+            num_classes,
+            kernel_size=1,
+            padding='same',
+            use_bias=True,
+            activation=activation,
+            bias_initializer=tf.zeros_initializer(),
+            name='dense-{}'.format(num_classes))
 
     def call(self, inputs, **kwargs):
         training = kwargs.pop('training')
         inputs = self.global_average_pooling(inputs, training=training)
         inputs = self.dropout(inputs, training=training)
         inputs = self.dense(inputs, training=training)
+        inputs = tf.squeeze(inputs, [1, 2])
         return inputs
+
+
+def global_pool(shape, pool_op=keras.layers.AvgPool2D):
+    pool_size = [shape[1], shape[2]]
+    output = pool_op(pool_size=pool_size, strides=[1, 1], padding='valid')
+    return output
 
 
 def create_mobilenet_v2_14(num_classes,
@@ -203,16 +216,18 @@ def create_mobilenet_v2_14(num_classes,
 
     inputs = keras.Input(shape=nets.mobilenet_v2.IMG_SHAPE_224)
     preprocess_layer = PreprocessLayer()
-    mobilenet = nets.mobilenet_v2.create_mobilenet_v2(
+    mobilenet = mobilenet_v2_orchids.create_mobilenet_v2(
         input_shape=nets.mobilenet_v2.IMG_SHAPE_224,
         alpha=1.4,
         include_top=False,
         weights='imagenet')
-    prediction_layer = PredictionLayer(num_classes=num_classes,
-                                       activation='softmax')
-
     processed_inputs = preprocess_layer(inputs, training=training)
     mobilenet_logits = mobilenet(processed_inputs, training=training)
+
+    prediction_layer = PredictionLayer(num_classes=num_classes,
+                                       shape=mobilenet_logits.get_shape().as_list(),
+                                       activation='softmax')
+
     outputs = prediction_layer(mobilenet_logits, training=training)
 
     model = Orchids52Mobilenet140(inputs, outputs,
