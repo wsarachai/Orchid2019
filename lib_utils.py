@@ -62,7 +62,8 @@ def config_optimizer(optimizer, learning_rate, **kwargs):
 
 
 def config_loss(**kwargs):
-    loss_fn = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+    #loss_fn = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+    loss_fn = tf.keras.losses.BinaryCrossentropy()
     return loss_fn
 
 

@@ -250,7 +250,6 @@ class PreprocessLayer(keras.layers.Layer):
 
     def call(self, inputs, **kwargs):
         training = kwargs.pop('training')
-        central_fraction = kwargs.pop('central_fraction', 0.875)
 
         # mode = kwargs.pop('mode', 'horizontal')
         # factor = kwargs.pop('factor', 0.2)
@@ -264,10 +263,12 @@ class PreprocessLayer(keras.layers.Layer):
 
         if not training:
             shape = inputs.get_shape().as_list()
+            central_fraction = kwargs.pop('central_fraction', 0.875)
             inputs = tf.image.central_crop(inputs, central_fraction=central_fraction)
             inputs = tf.image.resize(images=inputs,
                                      size=(shape[1], shape[2]),
                                      method=tf.image.ResizeMethod.BILINEAR)
+
         inputs = tf.subtract(inputs, 0.5)
         inputs = tf.multiply(inputs, 2.0)
         return inputs

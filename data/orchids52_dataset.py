@@ -50,7 +50,8 @@ def _preprocess_for_train(image, label_values, aug_method, image_size):
               tf.image.ResizeMethod.GAUSSIAN,
               tf.image.ResizeMethod.MITCHELLCUBIC]
 
-    cast_image = tf.image.convert_image_dtype(image, dtype=tf.float32)
+    #image = tf.image.convert_image_dtype(image, dtype=tf.float32)
+    image = tf.cast(image, dtype=tf.float32)
 
     def apply_random_selector(x):
         num_cases = len(method)
@@ -61,7 +62,7 @@ def _preprocess_for_train(image, label_values, aug_method, image_size):
                                     pred=tf.equal(case, sel))[1] for case in range(num_cases)]
         return tf.raw_ops.Merge(inputs=inputs)[0]
 
-    distorted_image = apply_random_selector(cast_image)
+    distorted_image = apply_random_selector(image)
 
     num_distort_cases = 4
     fast_mode = True if aug_method == 'fast' else False
