@@ -115,7 +115,7 @@ load_dataset_v3 = wrapped_partial(
     validate_size=data.orchids52_dataset.VALIDATE_SIZE_V3,
     data_dir='tf-records/v3')
 
-load_dataset_v2.num_of_class = data.orchids52_dataset.NUM_OF_CLASSES
+load_dataset_v2.num_of_classes = data.orchids52_dataset.NUM_OF_CLASSES
 load_dataset_v2.train_size = data.orchids52_dataset.TRAIN_SIZE_V2
 load_dataset_v2.test_size = data.orchids52_dataset.TEST_SIZE_V2
 load_dataset_v2.validate_size = data.orchids52_dataset.VALIDATE_SIZE_V2

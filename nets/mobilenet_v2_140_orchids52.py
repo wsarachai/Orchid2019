@@ -9,6 +9,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
 from tensorflow.python.keras import Sequential
+from nets import mobilenet_v2
 
 logging = tf.compat.v1.logging
 

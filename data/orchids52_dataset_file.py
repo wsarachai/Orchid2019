@@ -154,12 +154,12 @@ load_dataset_v3 = wrapped_partial(
     validate_size=orchids52_dataset.VALIDATE_SIZE_V3,
     data_dir='v2')
 
-load_dataset_v2.num_of_class = orchids52_dataset.NUM_OF_CLASSES
+load_dataset_v2.num_of_classes = orchids52_dataset.NUM_OF_CLASSES
 load_dataset_v2.train_size = orchids52_dataset.TRAIN_SIZE_V2
 load_dataset_v2.test_size = orchids52_dataset.TEST_SIZE_V2
 load_dataset_v2.validate_size = orchids52_dataset.VALIDATE_SIZE_V2
 
-load_dataset_v3.num_of_class = orchids52_dataset.NUM_OF_CLASSES
+load_dataset_v3.num_of_classes = orchids52_dataset.NUM_OF_CLASSES
 load_dataset_v3.train_size = orchids52_dataset.TRAIN_SIZE_V3
 load_dataset_v3.test_size = orchids52_dataset.TEST_SIZE_V3
 load_dataset_v3.validate_size = orchids52_dataset.VALIDATE_SIZE_V3

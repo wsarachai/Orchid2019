@@ -7,6 +7,10 @@ import copy
 import nets
 import tensorflow as tf
 
+physical_devices = tf.config.experimental.list_physical_devices('GPU')
+if len(physical_devices) > 0:
+    config = tf.config.experimental.set_memory_growth(physical_devices[0], True)
+
 logging = tf.compat.v1.logging
 
 
@@ -32,9 +36,6 @@ def apply_with_random_selector(x, func, num_cases):
 def start(start_fn):
     logging.set_verbosity(logging.INFO)
     logging.info("tf.version %s" % tf.version.VERSION)
-    physical_devices = tf.config.experimental.list_physical_devices('GPU')
-    if len(physical_devices) > 0:
-        config = tf.config.experimental.set_memory_growth(physical_devices[0], True)
     tf.compat.v1.app.run(start_fn)
 
 

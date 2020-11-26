@@ -99,9 +99,10 @@ class Orchids52Mobilenet140(object):
         self.checkpoint = None
         self.prediction_layer_checkpoints = []
 
-    def compile(self):
+    def compile(self, **kwargs):
         self.model.compile(optimizer=self.optimizer,
-                           loss=self.loss_fn)
+                           loss=self.loss_fn,
+                           **kwargs)
 
     def process_step(self, inputs, training=False):
         return self.model(inputs, training=training)
@@ -169,9 +170,10 @@ class Orchids52Mobilenet140(object):
                     saved_var = var_loaded[i]
                     tf.assert_equal(var.shape, saved_var.shape)
                     var.assign(saved_var)
-                return True
+                result = True
             else:
-                return False
+                result = False
+        return result
 
     def get_step_number_from_latest_checkpoint(self):
         try:

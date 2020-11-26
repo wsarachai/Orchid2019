@@ -43,8 +43,16 @@ flags.DEFINE_string('checkpoint_path', None,
                     'Checkpoint path')
 
 flags.DEFINE_string('image_dir',
-                    '/Volumes/Data/_dataset/_orchids_dataset/orchids52_data/v1/test/',
+                    '/Volumes/Data/tmp/orchids52_data/test/',
                     'The directory where the dataset images are locate')
+
+flags.DEFINE_string('optimizer', 'rmsprop',
+                    'The name of the optimizer, one of "adadelta", "adagrad", "adam",'
+                    '"ftrl", "momentum", "sgd" or "rmsprop".')
+
+flags.DEFINE_string('trained_path',
+                    '/Volumes/Data/tmp/orchids-models/mobilenet_v2_140_orchids52_0001/pretrain2/model.ckpt-12000',
+                    'Checkpoint Path')
 
 
 def create_image_lists(image_dir):
@@ -140,15 +148,27 @@ def main(unused_argv):
     dataset_images = create_image_lists(image_dir=FLAGS.image_dir)
     load_dataset = data_utils.dataset_mapping[FLAGS.dataset]
     create_model = utils.nets_mapping[FLAGS.model]
+    workspace_path = os.environ['WORKSPACE'] if 'WORKSPACE' in os.environ else '/Volumes/Data/tmp'
+    checkpoint_path = os.path.join(workspace_path, 'orchids-models', 'orchids2019', FLAGS.model)
+
+    training_step = utils.TRAIN_TEMPLATE.format(step=1)
+    learning_rate = lib_utils.config_learning_rate(learning_rate=FLAGS.learning_rate,
+                                                   exp_decay=FLAGS.exp_decay,
+                                                   training_step=training_step)
+    optimizer = lib_utils.config_optimizer(FLAGS.optimizer,
+                                           learning_rate=learning_rate,
+                                           training_step=training_step)
+    loss_fn = lib_utils.config_loss(from_logits=False)
 
     model = create_model(num_classes=load_dataset.num_of_classes,
-                         optimizer=None,
-                         loss_fn=None,
+                         optimizer=optimizer,
+                         loss_fn=loss_fn,
                          batch_size=1,
-                         step='')
-    accuracy_metric = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
-    model.compile(metrics=[accuracy_metric])
-    model.restore_model_variables(checkpoint_path=FLAGS.checkpoint_path)
+                         step=training_step)
+
+    model.config_checkpoint(checkpoint_path)
+    model.restore_model_variables(
+        checkpoint_path=FLAGS.trained_path)
     model.summary()
 
     count = 0
