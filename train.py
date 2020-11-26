@@ -52,6 +52,15 @@ flags.DEFINE_string('dataset', data_utils.ORCHIDS52_V1_TFRECORD,
 flags.DEFINE_string('model', utils.MOBILENET_V2_140_ORCHIDS52,
                     'Model')
 
+flags.DEFINE_string('optimizer', 'rmsprop',
+                    'The name of the optimizer, one of "adadelta", "adagrad", "adam",'
+                    '"ftrl", "momentum", "sgd" or "rmsprop".')
+
+flags.DEFINE_string('trained_path',
+                    '/Volumes/Data/tmp/orchids-models/mobilenet_v2_140_orchids52_0001/pretrain2/model.ckpt-12000',
+                    'Checkpoint Path')
+
+
 
 def main(unused_argv):
     logging.debug(unused_argv)
@@ -87,8 +96,10 @@ def main(unused_argv):
         learning_rate = lib_utils.config_learning_rate(learning_rate=FLAGS.learning_rate,
                                                        exp_decay=FLAGS.exp_decay,
                                                        training_step=training_step)
-        optimizer = lib_utils.config_optimizer(learning_rate=learning_rate, training_step=training_step)
-        loss_fn = lib_utils.config_loss()
+        optimizer = lib_utils.config_optimizer(FLAGS.optimizer,
+                                               learning_rate=learning_rate,
+                                               training_step=training_step)
+        loss_fn = lib_utils.config_loss(from_logits=False)
 
         model = create_model(num_classes=data.orchids52_dataset.NUM_OF_CLASSES,
                              optimizer=optimizer,
@@ -101,7 +112,7 @@ def main(unused_argv):
                                                 batch_size=batch_size)
 
         model.config_checkpoint(checkpoint_path)
-        epoch = model.restore_model_variables()
+        epoch = model.restore_model_variables(checkpoint_path=FLAGS.trained_path)
         model.summary()
 
         history_fine = train_model.fit(initial_epoch=epoch,

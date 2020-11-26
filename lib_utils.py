@@ -54,13 +54,17 @@ def config_learning_rate(learning_rate=0.001,
     return learning_rate
 
 
-def config_optimizer(learning_rate, **kwargs):
-    optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate)
-    return optimizer
+def config_optimizer(optimizer, learning_rate, **kwargs):
+    if optimizer == "rmsprop":
+        return tf.keras.optimizers.RMSprop(learning_rate=learning_rate)
+    elif optimizer == "adam":
+        return tf.keras.optimizers.Adam(learning_rate=learning_rate)
+    else:
+        return tf.keras.optimizers.SGD(learning_rate=learning_rate)
 
 
-def config_loss(**kwargs):
-    loss_fn = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+def config_loss(from_logits):
+    loss_fn = tf.keras.losses.BinaryCrossentropy(from_logits=from_logits)
     return loss_fn
 
 

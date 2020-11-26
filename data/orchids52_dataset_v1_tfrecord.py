@@ -9,11 +9,18 @@ import nets
 import tensorflow as tf
 
 feature_description = {
-    'image/colorspace': tf.io.FixedLenFeature([], tf.string, default_value=''),
-    'image/channels': tf.io.FixedLenFeature([], tf.int64, default_value=0),
-    'image/format': tf.io.FixedLenFeature([], tf.string, default_value=''),
-    'image/class/label': tf.io.FixedLenFeature([], tf.string, default_value=''),
-    'image/image_raw': tf.io.FixedLenFeature((), tf.string, default_value='')
+    'image/height': tf.io.FixedLenFeature([], tf.int64, default_value=tf.zeros([], dtype=tf.int64)),
+    'image/width': tf.io.FixedLenFeature([], tf.int64, default_value=tf.zeros([], dtype=tf.int64)),
+    'image/colorspace': tf.io.FixedLenFeature((), tf.string, default_value=''),
+    'image/channels': tf.io.FixedLenFeature([], tf.int64, default_value=tf.zeros([], dtype=tf.int64)),
+    'image/class/label': tf.io.FixedLenFeature([], tf.int64, default_value=tf.zeros([], dtype=tf.int64)),
+    'image/class/synset': tf.io.FixedLenFeature((), tf.string, default_value=''),
+    'image/class/text': tf.io.FixedLenFeature((), tf.string, default_value=''),
+    'image/format': tf.io.FixedLenFeature((), tf.string, default_value=''),
+    'image/filename': tf.io.FixedLenFeature((), tf.string, default_value=''),
+    'image/encoded': tf.io.FixedLenFeature((), tf.string, default_value=''),
+    'bottleneck/inception_v1': tf.io.FixedLenFeature((), tf.string, default_value=''),
+    'bottleneck/inception_v3': tf.io.FixedLenFeature((), tf.string, default_value=''),
 }
 
 preprocess_for_train = None
@@ -26,15 +33,14 @@ def wrapped_partial(func, *args, **kwargs):
     return partial_func
 
 
-def get_label(serialize_example):
+def _get_label(serialize_example, depth):
     label = serialize_example['image/class/label']
-    label_string = tf.strings.split(label, ',')
-    label_values = tf.strings.to_number(label_string, out_type=tf.dtypes.int64)
+    label_values = tf.one_hot(label, depth=depth)
     return label_values
 
 
 def decode_example(serialize_example):
-    image = serialize_example['image/image_raw']
+    image = serialize_example['image/encoded']
     image = tf.image.decode_jpeg(image, channels=3)
     label_values = get_label(serialize_example)
     return image, label_values
@@ -50,7 +56,6 @@ def _load_dataset(split,
                   batch_size,
                   train_size,
                   test_size,
-                  validate_size,
                   repeat=False,
                   aug_method='fast',
                   num_readers=1,
@@ -94,33 +99,22 @@ def _load_dataset(split,
             setattr(decode_dataset, 'size', train_size)
         elif split == 'test':
             setattr(decode_dataset, 'size', test_size)
-        elif split == 'validate':
-            setattr(decode_dataset, 'size', validate_size)
 
     setattr(decode_dataset, 'num_of_classes', data.orchids52_dataset.NUM_OF_CLASSES)
 
     return decode_dataset
 
 
-load_dataset_v2 = wrapped_partial(
-    _load_dataset,
-    train_size=data.orchids52_dataset.TRAIN_SIZE_V2,
-    test_size=data.orchids52_dataset.TEST_SIZE_V2,
-    validate_size=data.orchids52_dataset.VALIDATE_SIZE_V2,
-    data_dir='tf-records/v2')
-load_dataset_v3 = wrapped_partial(
-    _load_dataset,
-    train_size=data.orchids52_dataset.TRAIN_SIZE_V3,
-    test_size=data.orchids52_dataset.TEST_SIZE_V3,
-    validate_size=data.orchids52_dataset.VALIDATE_SIZE_V3,
-    data_dir='tf-records/v3')
+get_label = wrapped_partial(
+    _get_label,
+    depth=data.orchids52_dataset.NUM_OF_CLASSES)
 
-load_dataset_v2.num_of_class = data.orchids52_dataset.NUM_OF_CLASSES
-load_dataset_v2.train_size = data.orchids52_dataset.TRAIN_SIZE_V2
-load_dataset_v2.test_size = data.orchids52_dataset.TEST_SIZE_V2
-load_dataset_v2.validate_size = data.orchids52_dataset.VALIDATE_SIZE_V2
+load_dataset_v1 = wrapped_partial(
+    _load_dataset,
+    train_size=data.orchids52_dataset.TRAIN_SIZE_V1,
+    test_size=data.orchids52_dataset.TEST_SIZE_V1,
+    data_dir='tf-records/v1')
 
-load_dataset_v3.num_of_class = data.orchids52_dataset.NUM_OF_CLASSES
-load_dataset_v3.train_size = data.orchids52_dataset.TRAIN_SIZE_V3
-load_dataset_v3.test_size = data.orchids52_dataset.TEST_SIZE_V3
-load_dataset_v3.validate_size = data.orchids52_dataset.VALIDATE_SIZE_V3
+load_dataset_v1.num_of_classes = data.orchids52_dataset.NUM_OF_CLASSES
+load_dataset_v1.train_size = data.orchids52_dataset.TRAIN_SIZE_V1
+load_dataset_v1.test_size = data.orchids52_dataset.TEST_SIZE_V1
