@@ -56,6 +56,10 @@ flags.DEFINE_string('optimizer', 'rmsprop',
                     'The name of the optimizer, one of "adadelta", "adagrad", "adam",'
                     '"ftrl", "momentum", "sgd" or "rmsprop".')
 
+flags.DEFINE_string('trained_path',
+                    '/Volumes/Data/tmp/orchids-models/mobilenet_v2_140_orchids52_0001/pretrain2/model.ckpt-12000',
+                    'Checkpoint Path')
+
 
 def main(unused_argv):
     logging.debug(unused_argv)
@@ -109,7 +113,7 @@ def main(unused_argv):
                                                 batch_size=batch_size)
 
         model.config_checkpoint(checkpoint_path)
-        epoch = model.restore_model_variables()
+        epoch = model.restore_model_variables(checkpoint_path=FLAGS.trained_path)
         model.summary()
 
         history_fine = train_model.fit(initial_epoch=epoch,

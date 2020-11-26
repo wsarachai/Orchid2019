@@ -153,15 +153,15 @@ class Orchids52Mobilenet140(object):
         return value_to_load
 
     def restore_model_from_latest_checkpoint_if_exist(self, **kwargs):
+        result = False
         if self.checkpoint:
             checkpoint, checkpoint_manager = self.checkpoint
             if checkpoint_manager.latest_checkpoint:
                 status = checkpoint.restore(checkpoint_manager.latest_checkpoint)
                 status.assert_existing_objects_matched()
-                return True
-            else:
-                return False
-        else:
+                result = True
+
+        if not result:
             latest_checkpoint = kwargs.pop('checkpoint_path')
             if latest_checkpoint:
                 var_loaded = self.load_from_v1(latest_checkpoint)
