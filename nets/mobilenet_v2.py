@@ -120,12 +120,10 @@ def global_pool(input_tensor, pool_op=tf.compat.v1.nn.avg_pool2d):
   return output
 
 
-def create_mobilenet_v1(inputs,
-                        alpha=1.0,
-                        include_top=True,
-                        input_tensor=None,
-                        classes=52,
-                        **kwargs):
+def create_mobilenet_v1(alpha,
+                        classes,
+                        model_name='mobilenet_v2'):
+    inputs = layers.Input(shape=(224, 224, 3))
     channel_axis = -1
     first_block_filters = _make_divisible(32 * alpha, 8)
     x = layers.Conv2D(
@@ -134,13 +132,11 @@ def create_mobilenet_v1(inputs,
         strides=(2, 2),
         padding='same',
         use_bias=False,
-        kernel_regularizer=tf.keras.regularizers.l2(regularizers_l2),
-        name='Conv')(inputs)
+        name='%s_Conv1' % model_name)(inputs)
     x = layers.BatchNormalization(
-        axis=channel_axis, epsilon=1e-3, momentum=0.999, name='Conv')(x)
-    x = layers.ReLU(6., name='Conv')(x)
+        axis=channel_axis, epsilon=1e-3, momentum=0.999, name='%s_bn_Conv1' % model_name)(x)
+    x = layers.ReLU(6., name='%s_Conv1_relu' % model_name)(x)
 
-    model_name = 'Conv'
     x = _inverted_res_block(model_name,
                             x, filters=16, alpha=alpha, stride=1, expansion=1, block_id=0)
 
@@ -206,7 +202,9 @@ def create_mobilenet_v1(inputs,
 
         logits = tf.squeeze(logits, [1, 2])
 
-    return logits
+    model = training.Model(inputs, logits)
+
+    return model
 
 
 def create_mobilenet_v2(input_shape=None,
