@@ -182,7 +182,7 @@ class Orchids52Mobilenet140(object):
         else:
             return step
 
-    def restore_model_variables(self,load_from_checkpoint_first=True, checkpoint_path=None):
+    def restore_model_variables(self, load_from_checkpoint_first=True, checkpoint_path=None):
         step = 1
         loaded_successfully = False
         if load_from_checkpoint_first:
@@ -247,12 +247,12 @@ class PreprocessLayer(keras.layers.Layer):
             keras.layers.experimental.preprocessing.RandomFlip(mode),
             keras.layers.experimental.preprocessing.RandomRotation(factor),
         ])
-        #self.preprocess_input = keras.applications.mobilenet_v2.preprocess_input
+        # self.preprocess_input = keras.applications.mobilenet_v2.preprocess_input
 
     def call(self, inputs, **kwargs):
         training = kwargs.pop('training')
         inputs = self.data_augmentation(inputs, training=training)
-        #inputs = self.preprocess_input(inputs)
+        # inputs = self.preprocess_input(inputs)
         inputs = inputs / 255.0
         inputs = inputs - 0.5
         inputs = inputs * 2.0
@@ -286,6 +286,20 @@ def global_pool(shape, pool_op=keras.layers.AvgPool2D):
     pool_size = [shape[1], shape[2]]
     output = pool_op(pool_size=pool_size, strides=[1, 1], padding='valid')
     return output
+
+
+def create_mobilenet_v2_14_v1(num_classes,
+                              training=False,
+                              **kwargs):
+
+    mobilenet = nets.mobilenet_v2.create_mobilenet_v2(
+        input_shape=nets.mobilenet_v2.IMG_SHAPE_224,
+        alpha=1.4,
+        include_top=False,
+        classes=num_classes,
+        weights='imagenet')
+
+    return mobilenet
 
 
 def create_mobilenet_v2_14(num_classes,

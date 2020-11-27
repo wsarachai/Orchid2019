@@ -62,7 +62,7 @@ flags.DEFINE_string('trained_path',
                     'Checkpoint Path')
 
 
-def main(unused_argv):
+def main1(unused_argv):
     logging.debug(unused_argv)
     workspace_path = os.environ['WORKSPACE'] if 'WORKSPACE' in os.environ else '/Volumes/Data/tmp'
     data_path = os.environ['DATA_DIR'] if 'DATA_DIR' in os.environ else '/Volumes/Data/_dataset/_orchids_dataset'
@@ -117,9 +117,15 @@ def main(unused_argv):
         model.save(checkpoint_path)
 
 
-def main2(unused_argv):
+def main(unused_argv):
     logging.debug(unused_argv)
+
     from experiments import list_var_name
+
+    name_list_v1 = list_var_name.load_v1()
+    for v in name_list_v1:
+        print(v[0])
+
     workspace_path = os.environ['WORKSPACE'] if 'WORKSPACE' in os.environ else '/Volumes/Data/tmp'
     checkpoint_path = os.path.join(workspace_path, 'orchids-models', 'orchids2019', FLAGS.model, 'pretrain', 'chk')
     create_model = nets.utils.nets_mapping[FLAGS.model]

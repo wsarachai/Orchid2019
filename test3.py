@@ -7,11 +7,10 @@ import re
 import sys
 import collections
 import tensorflow as tf
-import numpy as np
+from tensorflow import keras
 
-from data import data_utils
-from nets import utils
-from nets.mobilenet_v2 import default_image_size
+from experiments import list_var_name
+from nets.mobilenet_v2 import default_image_size, create_mobilenet_v1, create_mobilenet_v2, IMG_SHAPE_224
 
 flags = tf.compat.v1.flags
 logging = tf.compat.v1.logging
@@ -54,8 +53,6 @@ flags.DEFINE_string(
     'The directory where the dataset images are locate')
 
 flags.DEFINE_integer('total_test_images', 739, 'The total number of test images.')
-
-FLAGS = flags.FLAGS
 
 
 def create_image_lists(image_dir):
@@ -139,118 +136,84 @@ def image_preprocessing_fn(image, height, width,
         return image
 
 
-def main(_):
-    workspace_path = os.environ['WORKSPACE'] if 'WORKSPACE' in os.environ else '/Volumes/Data/tmp'
-    data_path = os.environ['DATA_DIR'] if 'DATA_DIR' in os.environ else '/Volumes/Data/_dataset/_orchids_dataset'
-    data_dir = os.path.join(data_path, 'orchids52_data')
-    load_dataset = data_utils.dataset_mapping[FLAGS.dataset]
-    create_model = utils.nets_mapping[FLAGS.model]
-    checkpoint_path = os.path.join(workspace_path, 'orchids-models', 'orchids2019', FLAGS.model, 'pretrain')
+def main(_, nets=None):
+    with tf.compat.v1.Graph().as_default() as g:
+        with tf.compat.v1.variable_scope('MobilenetV2'):
+            dataset_images = create_image_lists(image_dir=FLAGS.image_dir)
+            jpeg_data = tf.compat.v1.placeholder(tf.string, name='DecodeJPGInput')
+            decoded_image = tf.compat.v1.image.decode_jpeg(jpeg_data, channels=3)
+            eval_image_size = default_image_size
+            image = image_preprocessing_fn(decoded_image, eval_image_size, eval_image_size)
 
-    with tf.Graph().as_default():
-        dataset_images = create_image_lists(image_dir=FLAGS.image_dir)
-        test_ds = load_dataset(split="test", batch_size=batch_size, root_path=data_dir)
+            inputs = tf.expand_dims(image, 0)
+            logits = create_mobilenet_v1(inputs, alpha=1.4)
 
-        jpeg_data = tf.compat.v1.placeholder(tf.string, name='DecodeJPGInput')
-        decoded_image = tf.compat.v1.image.decode_jpeg(jpeg_data, channels=3))
+            predictions = tf.argmax(logits, 1)
+            softmax = tf.nn.softmax(logits, axis=1)
+            softmax = tf.squeeze(softmax)
 
-        eval_image_size = default_image_size
-        image = image_preprocessing_fn(decoded_image, eval_image_size, eval_image_size)
+            var_list = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.VARIABLES)
+            name_list_v1 = list_var_name.load_v1()
+            _mapped = zip(name_list_v1, var_list)
+            variables_to_restore = {}
+            for k, v in _mapped:
+                src_name = k[0]
+                variables_to_restore.update({src_name: v})
+            checkpoint_path = '/Volumes/Data/tmp/orchids-models/mobilenet_v2_140_orchids52_0001/pretrain2/model.ckpt-12000'
+            reader = tf.compat.v1.train.NewCheckpointReader(checkpoint_path)
+            var_to_shape_map = reader.get_variable_to_shape_map()
 
-        image = tf.expand_dims(image, 0)
-        logits, end_points = network_fn(image, **kwargs)
+            key_to_numpy = {}
+            for key in var_to_shape_map:
+                key_to_numpy[key] = tf.constant(reader.get_tensor(key))
 
-        variables_to_restore = slim.get_variables_to_restore()
+            assign_op = []
+            with tf.compat.v1.variable_scope(tf.compat.v1.get_variable_scope(),
+                                             reuse=tf.compat.v1.AUTO_REUSE):
+                for _src_name, dst_var in variables_to_restore.items():
+                    src_name = _src_name
+                    if src_name in key_to_numpy:
+                        print('Restore variable: {}'.format(dst_var.op.name))
+                        #copy_var = tf.compat.v1.get_variable(dst_name)
+                        init = key_to_numpy[src_name]
+                        assign0 = tf.compat.v1.assign(dst_var, init)
+                        with tf.control_dependencies(assign_op):
+                            assign_op.append(assign0)
+                    else:
+                        raise ValueError("Can't find {}".format(src_name))
 
-        predictions = tf.argmax(logits, 1)
-        softmax = tf.nn.softmax(logits, axis=1)
-        softmax = tf.squeeze(softmax)
+            def callback(sess):
+                sess.run(assign_op)
 
-        if tf.gfile.IsDirectory(FLAGS.checkpoint_path):
-            checkpoint_path = tf.train.latest_checkpoint(FLAGS.checkpoint_path)
-        else:
-            checkpoint_path = FLAGS.checkpoint_path
-
-        print(">>> Total number fo parameters: {}".format(custom_utils.get_total_parameters()))
-
-        #
-        # Create key maps
-        #
-        # reader = tf.train.NewCheckpointReader(checkpoint_path)
-        # var_to_shape_map = reader.get_variable_to_shape_map()
-        # key_to_numpy = {}
-        # for key in var_to_shape_map:
-        #   key_to_numpy[key] = reader.get_tensor(key)
-        # key_to_tensor = {}
-        # for var in variables_to_restore:
-        #   key = var.op.name
-        #   key_to_tensor[key] = var
-
-        # get variable
-        # for _k, var in key_to_numpy.items():
-        #   filename = _k.replace('/', '-')
-        #   filename = '/tmp/chk-weight-2/{}.txt'.format(filename)
-        #   print("Writing checipoint weight {}".format(filename))
-        #   var = np.expand_dims(var, axis=0)
-        #   write_weight(filename, var)
-
-        _init_fn = nets_factory.get_init_fn(
-            model_name=FLAGS.model_name,
-            is_training=False)
-
-        with tf.Session() as sess:
-            if _init_fn:
-                init_callback_fn = _init_fn(var_list=variables_to_restore,
-                                            checkpoint_path=checkpoint_path)
+            with tf.compat.v1.Session() as sess:
                 sess.run(tf.compat.v1.global_variables_initializer())
-                if init_callback_fn:
-                    init_callback_fn(sess)
-            else:
-                saver = tf.train.Saver(variables_to_restore)
-                sess.run(tf.compat.v1.global_variables_initializer())
-                saver.restore(sess, checkpoint_path)
+                if callback:
+                    callback(sess)
 
-            # get variable
-            # for _k, var in key_to_tensor.items():
-            #   filename = _k.replace('/', '-')
-            #   filename = '/tmp/m2-weight/{}.txt'.format(filename)
-            #   print ("Writing {}".format(filename))
-            #   v = sess.run(var)
-            #   write_weight(filename, v)
+                count = 0
+                corrected = 0
+                for label, data in dataset_images.items():
+                    for file in data['testing']:
+                        filename = os.path.join(FLAGS.image_dir, data['dir'], file)
+                        image_data = tf.io.gfile.GFile(filename, 'rb').read()
+                        results = sess.run([predictions, softmax], feed_dict={jpeg_data: image_data})
 
-            # fl = open("/Users/sarachaii/Documents/confusion-label.txt", "w")
-            # fp = open("/Users/sarachaii/Documents/confusion-prediction.txt", "w")
+                        total_images = 739
+                        count += 1
+                        predict = results[0][0]
+                        confi = results[1][predict]
+                        spredict = "n{:04d}".format(predict)
+                        if spredict == label:
+                            corrected += 1
+                        sys.stdout.write("\r>> {}/{}: Predict: {}, expected: {}, confident: {:.4f}, acc: {:.4f}".format(
+                            count, total_images, spredict, label, confi, corrected / count))
+                        sys.stdout.flush()
 
-            count = 0
-            corrected = 0
-            for label, data in dataset_images.items():
-                for file in data['testing']:
-                    filename = os.path.join(FLAGS.image_dir, data['dir'], file)
-                    image_data = tf.gfile.FastGFile(filename, 'rb').read()
-                    results = sess.run([predictions, softmax], feed_dict={jpeg_data: image_data})
-
-                    # for __k, layer in end_points.items():
-                    #  filename = __k.replace('/', '-')
-                    #  results = sess.run(layer, feed_dict={jpeg_data: image_data})
-                    #  write_weight(filename='/tmp/m1_output/{}.txt'.format(filename), w=results)
-
-                    count += 1
-                    predict = results[0][0]
-                    confi = results[1][predict]
-                    spredict = "n{:04d}".format(predict)
-                    if spredict == label:
-                        corrected += 1
-                    sys.stdout.write("\r>> {}/{}: Predict: {}, expected: {}, confident: {:.4f}, acc: {:.4f}".format(
-                        count, total_images, spredict, label, confi, corrected / count))
-                    sys.stdout.flush()
-                    # fl.write("{},".format(label))
-                    # fp.write("{},".format(spredict))
-
-            sys.stdout.write('\n\nDone evaluation -- epoch limit reached')
-            sys.stdout.write('Accuracy: {:.4f}'.format(corrected / total_images))
-            sys.stdout.flush()
+                sys.stdout.write('\n\nDone evaluation -- epoch limit reached')
+                sys.stdout.write('Accuracy: {:.4f}'.format(corrected / total_images))
+                sys.stdout.flush()
 
 
 if __name__ == '__main__':
-    tf.logging.set_verbosity(tf.logging.INFO)
-    tf.app.run()
+    logging.set_verbosity(logging.INFO)
+    tf.compat.v1.app.run()
