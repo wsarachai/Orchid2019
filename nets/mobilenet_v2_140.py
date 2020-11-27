@@ -9,6 +9,9 @@ import lib_utils
 import tensorflow as tf
 import tensorflow.keras as keras
 
+from nets.constants import TRAIN_TEMPLATE
+from nets.mobilenet_v2 import PredictionLayer, PreprocessLayer
+
 logging = tf.compat.v1.logging
 
 
@@ -122,8 +125,6 @@ class Orchids52Mobilenet140(object):
         self.model.summary()
 
     def config_checkpoint(self, checkpoint_path):
-        assert (self.optimizer is not None and self.predict_layers is not None)
-
         self.checkpoint_path = checkpoint_path
         checkpoint = tf.train.Checkpoint(
             step=tf.Variable(1),
@@ -182,6 +183,13 @@ class Orchids52Mobilenet140(object):
         else:
             return step
 
+    def load_weights(self, checkpoint_path):
+        status = self.model.load_weights(checkpoint_path)
+        status.assert_consumed()
+
+    def save_weight(self, checkpoint_path):
+        self.model.save_weights(checkpoint_path)
+
     def restore_model_variables(self, load_from_checkpoint_first=True, checkpoint_path=None):
         step = 1
         loaded_successfully = False
@@ -196,11 +204,11 @@ class Orchids52Mobilenet140(object):
         return step
 
     def config_layers(self):
-        if self.step == nets.utils.TRAIN_STEP1:
+        if self.step == nets.constants.TRAIN_STEP1:
             self.set_mobilenet_training_status(False)
 
     def load_model_variables(self):
-        if self.step == nets.utils.TRAIN_STEP1:
+        if self.step == nets.constants.TRAIN_STEP1:
             self.load_model_step1()
 
     def load_model_step1(self):
@@ -240,66 +248,33 @@ class Orchids52Mobilenet140(object):
                         options=options)
 
 
-class PreprocessLayer(keras.layers.Layer):
-    def __init__(self, mode='horizontal', factor=0.2):
-        super(PreprocessLayer, self).__init__()
-        self.data_augmentation = keras.Sequential([
-            keras.layers.experimental.preprocessing.RandomFlip(mode),
-            keras.layers.experimental.preprocessing.RandomRotation(factor),
-        ])
-        # self.preprocess_input = keras.applications.mobilenet_v2.preprocess_input
-
-    def call(self, inputs, **kwargs):
-        training = kwargs.pop('training')
-        inputs = self.data_augmentation(inputs, training=training)
-        # inputs = self.preprocess_input(inputs)
-        inputs = inputs / 255.0
-        inputs = inputs - 0.5
-        inputs = inputs * 2.0
-        return inputs
-
-
-class PredictionLayer(keras.layers.Layer):
-    def __init__(self, num_classes, shape, activation='linear', dropout_ratio=0.2):
-        super(PredictionLayer, self).__init__()
-        self.global_average_pooling = global_pool(shape=shape)
-        self.dropout = keras.layers.Dropout(dropout_ratio)
-        self.dense = keras.layers.Conv2D(
-            num_classes,
-            kernel_size=1,
-            padding='same',
-            use_bias=True,
-            activation=activation,
-            bias_initializer=tf.zeros_initializer(),
-            name='dense-{}'.format(num_classes))
-
-    def call(self, inputs, **kwargs):
-        training = kwargs.pop('training')
-        inputs = self.global_average_pooling(inputs, training=training)
-        inputs = self.dropout(inputs, training=training)
-        inputs = self.dense(inputs, training=training)
-        inputs = tf.squeeze(inputs, [1, 2])
-        return inputs
-
-
-def global_pool(shape, pool_op=keras.layers.AvgPool2D):
-    pool_size = [shape[1], shape[2]]
-    output = pool_op(pool_size=pool_size, strides=[1, 1], padding='valid')
-    return output
-
-
 def create_mobilenet_v2_14_v1(num_classes,
+                              optimizer,
+                              loss_fn,
                               training=False,
                               **kwargs):
+    step = kwargs.pop('step') if 'step' in kwargs else TRAIN_TEMPLATE.format(step=1)
 
-    mobilenet = nets.mobilenet_v2.create_mobilenet_v2(
+    inputs = keras.Input(shape=nets.mobilenet_v2.IMG_SHAPE_224, dtype=tf.float32)
+    prediction_layer = PredictionLayer(num_classes=num_classes)
+    mobilenet = nets.mobilenet_v2.create_mobilenet_v1(
         input_shape=nets.mobilenet_v2.IMG_SHAPE_224,
         alpha=1.4,
         include_top=False,
-        classes=num_classes,
-        weights='imagenet')
+        classes=num_classes)
 
-    return mobilenet
+    outputs = mobilenet(inputs, training=training)
+    outputs = prediction_layer(outputs, training=training)
+
+    model = Orchids52Mobilenet140(inputs, outputs,
+                                  optimizer=optimizer,
+                                  loss_fn=loss_fn,
+                                  mobilenet=mobilenet,
+                                  predict_layers=[prediction_layer],
+                                  training=training,
+                                  step=step)
+
+    return model
 
 
 def create_mobilenet_v2_14(num_classes,
@@ -307,21 +282,17 @@ def create_mobilenet_v2_14(num_classes,
                            loss_fn,
                            training=False,
                            **kwargs):
-    step = kwargs.pop('step') if 'step' in kwargs else nets.utils.TRAIN_TEMPLATE.format(1)
-
+    step = kwargs.pop('step') if 'step' in kwargs else TRAIN_TEMPLATE.format(step=1)
     inputs = keras.Input(shape=nets.mobilenet_v2.IMG_SHAPE_224)
     preprocess_layer = PreprocessLayer()
-    mobilenet = nets.mobilenet_v2.create_mobilenet_v2(
+    mobilenet = nets.mobilenet_v2.create_mobilenet_v1(
         input_shape=nets.mobilenet_v2.IMG_SHAPE_224,
         alpha=1.4,
-        include_top=False,
-        weights='imagenet')
+        include_top=False)
 
     processed_inputs = preprocess_layer(inputs, training=training)
     mobilenet_logits = mobilenet(processed_inputs, training=training)
-    prediction_layer = PredictionLayer(num_classes=num_classes,
-                                       shape=mobilenet_logits.get_shape().as_list(),
-                                       activation='softmax')
+    prediction_layer = PredictionLayer(num_classes=num_classes)
     outputs = prediction_layer(mobilenet_logits, training=training)
 
     model = Orchids52Mobilenet140(inputs, outputs,

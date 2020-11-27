@@ -10,7 +10,7 @@ import tensorflow as tf
 from tensorflow import keras
 
 from experiments import list_var_name
-from nets.mobilenet_v2 import default_image_size, create_mobilenet_v1, create_mobilenet_v2, IMG_SHAPE_224
+from nets.mobilenet_v2 import default_image_size, create_mobilenet_v1, PredictionLayer
 
 flags = tf.compat.v1.flags
 logging = tf.compat.v1.logging
@@ -220,7 +220,16 @@ def main(_, nets=None):
     workspace_path = os.environ['WORKSPACE'] if 'WORKSPACE' in os.environ else '/Volumes/Data/tmp'
     save_path = os.path.join(workspace_path, 'orchids-models', 'orchids2019', 'mobilenet_v2_140', 'pretrain', 'chk')
 
-    model = create_mobilenet_v1(alpha=1.4, classes=52)
+    num_classes = 52
+    total_images = 739
+    inputs = keras.layers.Input(shape=(224, 224, 3), dtype=tf.float32)
+    model = create_mobilenet_v1(input_shape=(224, 224, 3), alpha=1.4, classes=num_classes)
+    predictionLayer = PredictionLayer(num_classes=num_classes)
+
+    x = model(inputs)
+    output = predictionLayer(x)
+
+    model = keras.Model(inputs, output)
 
     var_list = model.weights
     name_list_v1 = list_var_name.load_v1()
@@ -248,14 +257,11 @@ def main(_, nets=None):
             else:
                 raise ValueError("Can't find {}".format(src_name))
 
-    #model.save_weights(save_path)
-
     dataset_images = create_image_lists(image_dir=FLAGS.image_dir)
 
     count = 0
     corrected = 0
     central_fraction = 0.875
-    total_images = 739
     for label, data in dataset_images.items():
         for file in data['testing']:
             filename = os.path.join(FLAGS.image_dir, data['dir'], file)
@@ -268,14 +274,14 @@ def main(_, nets=None):
                 images=image,
                 size=(224, 224),
                 align_corners=False)
+            image = tf.squeeze(image, [0])
             image = tf.subtract(image, 0.5)
-            image_input = tf.multiply(image, 2.0)
+            image = tf.multiply(image, 2.0)
+            image_input = tf.expand_dims(image, 0)
 
             results = model(image_input)
-
             predictions = tf.argmax(results, axis=1)
-            softmax = tf.nn.softmax(results, axis=1)
-            softmax = tf.squeeze(softmax)
+            softmax = tf.squeeze(results)
 
             count += 1
             predict = predictions[0]
@@ -290,6 +296,8 @@ def main(_, nets=None):
     sys.stdout.write('\n\nDone evaluation -- epoch limit reached')
     sys.stdout.write('Accuracy: {:.4f}'.format(corrected / total_images))
     sys.stdout.flush()
+
+    model.save_weights(save_path)
 
 
 if __name__ == '__main__':

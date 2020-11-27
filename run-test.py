@@ -7,12 +7,16 @@ import re
 import sys
 import collections
 import tensorflow as tf
+from tensorflow import keras
+
 import nets
 import numpy as np
 
 import lib_utils
 from data import data_utils
-from nets import utils
+from experiments import list_var_name
+from nets import utils, constants
+from nets.mobilenet_v2 import create_mobilenet_v1, PredictionLayer, PreprocessLayer
 
 flags = tf.compat.v1.flags
 logging = tf.compat.v1.logging
@@ -123,7 +127,7 @@ def main1(unused_argv):
     print(test_ds.size)
     print(test_ds.num_of_classes)
 
-    training_step = utils.TRAIN_TEMPLATE.format(step=FLAGS.train_step)
+    training_step = constants.TRAIN_TEMPLATE.format(step=FLAGS.train_step)
     print(training_step)
 
     model = create_model(num_classes=test_ds.num_of_classes,
@@ -145,60 +149,53 @@ def main1(unused_argv):
 
 def main(unused_argv):
     logging.debug(unused_argv)
-    dataset_images = create_image_lists(image_dir=FLAGS.image_dir)
     load_dataset = data_utils.dataset_mapping[FLAGS.dataset]
     create_model = utils.nets_mapping[FLAGS.model]
-    workspace_path = os.environ['WORKSPACE'] if 'WORKSPACE' in os.environ else '/Volumes/Data/tmp'
-    checkpoint_path = os.path.join(workspace_path, 'orchids-models', 'orchids2019', FLAGS.model)
 
-    training_step = utils.TRAIN_TEMPLATE.format(step=1)
-    learning_rate = lib_utils.config_learning_rate(learning_rate=FLAGS.learning_rate,
-                                                   exp_decay=FLAGS.exp_decay,
-                                                   training_step=training_step)
-    optimizer = lib_utils.config_optimizer(FLAGS.optimizer,
-                                           learning_rate=learning_rate,
-                                           training_step=training_step)
-    loss_fn = lib_utils.config_loss(from_logits=False)
-
+    training_step = constants.TRAIN_TEMPLATE.format(step=1)
     model = create_model(num_classes=load_dataset.num_of_classes,
-                         optimizer=optimizer,
-                         loss_fn=loss_fn,
+                         optimizer=None,
+                         loss_fn=None,
                          batch_size=1,
                          step=training_step)
 
-    model.config_checkpoint(checkpoint_path)
-    model.restore_model_variables(
-        checkpoint_path=FLAGS.trained_path)
+    model.load_weights(
+        FLAGS.checkpoint_path)
+
     model.summary()
 
     count = 0
     corrected = 0
     total_images = load_dataset.test_size
+    dataset_images = create_image_lists(image_dir=FLAGS.image_dir)
+
+    preprocessLayer = PreprocessLayer()
+
     for label, data in dataset_images.items():
         for file in data['testing']:
             filename = os.path.join(FLAGS.image_dir, data['dir'], file)
             image_data = tf.io.gfile.GFile(filename, 'rb').read()
             image = tf.image.decode_jpeg(image_data, channels=3)
-            image = tf.image.convert_image_dtype(image, dtype=tf.float32)
-            inputs = tf.image.resize(images=image,
-                                     size=nets.mobilenet_v2.IMG_SIZE_224,
-                                     method=tf.image.ResizeMethod.BILINEAR)
-            inputs = tf.convert_to_tensor([inputs])
-            result = model.model(inputs).numpy()
+            image = tf.expand_dims(image, 0)
+
+            image_input = preprocessLayer(image)
+            result = model.process_step(image_input)
 
             count += 1
             predict = np.argmax(result, axis=1)[0]
-            confi = result[0][predict]
-            spredict = "n{:04d}".format(predict)
-            if spredict == label:
+            confident = result[0][predict]
+            predict_str = "n{:04d}".format(predict)
+            if predict_str == label:
                 corrected += 1
             sys.stdout.write("\r>> {}/{}: Predict: {}, expected: {}, confident: {:.4f}, acc: {:.4f}".format(
-                count, total_images, spredict, label, confi, corrected / count))
+                count, total_images, predict_str, label, confident, corrected / count))
             sys.stdout.flush()
 
         sys.stdout.write('\n\nDone evaluation -- epoch limit reached')
         sys.stdout.write('Accuracy: {:.4f}'.format(corrected / total_images))
         sys.stdout.flush()
+
+    model.save_weight(FLAGS.checkpoint_path)
 
 
 if __name__ == '__main__':

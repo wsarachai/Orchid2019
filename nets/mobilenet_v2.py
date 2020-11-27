@@ -4,12 +4,12 @@ from __future__ import print_function
 
 import os
 import tensorflow as tf
-from tensorflow.python.keras import layers
 from tensorflow.python.keras import backend
 from tensorflow.python.keras.engine import training
 from tensorflow.python.keras.utils import data_utils
 from tensorflow.python.keras.utils import layer_utils
 from tensorflow.python.keras.applications import imagenet_utils
+from tensorflow.keras import layers
 
 logging = tf.compat.v1.logging
 
@@ -18,7 +18,57 @@ BASE_WEIGHT_PATH = ('https://storage.googleapis.com/tensorflow/'
 default_image_size = 224
 IMG_SIZE_224 = (default_image_size, default_image_size)
 IMG_SHAPE_224 = IMG_SIZE_224 + (3,)
-regularizers_l2 = 0.00001
+
+
+class PreprocessLayer(layers.Layer):
+    def __init__(self, mode='horizontal', factor=0.2, central_fraction=0.875):
+        super(PreprocessLayer, self).__init__()
+        self.central_fraction = central_fraction
+        # self.data_augmentation = Sequential([
+        #     layers.experimental.preprocessing.RandomFlip(mode),
+        #     layers.experimental.preprocessing.RandomRotation(factor),
+        # ])
+        # self.preprocess_input = keras.applications.mobilenet_v2.preprocess_input
+
+    def call(self, inputs, **kwargs):
+        training = kwargs.pop('training')
+        # inputs = self.data_augmentation(inputs, training=training)
+        inputs = tf.image.convert_image_dtype(inputs, dtype=tf.float32)
+        inputs = tf.image.central_crop(inputs, central_fraction=self.central_fraction)
+        inputs = tf.compat.v1.image.resize_bilinear(
+            images=inputs,
+            size=(224, 224),
+            align_corners=False)
+        inputs = tf.subtract(inputs, 0.5)
+        inputs = tf.multiply(inputs, 2.0)
+
+        # inputs = self.preprocess_input(inputs)
+
+        return inputs
+
+
+class PredictionLayer(layers.Layer):
+    def __init__(self, num_classes, dropout_ratio=0.2):
+        super(PredictionLayer, self).__init__()
+        self.dropout = layers.Dropout(dropout_ratio)
+        self.dense = layers.Conv2D(
+            num_classes,
+            kernel_size=1,
+            padding='same',
+            use_bias=True,
+            activation=None,
+            bias_initializer=tf.zeros_initializer(),
+            name='dense-{}'.format(num_classes))
+
+    def call(self, inputs, **kwargs):
+        _training = kwargs.pop('training')
+        inputs = global_pool(inputs)
+        inputs = self.dropout(inputs, training=_training)
+        inputs = self.dense(inputs, training=_training)
+        inputs = tf.squeeze(inputs, [1, 2])
+        inputs = tf.nn.softmax(inputs, axis=1)
+
+        return inputs
 
 
 def _inverted_res_block(name, inputs, expansion, stride, alpha, filters, block_id):
@@ -39,7 +89,6 @@ def _inverted_res_block(name, inputs, expansion, stride, alpha, filters, block_i
             padding='same',
             use_bias=False,
             activation=None,
-            kernel_regularizer=tf.keras.regularizers.l2(regularizers_l2),
             name=prefix + 'expand')(
             x)
         x = layers.BatchNormalization(
@@ -81,7 +130,6 @@ def _inverted_res_block(name, inputs, expansion, stride, alpha, filters, block_i
         padding='same',
         use_bias=False,
         activation=None,
-        kernel_regularizer=tf.keras.regularizers.l2(regularizers_l2),
         name=prefix + 'project')(
         x)
     x = layers.BatchNormalization(
@@ -106,24 +154,24 @@ def _make_divisible(v, divisor, min_value=None):
     return new_v
 
 
-def global_pool(input_tensor, pool_op=tf.compat.v1.nn.avg_pool2d):
+def global_pool(input_tensor, pool_op=layers.AvgPool2D):
   shape = input_tensor.get_shape().as_list()
   if shape[1] is None or shape[2] is None:
-    kernel_size = tf.convert_to_tensor(
-        [1, tf.shape(input_tensor)[1],
-         tf.shape(input_tensor)[2], 1])
+    pool_size = tf.convert_to_tensor(
+        [tf.shape(input_tensor)[1], tf.shape(input_tensor)[2]])
   else:
-    kernel_size = [1, shape[1], shape[2], 1]
-  output = pool_op(
-      input_tensor, ksize=kernel_size, strides=[1, 1, 1, 1], padding='VALID')
+    pool_size = [shape[1], shape[2]]
+  output = pool_op(pool_size=pool_size, strides=[1, 1], padding='valid')(input_tensor)
   output.set_shape([None, 1, 1, None])
   return output
 
 
-def create_mobilenet_v1(alpha,
+def create_mobilenet_v1(input_shape,
+                        alpha,
                         classes,
+                        include_top=False,
                         model_name='mobilenet_v2'):
-    inputs = layers.Input(shape=(224, 224, 3))
+    inputs = layers.Input(shape=input_shape)
     channel_axis = -1
     first_block_filters = _make_divisible(32 * alpha, 8)
     x = layers.Conv2D(
@@ -189,20 +237,11 @@ def create_mobilenet_v1(alpha,
         axis=channel_axis, epsilon=1e-3, momentum=0.999, name='%s_Conv_1_bn' % model_name)(x)
     x = layers.ReLU(6., name='%s_out_relu' % model_name)(x)
 
-    with tf.compat.v1.variable_scope('Logits'):
-        global_average_pooling = global_pool(x)
-        dropout = layers.Dropout(0.2)(global_average_pooling)
-        logits = layers.Conv2D(
-            classes,
-            kernel_size=1,
-            padding='same',
-            use_bias=True,
-            activation=None,
-            bias_initializer=tf.zeros_initializer())(dropout)
+    if include_top:
+        prediction_layer = PredictionLayer(num_classes=classes)
+        x = prediction_layer(x)
 
-        logits = tf.squeeze(logits, [1, 2])
-
-    model = training.Model(inputs, logits)
+    model = training.Model(inputs, x)
 
     return model
 
