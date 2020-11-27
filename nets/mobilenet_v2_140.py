@@ -9,6 +9,8 @@ import lib_utils
 import tensorflow as tf
 import tensorflow.keras as keras
 
+logging = tf.compat.v1.logging
+
 
 def load_from_v1(latest_checkpoint):
     # Try reading on v1 data format
@@ -155,6 +157,7 @@ class Orchids52Mobilenet140(object):
         if self.checkpoint:
             checkpoint, checkpoint_manager = self.checkpoint
             if checkpoint_manager.latest_checkpoint:
+                logging.info("Loading weight from [{}]".format(checkpoint_manager.latest_checkpoint))
                 status = checkpoint.restore(checkpoint_manager.latest_checkpoint)
                 status.assert_existing_objects_matched()
                 result = True
