@@ -3,6 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 import os
+import re
 import tensorflow as tf
 import lib_utils
 import data
@@ -61,7 +62,6 @@ flags.DEFINE_string('trained_path',
                     'Checkpoint Path')
 
 
-
 def main(unused_argv):
     logging.debug(unused_argv)
     workspace_path = os.environ['WORKSPACE'] if 'WORKSPACE' in os.environ else '/Volumes/Data/tmp'
@@ -69,7 +69,7 @@ def main(unused_argv):
     data_dir = os.path.join(data_path, 'orchids52_data')
     load_dataset = data.data_utils.dataset_mapping[FLAGS.dataset]
     create_model = nets.utils.nets_mapping[FLAGS.model]
-    checkpoint_path = os.path.join(workspace_path, 'orchids-models', 'orchids2019', FLAGS.model)
+    checkpoint_path = os.path.join(workspace_path, 'orchids-models', 'orchids2019', FLAGS.model, 'pretrain')
 
     if not tf.io.gfile.exists(checkpoint_path):
         os.makedirs(checkpoint_path)
@@ -77,18 +77,13 @@ def main(unused_argv):
     model = None
     total_epochs = [int(e) for e in FLAGS.total_epochs.split(',')]
     num_state = FLAGS.end_state - FLAGS.start_state
-    assert(num_state == len(total_epochs))
+    assert (num_state == len(total_epochs))
     for idx, train_step in enumerate(range(FLAGS.start_state, FLAGS.end_state)):
         if train_step == 1:
             batch_size = FLAGS.batch_size
         else:
             batch_size = FLAGS.batch_size // 4
 
-        train_ds = load_dataset(split="train",
-                                batch_size=batch_size,
-                                root_path=data_dir,
-                                aug_method=FLAGS.aug_method)
-        validate_ds = load_dataset(split="validate", batch_size=batch_size, root_path=data_dir)
         test_ds = load_dataset(split="test", batch_size=batch_size, root_path=data_dir)
 
         training_step = utils.TRAIN_TEMPLATE.format(step=train_step)
@@ -104,7 +99,6 @@ def main(unused_argv):
         model = create_model(num_classes=data.orchids52_dataset.NUM_OF_CLASSES,
                              optimizer=optimizer,
                              loss_fn=loss_fn,
-                             training=True,
                              batch_size=batch_size,
                              step=training_step)
 
@@ -112,28 +106,39 @@ def main(unused_argv):
                                                 batch_size=batch_size)
 
         model.config_checkpoint(checkpoint_path)
-        epoch = model.restore_model_variables(checkpoint_path=FLAGS.trained_path)
+        epoch = model.restore_model_variables(
+            checkpoint_path=checkpoint_path+'/chk')
         model.summary()
-
-        history_fine = train_model.fit(initial_epoch=epoch,
-                                       epoches=total_epochs[idx],
-                                       train_ds=train_ds,
-                                       validate_ds=validate_ds,
-                                       bash=FLAGS.bash,
-                                       save_best_only=FLAGS.save_best_only)
-
-        timestamp = datetime.now().strftime("%m-%d-%Y-%H-%M-%S")
-        history_path = os.path.join(
-            checkpoint_path,
-            '{}-history-{}.pack'.format(timestamp, training_step))
-        with open(history_path, 'wb') as handle:
-            dump(history_fine['history'], handle)
 
         print('Test accuracy: ')
         train_model.evaluate(datasets=test_ds)
 
     if FLAGS.save_model and model:
         model.save(checkpoint_path)
+
+
+def main2(unused_argv):
+    logging.debug(unused_argv)
+    from experiments import list_var_name
+    workspace_path = os.environ['WORKSPACE'] if 'WORKSPACE' in os.environ else '/Volumes/Data/tmp'
+    checkpoint_path = os.path.join(workspace_path, 'orchids-models', 'orchids2019', FLAGS.model, 'pretrain', 'chk')
+    create_model = nets.utils.nets_mapping[FLAGS.model]
+
+    model = create_model(num_classes=data.orchids52_dataset.NUM_OF_CLASSES,
+                         optimizer=None,
+                         loss_fn=None,
+                         batch_size=1,
+                         step='')
+
+    name_list_v1 = list_var_name.load_v1()
+
+    _mapped = zip(name_list_v1, model.model.weights)
+    for k, v in _mapped:
+        v.assign(k[1])
+
+    model.model.save_weights(checkpoint_path)
+
+    print("Done.")
 
 
 if __name__ == '__main__':

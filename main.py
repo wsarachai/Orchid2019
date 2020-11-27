@@ -93,7 +93,7 @@ def main(unused_argv):
                   metrics=['accuracy'])
 
     model.summary()
-    total_epochs = 2
+    total_epochs = 100
 
     checkpoint = tf.train.Checkpoint(
         step=tf.Variable(1),
@@ -111,10 +111,8 @@ def main(unused_argv):
     model.fit(train_ds,
               epochs=total_epochs,
               validation_data=validate_ds,
-              steps_per_epoch=2,
-              validation_steps=2)
-              # steps_per_epoch=train_ds.size//batch_size,
-              # validation_steps=validate_ds.size//batch_size)
+              steps_per_epoch=train_ds.size//batch_size,
+              validation_steps=validate_ds.size//batch_size)
 
     checkpoint_manager.save()
 

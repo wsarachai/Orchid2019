@@ -162,20 +162,13 @@ class Orchids52Mobilenet140(object):
                 status.assert_existing_objects_matched()
                 result = True
 
-        if not result:
-            latest_checkpoint = kwargs.pop('checkpoint_path')
-            if latest_checkpoint:
-                var_loaded = load_from_v1(latest_checkpoint)
-                all_vars = self.model.weights
-                for i, var in enumerate(all_vars):
-                    if i == 258:
-                        i = i
-                    saved_var = var_loaded[i]
-                    tf.assert_equal(var.shape, saved_var.shape)
-                    var.assign(saved_var)
-                result = True
-            else:
-                result = False
+            if not result:
+                latest_checkpoint = kwargs.pop('checkpoint_path')
+                if latest_checkpoint:
+                    checkpoint.restore(latest_checkpoint)
+                    result = True
+                else:
+                    result = False
         return result
 
     def get_step_number_from_latest_checkpoint(self):
@@ -184,16 +177,17 @@ class Orchids52Mobilenet140(object):
             index = checkpoint_manager.latest_checkpoint.index('ckpt-')
             step = checkpoint_manager.latest_checkpoint[index:][5:]
             step = int(step)
-        except NameError:
+        except:
             return 1
         else:
             return step
 
-    def restore_model_variables(self, load_from_checkpoint_first=True, checkpoint_path=None):
+    def restore_model_variables(self,load_from_checkpoint_first=True, checkpoint_path=None):
         step = 1
         loaded_successfully = False
         if load_from_checkpoint_first:
-            loaded_successfully = self.restore_model_from_latest_checkpoint_if_exist(checkpoint_path=checkpoint_path)
+            loaded_successfully = self.restore_model_from_latest_checkpoint_if_exist(
+                checkpoint_path=checkpoint_path)
         if not loaded_successfully:
             self.load_model_variables()
         else:
