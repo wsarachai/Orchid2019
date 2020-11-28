@@ -79,10 +79,17 @@ def preprocess_for_eval(image, height, width, central_fraction=0.875):
         image = tf.image.central_crop(image, central_fraction=central_fraction)
 
     if height and width:
-        image = tf.expand_dims(image, 0)
-        image = tf.compat.v1.image.resize_bilinear(image, [height, width],
-                                                   align_corners=False)
-        image = tf.squeeze(image, [0])
+        rank = len(image.get_shape().as_list())
+        if rank == 3:
+            image = tf.expand_dims(image, axis=0)
+            image = tf.compat.v1.image.resize_bilinear(image,
+                                                       [height, width],
+                                                       align_corners=False)
+            image = tf.squeeze(image, [0])
+        else:
+            image = tf.compat.v1.image.resize_bilinear(image,
+                                                       [height, width],
+                                                       align_corners=False)
     image = tf.subtract(image, 0.5)
     image = tf.multiply(image, 2.0)
     return image

@@ -43,9 +43,6 @@ flags.DEFINE_integer('end_state', 2,
 flags.DEFINE_float('learning_rate', 0.001,
                    'Learning Rate')
 
-flags.DEFINE_string('aug_method', 'fast',
-                    'Augmentation Method')
-
 flags.DEFINE_string('dataset', data_utils.ORCHIDS52_V1_TFRECORD,
                     'Dataset')
 
@@ -66,8 +63,8 @@ def main(unused_argv):
     workspace_path = os.environ['WORKSPACE'] if 'WORKSPACE' in os.environ else '/Volumes/Data/tmp'
     data_path = os.environ['DATA_DIR'] if 'DATA_DIR' in os.environ else '/Volumes/Data/_dataset/_orchids_dataset'
     data_dir = os.path.join(data_path, 'orchids52_data')
-    load_dataset = data_utils.dataset_mapping[FLAGS.dataset]
-    create_model = nets_mapping[FLAGS.model]
+    dataset = data_utils.dataset_mapping[FLAGS.dataset]
+    model_desc = nets_mapping[FLAGS.model]
     checkpoint_path = os.path.join(workspace_path, 'orchids-models', 'orchids2019', FLAGS.model)
 
     if not tf.io.gfile.exists(checkpoint_path):
@@ -83,12 +80,9 @@ def main(unused_argv):
         else:
             batch_size = FLAGS.batch_size // 4
 
-        train_ds = load_dataset(split="train",
-                                batch_size=batch_size,
-                                root_path=data_dir,
-                                aug_method=FLAGS.aug_method)
-        validate_ds = load_dataset(split="validate", batch_size=batch_size, root_path=data_dir)
-        test_ds = load_dataset(split="test", batch_size=batch_size, root_path=data_dir)
+        train_ds = dataset(split="train", root_path=data_dir)
+        validate_ds = dataset(split="validate", root_path=data_dir)
+        test_ds = dataset(split="test", root_path=data_dir)
 
         training_step = constants.TRAIN_TEMPLATE.format(step=train_step)
 
@@ -100,15 +94,16 @@ def main(unused_argv):
                                                training_step=training_step)
         loss_fn = lib_utils.config_loss(from_logits=False)
 
-        model = create_model(num_classes=data.constants.NUM_OF_CLASSES,
-                             optimizer=optimizer,
-                             loss_fn=loss_fn,
-                             training=True,
-                             batch_size=batch_size,
-                             step=training_step)
+        model = model_desc(num_classes=data.constants.NUM_OF_CLASSES,
+                           optimizer=optimizer,
+                           loss_fn=loss_fn,
+                           training=True,
+                           batch_size=batch_size,
+                           step=training_step)
 
         train_model = lib_utils.TrainClassifier(model=model,
-                                                batch_size=batch_size)
+                                                batch_size=batch_size,
+                                                model_desc=model_desc)
 
         model.config_checkpoint(checkpoint_path)
         epoch = model.restore_model_variables()
@@ -120,6 +115,8 @@ def main(unused_argv):
                                        validate_ds=validate_ds,
                                        bash=FLAGS.bash,
                                        save_best_only=FLAGS.save_best_only)
+
+        train_model.save_model_variables()
 
         timestamp = datetime.now().strftime("%m-%d-%Y-%H-%M-%S")
         history_path = os.path.join(

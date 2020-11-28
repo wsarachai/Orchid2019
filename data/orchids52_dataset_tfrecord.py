@@ -33,6 +33,7 @@ def get_label(serialize_example):
 def decode_example(serialize_example):
     image = serialize_example['image/image_raw']
     image = tf.image.decode_jpeg(image, channels=3)
+    image = tf.image.convert_image_dtype(image, dtype=tf.float32)
     label_values = get_label(serialize_example)
     return image, label_values
 
@@ -44,7 +45,6 @@ def parse_function(example_proto):
 def _load_dataset(split,
                   root_path,
                   data_dir,
-                  batch_size,
                   train_size,
                   test_size,
                   validate_size,
@@ -60,7 +60,6 @@ def _load_dataset(split,
                                  deterministic=False)
     parsed_dataset = dataset.map(parse_function, num_parallel_calls=num_map_threads)
     decode_dataset = parsed_dataset.map(decode_example)
-    decode_dataset = decode_dataset.batch(batch_size=batch_size).cache()
 
     if repeat:
         decode_dataset = decode_dataset.repeat()

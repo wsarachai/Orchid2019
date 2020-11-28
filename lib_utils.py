@@ -6,6 +6,7 @@ import os
 import copy
 import tensorflow as tf
 from nets import constants
+from nets.mobilenet_v2 import PreprocessLayer
 
 physical_devices = tf.config.experimental.list_physical_devices('GPU')
 if len(physical_devices) > 0:
@@ -69,9 +70,18 @@ def config_loss(from_logits):
     return loss_fn
 
 
+def resize_image(image, label):
+    image = tf.expand_dims(image, axis=0)
+    image = tf.compat.v1.image.resize_bilinear(image,
+                                               [224, 224],
+                                               align_corners=False)
+    image = tf.squeeze(image, [0])
+    return image, label
+
+
 class TrainClassifier:
 
-    def __init__(self, model, batch_size):
+    def __init__(self, model, batch_size, model_desc):
         self.model = model
         self.train_loss_metric = tf.keras.metrics.Mean(name='train_loss')
         self.regularization_loss_metric = tf.keras.metrics.Mean(name='regularization_loss')
@@ -79,10 +89,13 @@ class TrainClassifier:
         self.total_loss_metric = tf.keras.metrics.Mean(name='total_loss')
         self.accuracy_metric = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
         self.batch_size = batch_size
+        self.preprocess_step = PreprocessLayer(width=model_desc.width,
+                                               height=model_desc.height)
 
         self.model.compile()
 
     def train_step(self, inputs, labels):
+        inputs = self.preprocess_step(inputs, training=True)
         boundary_loss = 0.
         with tf.GradientTape() as tape:
             predictions = self.model.process_step(inputs, training=True)
@@ -110,6 +123,7 @@ class TrainClassifier:
         }
 
     def evaluate_step(self, inputs, labels):
+        inputs = self.preprocess_step(inputs, training=False)
         predictions = self.model.process_step(inputs, training=False)
         total_loss = self.model.get_loss(labels, predictions)
         self.total_loss_metric.update_state(total_loss)
@@ -152,6 +166,8 @@ class TrainClassifier:
         )
         val_accuracy = 0.0
         val_loss = 1.0
+        train_ds = train_ds.map(resize_image)
+        train_ds = train_ds.batch(batch_size=self.batch_size).cache()
         for epoch in range(initial_epoch, epoches + 1):
             print('\nEpoch: {}/{}'.format(epoch, epoches))
 
@@ -211,6 +227,8 @@ class TrainClassifier:
             stateful_metrics={'loss', 'accuracy'},
             unit_name='step'
         )
+        datasets = datasets.map(resize_image)
+        datasets = datasets.batch(batch_size=self.batch_size).cache()
         for inputs, labels in datasets:
             if inputs.shape.as_list()[0] == self.batch_size:
                 logs = self.evaluate_step(inputs, labels)
@@ -219,3 +237,6 @@ class TrainClassifier:
                 progbar.update(seen, list(logs.items()), finalize=finalize)
         logs = copy.copy(logs) if logs else {}
         print('loss: {:.3f}, accuracy: {:.3f}\n'.format(logs['loss'], logs['accuracy']))
+
+    def save_model_variables(self):
+        self.model.save_model_variables()

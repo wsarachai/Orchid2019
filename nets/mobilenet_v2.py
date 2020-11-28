@@ -9,7 +9,7 @@ from tensorflow.python.keras.engine import training
 from tensorflow.python.keras.utils import data_utils
 from tensorflow.python.keras.utils import layer_utils
 from tensorflow.python.keras.applications import imagenet_utils
-from tensorflow.keras import layers, Sequential
+from tensorflow.keras import layers, Model, Sequential
 
 from preprocesing.inception_preprocessing import preprocess_image
 
@@ -41,7 +41,7 @@ class PreprocessLayer(layers.Layer):
         return inputs
 
 
-class PredictionLayer(layers.Layer):
+class PredictionLayer(Model):
     def __init__(self, num_classes, dropout_ratio=0.2, activation="softmax"):
         super(PredictionLayer, self).__init__()
         self.activation = activation
@@ -65,6 +65,8 @@ class PredictionLayer(layers.Layer):
             inputs = tf.nn.softmax(inputs, axis=1)
         return inputs
 
+    def get_config(self):
+        super(PredictionLayer, self).get_config()
 
 def _inverted_res_block(name, inputs, expansion, stride, alpha, filters, block_id):
     """Inverted ResNet block."""

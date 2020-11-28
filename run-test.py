@@ -169,9 +169,9 @@ def main(unused_argv):
             filename = os.path.join(FLAGS.image_dir, data['dir'], file)
             image_data = tf.io.gfile.GFile(filename, 'rb').read()
             image = tf.image.decode_jpeg(image_data, channels=3)
+            image = tf.expand_dims(image, 0)
             image = preprocess_layer(image)
-            image_input = tf.expand_dims(image, 0)
-            result = model.process_step(image_input)
+            result = model.process_step(image)
 
             count += 1
             predict = np.argmax(result, axis=1)[0]

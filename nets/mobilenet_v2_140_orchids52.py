@@ -10,6 +10,7 @@ import tensorflow as tf
 import tensorflow.keras as keras
 from tensorflow.python.keras import Sequential
 from nets import mobilenet_v2, constants
+from nets.mobilenet_v2 import default_image_size
 
 logging = tf.compat.v1.logging
 
@@ -292,3 +293,7 @@ def create_orchid_mobilenet_v2_140(num_classes,
                                      training=training,
                                      step=step)
     return model
+
+
+create_orchid_mobilenet_v2_140.width = default_image_size
+create_orchid_mobilenet_v2_140.height = default_image_size

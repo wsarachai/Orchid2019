@@ -160,9 +160,9 @@ def main(_):
             filename = os.path.join(FLAGS.image_dir, data['dir'], file)
             image_data = tf.io.gfile.GFile(filename, 'rb').read()
             image = tf.image.decode_jpeg(image_data, channels=3)
+            image = tf.expand_dims(image, 0)
             image = preprocess_layer(image, training=False)
-            image_input = tf.expand_dims(image, 0)
-            results = model(image_input)
+            results = model(image)
 
             predictions = tf.argmax(results, axis=1)
             softmax = tf.squeeze(results)
