@@ -7,16 +7,12 @@ import re
 import sys
 import collections
 import tensorflow as tf
-from tensorflow import keras
-
-import nets
 import numpy as np
 
 import lib_utils
 from data import data_utils
-from experiments import list_var_name
 from nets import utils, constants
-from nets.mobilenet_v2 import create_mobilenet_v1, PredictionLayer, PreprocessLayer
+from nets.mobilenet_v2 import PreprocessLayer
 
 flags = tf.compat.v1.flags
 logging = tf.compat.v1.logging
@@ -37,7 +33,7 @@ flags.DEFINE_integer('train_step', 1,
 flags.DEFINE_float('learning_rate', 0.001,
                    'Learning Rate')
 
-flags.DEFINE_string('dataset', data_utils.ORCHIDS52_V1_TFRECORD,
+flags.DEFINE_string('dataset', data_utils.ORCHIDS52_V2_TFRECORD,
                     'Dataset')
 
 flags.DEFINE_string('model', utils.MOBILENET_V2_140_ORCHIDS52,
@@ -152,15 +148,12 @@ def main(unused_argv):
     load_dataset = data_utils.dataset_mapping[FLAGS.dataset]
     create_model = utils.nets_mapping[FLAGS.model]
 
-    training_step = constants.TRAIN_TEMPLATE.format(step=1)
+    training_step = constants.TRAIN_TEMPLATE.format(step=FLAGS.train_step)
     model = create_model(num_classes=load_dataset.num_of_classes,
                          optimizer=None,
                          loss_fn=None,
                          batch_size=1,
                          step=training_step)
-
-    model.load_weights(
-        FLAGS.checkpoint_path)
 
     model.summary()
 
@@ -168,17 +161,16 @@ def main(unused_argv):
     corrected = 0
     total_images = load_dataset.test_size
     dataset_images = create_image_lists(image_dir=FLAGS.image_dir)
-
-    preprocessLayer = PreprocessLayer()
+    preprocess_layer = PreprocessLayer(width=create_model.width,
+                                       height=create_model.height)
 
     for label, data in dataset_images.items():
         for file in data['testing']:
             filename = os.path.join(FLAGS.image_dir, data['dir'], file)
             image_data = tf.io.gfile.GFile(filename, 'rb').read()
             image = tf.image.decode_jpeg(image_data, channels=3)
-            image = tf.expand_dims(image, 0)
-
-            image_input = preprocessLayer(image)
+            image = preprocess_layer(image)
+            image_input = tf.expand_dims(image, 0)
             result = model.process_step(image_input)
 
             count += 1
@@ -194,8 +186,6 @@ def main(unused_argv):
         sys.stdout.write('\n\nDone evaluation -- epoch limit reached')
         sys.stdout.write('Accuracy: {:.4f}'.format(corrected / total_images))
         sys.stdout.flush()
-
-    model.save_weight(FLAGS.checkpoint_path)
 
 
 if __name__ == '__main__':

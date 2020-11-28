@@ -6,7 +6,7 @@ import os
 import tensorflow as tf
 import lib_utils
 from pickle import dump
-from data import data_utils, orchids52_dataset
+from data import data_utils, constants
 from data.data_utils import dataset_mapping
 from lib_utils import start
 from nets import utils
@@ -52,7 +52,7 @@ def main(unused_argv):
         validate_ds = load_dataset(split="validate", batch_size=FLAGS.batch_size, root_path=data_dir)
         test_ds = load_dataset(split="test", batch_size=FLAGS.batch_size, root_path=data_dir)
 
-        model = create_model(num_classes=orchids52_dataset.NUM_OF_CLASSES,
+        model = create_model(num_classes=constants.NUM_OF_CLASSES,
                              training=True,
                              batch_size=FLAGS.batch_size)
 

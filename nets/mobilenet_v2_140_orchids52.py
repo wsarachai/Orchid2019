@@ -9,7 +9,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
 from tensorflow.python.keras import Sequential
-from nets import mobilenet_v2
+from nets import mobilenet_v2, constants
 
 logging = tf.compat.v1.logging
 
@@ -65,18 +65,18 @@ class Orchids52Mobilenet140STN(nets.mobilenet_v2_140.Orchids52Mobilenet140):
             self.branch_model.trainable = trainable
 
     def config_layers(self):
-        if self.step == nets.utils.TRAIN_STEP1:
+        if self.step == constants.TRAIN_STEP1:
             self.set_mobilenet_training_status(False)
-        elif self.step == nets.utils.TRAIN_STEP2:
+        elif self.step == constants.TRAIN_STEP2:
             self.set_mobilenet_training_status(False)
             self.set_prediction_training_status(False)
-        elif self.step == nets.utils.TRAIN_STEP3:
+        elif self.step == constants.TRAIN_STEP3:
             self.set_mobilenet_training_status(False)
             self.set_prediction_training_status(False)
             self.stn_dense.trainable = False
-        elif self.step == nets.utils.TRAIN_V2_STEP1:
+        elif self.step == constants.TRAIN_V2_STEP1:
             self.set_mobilenet_training_status(False)
-        elif self.step == nets.utils.TRAIN_V2_STEP2:
+        elif self.step == constants.TRAIN_V2_STEP2:
             self.set_mobilenet_training_status(True)
 
     def load_model_step2(self):
@@ -94,7 +94,7 @@ class Orchids52Mobilenet140STN(nets.mobilenet_v2_140.Orchids52Mobilenet140):
 
         checkpoint, _ = self.checkpoint
         checkpoint_prefix = os.path.join(self.checkpoint_path,
-                                         nets.utils.TRAIN_TEMPLATE.format(step=3))
+                                         constants.TRAIN_TEMPLATE.format(step=3))
         checkpoint_manager = tf.train.CheckpointManager(
             checkpoint, directory=checkpoint_prefix, max_to_keep=self.max_to_keep)
         if checkpoint_manager.latest_checkpoint:
@@ -105,15 +105,15 @@ class Orchids52Mobilenet140STN(nets.mobilenet_v2_140.Orchids52Mobilenet140):
         pass
 
     def load_model_variables(self):
-        if self.step == nets.utils.TRAIN_STEP1:
+        if self.step == constants.TRAIN_STEP1:
             self.load_model_step1()
-        elif self.step == nets.utils.TRAIN_STEP2:
+        elif self.step == constants.TRAIN_STEP2:
             self.load_model_step2()
-        elif self.step == nets.utils.TRAIN_STEP3:
+        elif self.step == constants.TRAIN_STEP3:
             self.load_model_step3()
-        elif self.step == nets.utils.TRAIN_STEP4:
+        elif self.step == constants.TRAIN_STEP4:
             self.load_model_step4()
-        elif self.step == nets.utils.TRAIN_V2_STEP2:
+        elif self.step == constants.TRAIN_V2_STEP2:
             self.load_model_v2_step2()
 
 
@@ -133,12 +133,9 @@ class BranchBlock(keras.layers.Layer):
             weights='imagenet',
             sub_name='02')
         self.branches_prediction_models = [
-            nets.mobilenet_v2_140.PredictionLayer(num_classes=num_classes,
-                                                  activation='softmax'),
-            nets.mobilenet_v2_140.PredictionLayer(num_classes=num_classes,
-                                                  activation='softmax'),
-            nets.mobilenet_v2_140.PredictionLayer(num_classes=num_classes,
-                                                  activation='softmax')
+            nets.mobilenet_v2_140.PredictionLayer(num_classes=num_classes),
+            nets.mobilenet_v2_140.PredictionLayer(num_classes=num_classes),
+            nets.mobilenet_v2_140.PredictionLayer(num_classes=num_classes)
         ]
 
     def call(self, inputs, **kwargs):
@@ -203,31 +200,28 @@ class EstimationBlock(keras.layers.Layer):
         return main_net
 
 
-def create_orchid_mobilenet_v2_14(num_classes,
-                                  optimizer,
-                                  loss_fn,
-                                  training=False,
-                                  **kwargs):
+def create_orchid_mobilenet_v2_140(num_classes,
+                                   optimizer,
+                                   loss_fn,
+                                   training=False,
+                                   **kwargs):
     stn_dense = None
     branch_base_model = None
     boundary_loss = None
     estimate_block = None
     branches_prediction_models = []
-    step = kwargs.pop('step') if 'step' in kwargs else ''
-    batch_size = kwargs.pop('batch_size') if 'batch_size' in kwargs else 32
+    step = kwargs.pop('step', '')
+    batch_size = kwargs.pop('batch_size', 32)
 
     inputs = keras.Input(shape=nets.mobilenet_v2.IMG_SHAPE_224)
-    preprocess_layer = nets.mobilenet_v2_140.PreprocessLayer()
-    stn_base_model = nets.mobilenet_v2.create_mobilenet_v2(
+    stn_base_model = nets.mobilenet_v2.create_mobilenet_v2_custom(
         input_shape=nets.mobilenet_v2.IMG_SHAPE_224,
         alpha=1.4,
         include_top=False,
-        weights='imagenet',
-        sub_name='01')
+        suffix_name='01',
+        classes=num_classes)
 
-    processed_inputs = preprocess_layer(inputs, training=training)
-
-    if step != nets.utils.TRAIN_STEP1:
+    if step != constants.TRAIN_STEP1:
         # with tf.name_scope('stn'):
         scales = [0.8, 0.6]
         element_size = 3  # [x, y, scale]
@@ -246,11 +240,11 @@ def create_orchid_mobilenet_v2_14(num_classes,
             stn_dense
         ], name='localization_network')
 
-        loc_output = localization_network(processed_inputs)
+        loc_output = localization_network(inputs)
 
         # TODO: Change this function to keras layer
         stn_output, bound_err = stn.pre_spatial_transformer_network(
-            input_map=processed_inputs,
+            input_map=inputs,
             theta=loc_output,
             batch_size=batch_size,
             width=nets.mobilenet_v2.default_image_size,
@@ -274,18 +268,16 @@ def create_orchid_mobilenet_v2_14(num_classes,
         logits = branches_block(stn_output)
 
         # # with tf.name_scope('estimate_block'):
-        if step == nets.utils.TRAIN_STEP2:
+        if step == constants.TRAIN_STEP2:
             outputs = tf.reduce_mean(logits, axis=0)
         else:
             estimate_block = EstimationBlock(num_classes=num_classes, batch_size=batch_size)
             outputs = estimate_block(logits)
 
     else:
-        prediction_layer = nets.mobilenet_v2_140.PredictionLayer(
-            num_classes=num_classes,
-            activation='softmax')
+        prediction_layer = nets.mobilenet_v2_140.PredictionLayer(num_classes=num_classes)
         branches_prediction_models.append(prediction_layer)
-        mobilenet_logits = stn_base_model(processed_inputs, training=training)
+        mobilenet_logits = stn_base_model(inputs, training=training)
         outputs = prediction_layer(mobilenet_logits, training=training)
 
     model = Orchids52Mobilenet140STN(inputs, outputs,

@@ -3,15 +3,17 @@ from __future__ import division
 from __future__ import print_function
 
 import os
-
+import zipfile
 import nets
 import lib_utils
 import tensorflow as tf
 import tensorflow.keras as keras
+from tensorflow.python.keras.utils import data_utils
 
 from nets.constants import TRAIN_TEMPLATE
-from nets.mobilenet_v2 import PredictionLayer, PreprocessLayer
+from nets.mobilenet_v2 import PredictionLayer, default_image_size
 
+ORCHIDS_BASE_WEIGHT_PATH = 'https://ndownloader.figshare.com/files'
 logging = tf.compat.v1.logging
 
 
@@ -82,6 +84,24 @@ def load_from_v1(latest_checkpoint):
     return value_to_load
 
 
+def load_trained_weights(model,
+                         model_name='Orchids52MobilenetV2-140',
+                         weights='orchids52_140'):
+    if weights == 'orchids52_140':
+        weight_path = ORCHIDS_BASE_WEIGHT_PATH + '/25621319'
+        weights_path = data_utils.get_file(
+            model_name, weight_path, cache_subdir='models')
+
+        model_checkpoint_files = os.path.join(weights_path + '_weights', 'pretrain')
+        if not tf.io.gfile.exists(model_checkpoint_files):
+            with zipfile.ZipFile(weights_path, 'r') as zip_ref:
+                model_checkpoint_path = os.path.join(weights_path + '_weights')
+                zip_ref.extractall(model_checkpoint_path)
+        if tf.io.gfile.exists(model_checkpoint_files):
+            model_checkpoint_files = os.path.join(model_checkpoint_files, 'chk')
+            model.load_weights(model_checkpoint_files)
+
+
 class Orchids52Mobilenet140(object):
     def __init__(self, inputs, outputs,
                  optimizer,
@@ -137,23 +157,23 @@ class Orchids52Mobilenet140(object):
 
         predict_layers_path = os.path.join(checkpoint_path, 'predict_layers')
         for idx, predict_layer in enumerate(self.predict_layers):
-            checkpoint = tf.train.Checkpoint(
-                step=tf.Variable(1),
-                optimizer=self.optimizer,
-                model=predict_layer)
             prediction_layer_prefix = lib_utils.get_checkpoint_file(predict_layers_path, idx)
-            predict_layers_checkpoint_managers = tf.train.CheckpointManager(
-                checkpoint, directory=prediction_layer_prefix, max_to_keep=self.max_to_keep)
-            self.prediction_layer_checkpoints.append((checkpoint, predict_layers_checkpoint_managers))
+            self.prediction_layer_checkpoints.append((predict_layer, prediction_layer_prefix))
 
     def save_model_variables(self):
         _, checkpoint_manager = self.checkpoint
         checkpoint_manager.save()
         for checkpoint in self.prediction_layer_checkpoints:
-            _, checkpoint_manager = checkpoint
-            checkpoint_manager.save()
+            predict_layer, save_dir = checkpoint
+            predict_layer.save_weights(save_dir)
 
-    def restore_model_from_latest_checkpoint_if_exist(self, **kwargs):
+    def load_trained_weights(self, model_name='Orchids52MobilenetV2-140',
+                             weights='orchids52_140'):
+        load_trained_weights(self.model,
+                             model_name=model_name,
+                             weights=weights)
+
+    def restore_model_from_latest_checkpoint_if_exist(self):
         result = False
         if self.checkpoint:
             checkpoint, checkpoint_manager = self.checkpoint
@@ -162,14 +182,6 @@ class Orchids52Mobilenet140(object):
                 status = checkpoint.restore(checkpoint_manager.latest_checkpoint)
                 status.assert_existing_objects_matched()
                 result = True
-
-            if not result:
-                latest_checkpoint = kwargs.pop('checkpoint_path')
-                if latest_checkpoint:
-                    checkpoint.restore(latest_checkpoint)
-                    result = True
-                else:
-                    result = False
         return result
 
     def get_step_number_from_latest_checkpoint(self):
@@ -190,12 +202,11 @@ class Orchids52Mobilenet140(object):
     def save_weight(self, checkpoint_path):
         self.model.save_weights(checkpoint_path)
 
-    def restore_model_variables(self, load_from_checkpoint_first=True, checkpoint_path=None):
+    def restore_model_variables(self, load_from_checkpoint_first=True):
         step = 1
         loaded_successfully = False
         if load_from_checkpoint_first:
-            loaded_successfully = self.restore_model_from_latest_checkpoint_if_exist(
-                checkpoint_path=checkpoint_path)
+            loaded_successfully = self.restore_model_from_latest_checkpoint_if_exist()
         if not loaded_successfully:
             self.load_model_variables()
         else:
@@ -212,14 +223,7 @@ class Orchids52Mobilenet140(object):
             self.load_model_step1()
 
     def load_model_step1(self):
-        latest_checkpoint = None
-        for checkpoint, checkpoint_manager in self.prediction_layer_checkpoints:
-            if checkpoint_manager.latest_checkpoint:
-                # save latest checkpoint, it will reused later on init of pretrain 2 and 3
-                latest_checkpoint = checkpoint_manager.latest_checkpoint
-            if latest_checkpoint:
-                status = checkpoint.restore(latest_checkpoint)
-                status.assert_existing_objects_matched()
+        load_trained_weights(self.model)
 
     def set_mobilenet_training_status(self, trainable):
         if self.mobilenet:
@@ -248,52 +252,23 @@ class Orchids52Mobilenet140(object):
                         options=options)
 
 
-def create_mobilenet_v2_14_v1(num_classes,
-                              optimizer,
-                              loss_fn,
-                              training=False,
-                              **kwargs):
+def create_mobilenet_v2_140(num_classes,
+                            optimizer,
+                            loss_fn,
+                            training=False,
+                            **kwargs):
     step = kwargs.pop('step') if 'step' in kwargs else TRAIN_TEMPLATE.format(step=1)
 
     inputs = keras.Input(shape=nets.mobilenet_v2.IMG_SHAPE_224, dtype=tf.float32)
-    prediction_layer = PredictionLayer(num_classes=num_classes)
-    mobilenet = nets.mobilenet_v2.create_mobilenet_v1(
+    mobilenet = nets.mobilenet_v2.create_mobilenet_v2_custom(
         input_shape=nets.mobilenet_v2.IMG_SHAPE_224,
         alpha=1.4,
         include_top=False,
         classes=num_classes)
-
-    outputs = mobilenet(inputs, training=training)
-    outputs = prediction_layer(outputs, training=training)
-
-    model = Orchids52Mobilenet140(inputs, outputs,
-                                  optimizer=optimizer,
-                                  loss_fn=loss_fn,
-                                  mobilenet=mobilenet,
-                                  predict_layers=[prediction_layer],
-                                  training=training,
-                                  step=step)
-
-    return model
-
-
-def create_mobilenet_v2_14(num_classes,
-                           optimizer,
-                           loss_fn,
-                           training=False,
-                           **kwargs):
-    step = kwargs.pop('step') if 'step' in kwargs else TRAIN_TEMPLATE.format(step=1)
-    inputs = keras.Input(shape=nets.mobilenet_v2.IMG_SHAPE_224)
-    preprocess_layer = PreprocessLayer()
-    mobilenet = nets.mobilenet_v2.create_mobilenet_v1(
-        input_shape=nets.mobilenet_v2.IMG_SHAPE_224,
-        alpha=1.4,
-        include_top=False)
-
-    processed_inputs = preprocess_layer(inputs, training=training)
-    mobilenet_logits = mobilenet(processed_inputs, training=training)
     prediction_layer = PredictionLayer(num_classes=num_classes)
-    outputs = prediction_layer(mobilenet_logits, training=training)
+
+    x = mobilenet(inputs, training=training)
+    outputs = prediction_layer(x, training=training)
 
     model = Orchids52Mobilenet140(inputs, outputs,
                                   optimizer=optimizer,
@@ -303,4 +278,10 @@ def create_mobilenet_v2_14(num_classes,
                                   training=training,
                                   step=step)
 
+    model.load_trained_weights()
+
     return model
+
+
+create_mobilenet_v2_140.width = default_image_size
+create_mobilenet_v2_140.height = default_image_size

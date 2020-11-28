@@ -9,8 +9,8 @@ import pathlib
 import tensorflow as tf
 import numpy as np
 from datetime import datetime
-from data.data_utils import _bytes_feature, _int64_feature
-from data.orchids52_dataset import TRAIN_SIZE_V2, TEST_SIZE_V2, TRAIN_SIZE_V1, TEST_SIZE_V1
+from data.constants import TRAIN_SIZE_V2, TEST_SIZE_V2, TEST_SIZE_V1
+from data.data_utils import bytes_feature, int64_feature
 from data.orchids52_dataset_file import get_label
 from lib_utils import start
 from nets.mobilenet_v2 import IMG_SIZE_224
@@ -33,7 +33,7 @@ flags.DEFINE_string('data_version', ORCHIDS52_DATA_V1,
                     'The version of dataset')
 
 
-def process_path(file_path, class_names, image_size):
+def process_path(file_path, class_names):
     label = get_label(file_path, class_names)
     img = tf.io.read_file(file_path)
     return img, label
@@ -112,11 +112,11 @@ def serialize_example(image_buffer, label):
     image_format = b'JPEG'
 
     features_map = {
-        'image/colorspace': _bytes_feature(colorspace),
-        'image/channels': _int64_feature(channels),
-        'image/format': _bytes_feature(image_format),
-        'image/class/label': _bytes_feature(label),
-        'image/image_raw': _bytes_feature(image_buffer)
+        'image/colorspace': bytes_feature(colorspace),
+        'image/channels': int64_feature(channels),
+        'image/format': bytes_feature(image_format),
+        'image/class/label': bytes_feature(label),
+        'image/image_raw': bytes_feature(image_buffer)
     }
 
     example_proto = tf.train.Example(features=tf.train.Features(feature=features_map))
@@ -170,7 +170,7 @@ create_dataset = wrapped_partial(
     image_size=IMG_SIZE_224)
 
 
-def main(unused_argv):
+def main(_):
     create_dataset(FLAGS.images_dir, FLAGS.output_directory)
 
 

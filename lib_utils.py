@@ -4,8 +4,8 @@ from __future__ import print_function
 
 import os
 import copy
-import nets
 import tensorflow as tf
+from nets import constants
 
 physical_devices = tf.config.experimental.list_physical_devices('GPU')
 if len(physical_devices) > 0:
@@ -50,7 +50,7 @@ def config_learning_rate(learning_rate=0.001,
             decay_rate=0.96
         )
     else:
-        if training_step in [nets.utils.TRAIN_STEP4, nets.utils.TRAIN_V2_STEP2]:
+        if training_step in [constants.TRAIN_STEP4, constants.TRAIN_V2_STEP2]:
             learning_rate = 0.00001
     return learning_rate
 

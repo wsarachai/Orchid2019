@@ -10,7 +10,7 @@ import tensorflow as tf
 from tensorflow import keras
 
 from experiments import list_var_name
-from nets.mobilenet_v2 import default_image_size, create_mobilenet_v1, PredictionLayer
+from nets.mobilenet_v2 import default_image_size, PredictionLayer, create_mobilenet_v2_custom
 
 flags = tf.compat.v1.flags
 logging = tf.compat.v1.logging
@@ -135,10 +135,7 @@ def image_preprocessing_fn(image,
         return image
 
 
-def main1(_, nets=None):
-    workspace_path = os.environ['WORKSPACE'] if 'WORKSPACE' in os.environ else '/Volumes/Data/tmp'
-    checkpoint_path = os.path.join(workspace_path, 'orchids-models', 'orchids2019', FLAGS.model, 'pretrain', 'chk')
-
+def main1(_):
     with tf.compat.v1.Graph().as_default():
         with tf.compat.v1.variable_scope('MobilenetV2'):
             dataset_images = create_image_lists(image_dir=FLAGS.image_dir)
@@ -148,7 +145,7 @@ def main1(_, nets=None):
             image = image_preprocessing_fn(decoded_image, eval_image_size, eval_image_size)
 
             inputs = tf.expand_dims(image, 0)
-            logits = create_mobilenet_v1(inputs, alpha=1.4, classes=52)
+            logits = create_mobilenet_v2_custom(inputs, alpha=1.4, classes=52)
 
             predictions = tf.argmax(logits, 1)
             softmax = tf.nn.softmax(logits, axis=1)
@@ -216,14 +213,14 @@ def main1(_, nets=None):
                 sys.stdout.flush()
 
 
-def main(_, nets=None):
+def main(_):
     workspace_path = os.environ['WORKSPACE'] if 'WORKSPACE' in os.environ else '/Volumes/Data/tmp'
     save_path = os.path.join(workspace_path, 'orchids-models', 'orchids2019', 'mobilenet_v2_140', 'pretrain', 'chk')
 
     num_classes = 52
     total_images = 739
     inputs = keras.layers.Input(shape=(224, 224, 3), dtype=tf.float32)
-    model = create_mobilenet_v1(input_shape=(224, 224, 3), alpha=1.4, classes=num_classes)
+    model = create_mobilenet_v2_custom(input_shape=(224, 224, 3), alpha=1.4, classes=num_classes)
     predictionLayer = PredictionLayer(num_classes=num_classes)
 
     x = model(inputs)

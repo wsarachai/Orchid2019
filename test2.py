@@ -9,9 +9,9 @@ import collections
 import tensorflow as tf
 from tensorflow import keras
 
-from experiments import list_var_name
-from nets.mobilenet_v2 import default_image_size, create_mobilenet_v1, create_mobilenet_v2, IMG_SHAPE_224, \
-    PredictionLayer
+from nets.mobilenet_v2 import PredictionLayer, create_mobilenet_v2_custom, PreprocessLayer
+from nets.mobilenet_v2_140 import load_trained_weights
+from preprocesing.inception_preprocessing import preprocess_image
 
 flags = tf.compat.v1.flags
 logging = tf.compat.v1.logging
@@ -136,125 +136,32 @@ def image_preprocessing_fn(image,
         return image
 
 
-def main1(_, nets=None):
-    workspace_path = os.environ['WORKSPACE'] if 'WORKSPACE' in os.environ else '/Volumes/Data/tmp'
-    checkpoint_path = os.path.join(workspace_path, 'orchids-models', 'orchids2019', FLAGS.model, 'pretrain', 'chk')
-
-    with tf.compat.v1.Graph().as_default():
-        with tf.compat.v1.variable_scope('MobilenetV2'):
-            dataset_images = create_image_lists(image_dir=FLAGS.image_dir)
-            jpeg_data = tf.compat.v1.placeholder(tf.string, name='DecodeJPGInput')
-            decoded_image = tf.compat.v1.image.decode_jpeg(jpeg_data, channels=3)
-            eval_image_size = default_image_size
-            image = image_preprocessing_fn(decoded_image, eval_image_size, eval_image_size)
-
-            inputs = tf.expand_dims(image, 0)
-            logits = create_mobilenet_v1(inputs, alpha=1.4, classes=52)
-
-            predictions = tf.argmax(logits, 1)
-            softmax = tf.nn.softmax(logits, axis=1)
-            softmax = tf.squeeze(softmax)
-
-            var_list = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.VARIABLES)
-            name_list_v1 = list_var_name.load_v1()
-            _mapped = zip(name_list_v1, var_list)
-            variables_to_restore = {}
-            for k, v in _mapped:
-                src_name = k[0]
-                variables_to_restore.update({src_name: v})
-            checkpoint_path = '/Volumes/Data/tmp/orchids-models/mobilenet_v2_140_orchids52_0001/pretrain2/model.ckpt-12000'
-            reader = tf.compat.v1.train.NewCheckpointReader(checkpoint_path)
-            var_to_shape_map = reader.get_variable_to_shape_map()
-
-            key_to_numpy = {}
-            for key in var_to_shape_map:
-                key_to_numpy[key] = tf.constant(reader.get_tensor(key))
-
-            assign_op = []
-            with tf.compat.v1.variable_scope(tf.compat.v1.get_variable_scope(),
-                                             reuse=tf.compat.v1.AUTO_REUSE):
-                for _src_name, dst_var in variables_to_restore.items():
-                    src_name = _src_name
-                    if src_name in key_to_numpy:
-                        print('Restore variable: {}'.format(dst_var.op.name))
-                        # copy_var = tf.compat.v1.get_variable(dst_name)
-                        init = key_to_numpy[src_name]
-                        assign0 = tf.compat.v1.assign(dst_var, init)
-                        with tf.control_dependencies(assign_op):
-                            assign_op.append(assign0)
-                    else:
-                        raise ValueError("Can't find {}".format(src_name))
-
-            def callback(sess):
-                sess.run(assign_op)
-
-            with tf.compat.v1.Session() as sess:
-                sess.run(tf.compat.v1.global_variables_initializer())
-                if callback:
-                    callback(sess)
-
-                count = 0
-                corrected = 0
-                for label, data in dataset_images.items():
-                    for file in data['testing']:
-                        filename = os.path.join(FLAGS.image_dir, data['dir'], file)
-                        image_data = tf.io.gfile.GFile(filename, 'rb').read()
-                        results = sess.run([predictions, softmax], feed_dict={jpeg_data: image_data})
-
-                        total_images = 739
-                        count += 1
-                        predict = results[0][0]
-                        confi = results[1][predict]
-                        spredict = "n{:04d}".format(predict)
-                        if spredict == label:
-                            corrected += 1
-                        sys.stdout.write("\r>> {}/{}: Predict: {}, expected: {}, confident: {:.4f}, acc: {:.4f}".format(
-                            count, total_images, spredict, label, confi, corrected / count))
-                        sys.stdout.flush()
-
-                sys.stdout.write('\n\nDone evaluation -- epoch limit reached')
-                sys.stdout.write('Accuracy: {:.4f}'.format(corrected / total_images))
-                sys.stdout.flush()
-
-
-def main(_, nets=None):
-    workspace_path = os.environ['WORKSPACE'] if 'WORKSPACE' in os.environ else '/Volumes/Data/tmp'
-    save_path = os.path.join(workspace_path, 'orchids-models', 'orchids2019', 'mobilenet_v2_140', 'pretrain', 'chk')
-
+def main(_):
     num_classes = 52
     inputs = keras.layers.Input(shape=(224, 224, 3), dtype=tf.float32)
-    model = create_mobilenet_v1(input_shape=(224, 224, 3), alpha=1.4, classes=num_classes)
-    predictionLayer = PredictionLayer(num_classes=num_classes)
+    model = create_mobilenet_v2_custom(input_shape=(224, 224, 3), alpha=1.4, classes=num_classes)
+    prediction_layer = PredictionLayer(num_classes=num_classes)
 
-    x = model(inputs, training=False)
-    output = predictionLayer(x, training=False)
+    is_training = False
+    x = model(inputs, training=is_training)
+    output = prediction_layer(x, training=is_training)
 
-    model = keras.Model(inputs, output, trainable=False)
-
-    status = model.load_weights(save_path)
-    status.assert_consumed()
-
+    model = keras.Model(inputs, output, trainable=is_training)
+    preprocess_layer = PreprocessLayer(width=224, height=224)
     dataset_images = create_image_lists(image_dir=FLAGS.image_dir)
+
+    load_trained_weights(model)
 
     count = 0
     corrected = 0
-    central_fraction = 0.875
     total_images = 739
     for label, data in dataset_images.items():
         for file in data['testing']:
             filename = os.path.join(FLAGS.image_dir, data['dir'], file)
             image_data = tf.io.gfile.GFile(filename, 'rb').read()
             image = tf.image.decode_jpeg(image_data, channels=3)
-            image = tf.image.convert_image_dtype(image, dtype=tf.float32)
-            image = tf.image.central_crop(image, central_fraction=central_fraction)
-            image = tf.expand_dims(image, 0)
-            image = tf.compat.v1.image.resize_bilinear(
-                images=image,
-                size=(224, 224),
-                align_corners=False)
-            image = tf.subtract(image, 0.5)
-            image_input = tf.multiply(image, 2.0)
-
+            image = preprocess_layer(image, training=False)
+            image_input = tf.expand_dims(image, 0)
             results = model(image_input)
 
             predictions = tf.argmax(results, axis=1)

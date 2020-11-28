@@ -6,11 +6,11 @@ import os
 import tensorflow as tf
 import lib_utils
 import data
-import nets
 from datetime import datetime
 from pickle import dump
 from data import data_utils
-from nets import utils
+from nets import constants
+from nets.utils import nets_mapping
 
 flags = tf.compat.v1.flags
 logging = tf.compat.v1.logging
@@ -49,7 +49,7 @@ flags.DEFINE_string('aug_method', 'fast',
 flags.DEFINE_string('dataset', data_utils.ORCHIDS52_V1_TFRECORD,
                     'Dataset')
 
-flags.DEFINE_string('model', utils.MOBILENET_V2_140_ORCHIDS52,
+flags.DEFINE_string('model', constants.MOBILENET_V2_140_ORCHIDS52,
                     'Model')
 
 flags.DEFINE_string('optimizer', 'rmsprop',
@@ -61,14 +61,13 @@ flags.DEFINE_string('trained_path',
                     'Checkpoint Path')
 
 
-
 def main(unused_argv):
     logging.debug(unused_argv)
     workspace_path = os.environ['WORKSPACE'] if 'WORKSPACE' in os.environ else '/Volumes/Data/tmp'
     data_path = os.environ['DATA_DIR'] if 'DATA_DIR' in os.environ else '/Volumes/Data/_dataset/_orchids_dataset'
     data_dir = os.path.join(data_path, 'orchids52_data')
-    load_dataset = data.data_utils.dataset_mapping[FLAGS.dataset]
-    create_model = nets.utils.nets_mapping[FLAGS.model]
+    load_dataset = data_utils.dataset_mapping[FLAGS.dataset]
+    create_model = nets_mapping[FLAGS.model]
     checkpoint_path = os.path.join(workspace_path, 'orchids-models', 'orchids2019', FLAGS.model)
 
     if not tf.io.gfile.exists(checkpoint_path):
@@ -77,7 +76,7 @@ def main(unused_argv):
     model = None
     total_epochs = [int(e) for e in FLAGS.total_epochs.split(',')]
     num_state = FLAGS.end_state - FLAGS.start_state
-    assert(num_state == len(total_epochs))
+    assert (num_state == len(total_epochs))
     for idx, train_step in enumerate(range(FLAGS.start_state, FLAGS.end_state)):
         if train_step == 1:
             batch_size = FLAGS.batch_size
@@ -91,7 +90,7 @@ def main(unused_argv):
         validate_ds = load_dataset(split="validate", batch_size=batch_size, root_path=data_dir)
         test_ds = load_dataset(split="test", batch_size=batch_size, root_path=data_dir)
 
-        training_step = utils.TRAIN_TEMPLATE.format(step=train_step)
+        training_step = constants.TRAIN_TEMPLATE.format(step=train_step)
 
         learning_rate = lib_utils.config_learning_rate(learning_rate=FLAGS.learning_rate,
                                                        exp_decay=FLAGS.exp_decay,
@@ -101,7 +100,7 @@ def main(unused_argv):
                                                training_step=training_step)
         loss_fn = lib_utils.config_loss(from_logits=False)
 
-        model = create_model(num_classes=data.orchids52_dataset.NUM_OF_CLASSES,
+        model = create_model(num_classes=data.constants.NUM_OF_CLASSES,
                              optimizer=optimizer,
                              loss_fn=loss_fn,
                              training=True,
@@ -112,7 +111,7 @@ def main(unused_argv):
                                                 batch_size=batch_size)
 
         model.config_checkpoint(checkpoint_path)
-        epoch = model.restore_model_variables(checkpoint_path=FLAGS.trained_path)
+        epoch = model.restore_model_variables()
         model.summary()
 
         history_fine = train_model.fit(initial_epoch=epoch,

@@ -9,7 +9,9 @@ from tensorflow.python.keras.engine import training
 from tensorflow.python.keras.utils import data_utils
 from tensorflow.python.keras.utils import layer_utils
 from tensorflow.python.keras.applications import imagenet_utils
-from tensorflow.keras import layers
+from tensorflow.keras import layers, Sequential
+
+from preprocesing.inception_preprocessing import preprocess_image
 
 logging = tf.compat.v1.logging
 
@@ -21,35 +23,28 @@ IMG_SHAPE_224 = IMG_SIZE_224 + (3,)
 
 
 class PreprocessLayer(layers.Layer):
-    def __init__(self, mode='horizontal', factor=0.2, central_fraction=0.875):
+    def __init__(self, width, height, fast_mode=True):
         super(PreprocessLayer, self).__init__()
-        self.central_fraction = central_fraction
-        # self.data_augmentation = Sequential([
-        #     layers.experimental.preprocessing.RandomFlip(mode),
-        #     layers.experimental.preprocessing.RandomRotation(factor),
-        # ])
-        # self.preprocess_input = keras.applications.mobilenet_v2.preprocess_input
+        self.width = width
+        self.height = height
+        self.fast_mode = fast_mode
 
     def call(self, inputs, **kwargs):
-        training = kwargs.pop('training')
-        # inputs = self.data_augmentation(inputs, training=training)
-        inputs = tf.image.convert_image_dtype(inputs, dtype=tf.float32)
-        inputs = tf.image.central_crop(inputs, central_fraction=self.central_fraction)
-        inputs = tf.compat.v1.image.resize_bilinear(
-            images=inputs,
-            size=(224, 224),
-            align_corners=False)
-        inputs = tf.subtract(inputs, 0.5)
-        inputs = tf.multiply(inputs, 2.0)
-
-        # inputs = self.preprocess_input(inputs)
+        is_training = kwargs.pop('training', False)
+        is_training = False if is_training is None else is_training
+        inputs = preprocess_image(inputs,
+                                  width=self.width,
+                                  height=self.height,
+                                  is_training=is_training,
+                                  fast_mode=self.fast_mode)
 
         return inputs
 
 
 class PredictionLayer(layers.Layer):
-    def __init__(self, num_classes, dropout_ratio=0.2):
+    def __init__(self, num_classes, dropout_ratio=0.2, activation="softmax"):
         super(PredictionLayer, self).__init__()
+        self.activation = activation
         self.dropout = layers.Dropout(dropout_ratio)
         self.dense = layers.Conv2D(
             num_classes,
@@ -66,8 +61,8 @@ class PredictionLayer(layers.Layer):
         inputs = self.dropout(inputs, training=_training)
         inputs = self.dense(inputs, training=_training)
         inputs = tf.squeeze(inputs, [1, 2])
-        inputs = tf.nn.softmax(inputs, axis=1)
-
+        if self.activation == "softmax":
+            inputs = tf.nn.softmax(inputs, axis=1)
         return inputs
 
 
@@ -155,22 +150,26 @@ def _make_divisible(v, divisor, min_value=None):
 
 
 def global_pool(input_tensor, pool_op=layers.AvgPool2D):
-  shape = input_tensor.get_shape().as_list()
-  if shape[1] is None or shape[2] is None:
-    pool_size = tf.convert_to_tensor(
-        [tf.shape(input_tensor)[1], tf.shape(input_tensor)[2]])
-  else:
-    pool_size = [shape[1], shape[2]]
-  output = pool_op(pool_size=pool_size, strides=[1, 1], padding='valid')(input_tensor)
-  output.set_shape([None, 1, 1, None])
-  return output
+    shape = input_tensor.get_shape().as_list()
+    if shape[1] is None or shape[2] is None:
+        pool_size = tf.convert_to_tensor(
+            [tf.shape(input_tensor)[1], tf.shape(input_tensor)[2]])
+    else:
+        pool_size = [shape[1], shape[2]]
+    output = pool_op(pool_size=pool_size, strides=[1, 1], padding='valid')(input_tensor)
+    output.set_shape([None, 1, 1, None])
+    return output
 
 
-def create_mobilenet_v1(input_shape,
-                        alpha,
-                        classes,
-                        include_top=False,
-                        model_name='mobilenet_v2'):
+def create_mobilenet_v2_custom(input_shape,
+                               alpha,
+                               classes,
+                               include_top=False,
+                               model_name='mobilenet_v2',
+                               suffix_name=None):
+    if suffix_name is not None:
+        model_name = "{}-{}".format(model_name, suffix_name)
+
     inputs = layers.Input(shape=input_shape)
     channel_axis = -1
     first_block_filters = _make_divisible(32 * alpha, 8)
@@ -294,6 +293,8 @@ def create_mobilenet_v2(input_shape=None,
             raise ValueError('input_tensor specified: ', input_tensor,
                              'is not a keras tensor')
 
+    default_size = 224
+
     # If input_shape is None, infer shape from input_tensor
     if input_shape is None and input_tensor is not None:
 
@@ -333,8 +334,6 @@ def create_mobilenet_v2(input_shape=None,
 
         if rows == cols and rows in [96, 128, 160, 192, 224]:
             default_size = rows
-        else:
-            default_size = 224
 
     input_shape = imagenet_utils.obtain_input_shape(
         input_shape,
@@ -390,7 +389,6 @@ def create_mobilenet_v2(input_shape=None,
         strides=(2, 2),
         padding='valid',
         use_bias=False,
-        kernel_regularizer=tf.keras.regularizers.l2(regularizers_l2),
         name='%s_Conv1' % model_name)(x)
     x = layers.BatchNormalization(
         axis=channel_axis, epsilon=1e-3, momentum=0.999, name='%s_bn_Conv1' % model_name)(x)
