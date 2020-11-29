@@ -4,15 +4,6 @@ from __future__ import print_function
 
 import tensorflow as tf
 
-from tensorflow.python.ops import control_flow_ops
-
-
-def apply_with_random_selector(x, func, num_cases):
-    sel = tf.random.uniform([], maxval=num_cases, dtype=tf.int32)
-    return control_flow_ops.merge([
-        func(control_flow_ops.switch(x, tf.equal(sel, case))[1], case)
-        for case in range(num_cases)])[0]
-
 
 def distort_color(image, color_ordering=0, fast_mode=True):
     if fast_mode:
@@ -54,18 +45,12 @@ def preprocess_for_train(image, height, width, fast_mode=True):
         image = tf.image.convert_image_dtype(image, dtype=tf.float32)
 
     num_resize_cases = 1 if fast_mode else 4
-    distorted_image = apply_with_random_selector(
-        image,
-        lambda x, method: tf.compat.v1.image.resize_images(x, [height, width], method),
-        num_cases=num_resize_cases)
-
+    method = tf.random.uniform([], maxval=num_resize_cases, dtype=tf.int32)
+    distorted_image = tf.compat.v1.image.resize_images(image, [height, width], method)
     distorted_image = tf.image.random_flip_left_right(distorted_image)
 
-    num_distort_cases = 1 if fast_mode else 4
-    distorted_image = apply_with_random_selector(
-        distorted_image,
-        lambda x, ordering: distort_color(x, ordering, fast_mode),
-        num_cases=num_distort_cases)
+    ordering = tf.random.uniform([], maxval=num_resize_cases, dtype=tf.int32)
+    distorted_image = distort_color(distorted_image, ordering, fast_mode)
 
     distorted_image = tf.subtract(distorted_image, 0.5)
     distorted_image = tf.multiply(distorted_image, 2.0)

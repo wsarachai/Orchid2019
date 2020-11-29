@@ -90,7 +90,8 @@ class TrainClassifier:
         self.accuracy_metric = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
         self.batch_size = batch_size
         self.preprocess_step = PreprocessLayer(width=model_desc.width,
-                                               height=model_desc.height)
+                                               height=model_desc.height,
+                                               fast_mode=False)
 
         self.model.compile()
 

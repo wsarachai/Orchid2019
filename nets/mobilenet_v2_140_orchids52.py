@@ -11,6 +11,7 @@ import tensorflow.keras as keras
 from tensorflow.python.keras import Sequential
 from nets import mobilenet_v2, constants
 from nets.mobilenet_v2 import default_image_size
+from nets.mobilenet_v2_140 import load_trained_weights, WEIGHT_MOBILENET_V2
 
 logging = tf.compat.v1.logging
 
@@ -43,16 +44,8 @@ class Orchids52Mobilenet140STN(nets.mobilenet_v2_140.Orchids52Mobilenet140):
     def config_checkpoint(self, checkpoint_path):
         super(Orchids52Mobilenet140STN, self).config_checkpoint(checkpoint_path)
         if self.stn_dense:
-            stn_dense_checkpoint = tf.train.Checkpoint(
-                step=tf.Variable(1),
-                optimizer=self.optimizer,
-                model=self.stn_dense)
             checkpoint_prefix = os.path.join(checkpoint_path, 'stn_dense_layer')
-            stn_dense_checkpoint_manager = tf.train.CheckpointManager(
-                stn_dense_checkpoint,
-                directory=checkpoint_prefix,
-                max_to_keep=self.max_to_keep)
-            self.stn_dense_checkpoint = (stn_dense_checkpoint, stn_dense_checkpoint_manager)
+            self.stn_dense_checkpoint = (self.stn_dense, checkpoint_prefix)
 
     def save_model_variables(self):
         super(Orchids52Mobilenet140STN, self).save_model_variables()
@@ -82,10 +75,13 @@ class Orchids52Mobilenet140STN(nets.mobilenet_v2_140.Orchids52Mobilenet140):
 
     def load_model_step2(self):
         self.load_model_step1()
-        stn_dense_checkpoint, stn_dense_checkpoint_manager = self.stn_dense_checkpoint
-        if stn_dense_checkpoint_manager.latest_checkpoint:
-            status = stn_dense_checkpoint.restore(stn_dense_checkpoint_manager.latest_checkpoint)
-            status.assert_existing_objects_matched()
+        load_trained_weights(self.branch_model,
+                             weights=WEIGHT_MOBILENET_V2,
+                             alpha=self.alpha,
+                             include_top=False)
+        stn_dense_checkpoint, stn_dense_checkpoint_dir = self.stn_dense_checkpoint
+        if tf.io.gfile.exists(stn_dense_checkpoint_dir):
+            stn_dense_checkpoint.load_weights(stn_dense_checkpoint_dir)
 
     def load_model_step3(self):
         self.load_model_step2()
@@ -127,12 +123,13 @@ class BranchBlock(keras.layers.Layer):
         self.batch_size = batch_size
         self.width = width
         self.height = height
-        self.branch_base_model = nets.mobilenet_v2.create_mobilenet_v2(
+        self.branch_base_model = nets.mobilenet_v2.create_mobilenet_v2_custom(
             input_shape=nets.mobilenet_v2.IMG_SHAPE_224,
             alpha=1.4,
             include_top=False,
-            weights='imagenet',
-            sub_name='02')
+            suffix_name='02',
+            classes=num_classes)
+
         self.branches_prediction_models = [
             nets.mobilenet_v2_140.PredictionLayer(num_classes=num_classes),
             nets.mobilenet_v2_140.PredictionLayer(num_classes=num_classes),
@@ -262,7 +259,8 @@ def create_orchid_mobilenet_v2_140(num_classes,
                                             name='mse')
 
         # with tf.name_scope('branches'):
-        branches_block = BranchBlock(num_classes=num_classes, batch_size=batch_size)
+        branches_block = BranchBlock(num_classes=num_classes,
+                                     batch_size=batch_size)
         branch_base_model = branches_block.branch_base_model
         branches_prediction_models = branches_block.branches_prediction_models
 
