@@ -15,7 +15,7 @@ from nets.mobilenet_v2 import PredictionLayer, default_image_size
 
 ORCHIDS_BASE_WEIGHT_PATH = 'https://ndownloader.figshare.com/files'
 WEIGHT_MOBILENET_V2 = 'orchids52_mobilenet_v2'
-WEIGHT_MOBILENET_V2_TOP_ONLY = 'orchids52_mobilenet_v2_only_top'
+WEIGHT_MOBILENET_V2_TOP = 'orchids52_mobilenet_v2_top'
 logging = tf.compat.v1.logging
 
 
@@ -95,17 +95,14 @@ def load_trained_weights(model,
 
     if weights == WEIGHT_MOBILENET_V2:
         if alpha == 1.4 and include_top:
-            weight_path = ORCHIDS_BASE_WEIGHT_PATH + '/25621319'
+            weight_path = ORCHIDS_BASE_WEIGHT_PATH + '/25623764'
             model_name = weights + '_' + str(alpha)
         elif alpha == 1.4 and not include_top:
-            weight_path = ORCHIDS_BASE_WEIGHT_PATH + '/25621319'
+            weight_path = ORCHIDS_BASE_WEIGHT_PATH + '/25623752'
             model_name = weights + '_' + str(alpha) + '_no_top'
-        else:
-            weight_path = ORCHIDS_BASE_WEIGHT_PATH + '/25621319'
-            model_name = weights + '_' + str(alpha) + '_no_top'
-    elif weights == WEIGHT_MOBILENET_V2_TOP_ONLY:
-        weight_path = ORCHIDS_BASE_WEIGHT_PATH + '/25621319'
-        model_name = weights + '_' + str(alpha) + '_only_top'
+    elif weights == WEIGHT_MOBILENET_V2_TOP:
+        weight_path = ORCHIDS_BASE_WEIGHT_PATH + '/25623755'
+        model_name = weights + '_' + str(alpha) + '_top'
 
     assert model_name and weight_path
 
@@ -253,7 +250,7 @@ class Orchids52Mobilenet140(object):
                              include_top=False)
         for predict_layer in self.predict_layers:
             load_trained_weights(predict_layer,
-                                 weights=WEIGHT_MOBILENET_V2_TOP_ONLY)
+                                 weights=WEIGHT_MOBILENET_V2_TOP)
 
     def set_mobilenet_training_status(self, trainable):
         if self.mobilenet:
