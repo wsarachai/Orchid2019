@@ -88,7 +88,6 @@ class Orchids52Mobilenet140STN(nets.mobilenet_v2_140.Orchids52Mobilenet140):
 
     def load_model_step4(self):
         assert (self.checkpoint_path is not None)
-
         checkpoint, _ = self.checkpoint
         checkpoint_prefix = os.path.join(self.checkpoint_path,
                                          constants.TRAIN_TEMPLATE.format(step=3))
