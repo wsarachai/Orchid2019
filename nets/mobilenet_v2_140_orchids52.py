@@ -44,14 +44,14 @@ class Orchids52Mobilenet140STN(nets.mobilenet_v2_140.Orchids52Mobilenet140):
     def config_checkpoint(self, checkpoint_path):
         super(Orchids52Mobilenet140STN, self).config_checkpoint(checkpoint_path)
         if self.stn_dense:
-            checkpoint_prefix = os.path.join(checkpoint_path, 'stn_dense_layer')
+            checkpoint_prefix = os.path.join(checkpoint_path, 'stn_dense_layer', 'cp')
             self.stn_dense_checkpoint = (self.stn_dense, checkpoint_prefix)
 
     def save_model_variables(self):
         super(Orchids52Mobilenet140STN, self).save_model_variables()
         if self.stn_dense:
-            _, stn_dense_checkpoint_manager = self.stn_dense_checkpoint
-            stn_dense_checkpoint_manager.save()
+            stn_dense_checkpoint, stn_dense_checkpoint_dir = self.stn_dense_checkpoint
+            stn_dense_checkpoint.save_weights(stn_dense_checkpoint_dir)
 
     def set_mobilenet_training_status(self, trainable):
         super(Orchids52Mobilenet140STN, self).set_mobilenet_training_status(trainable)
