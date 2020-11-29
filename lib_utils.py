@@ -160,15 +160,20 @@ class TrainClassifier:
         is_run_from_bash = kwargs.pop('bash') if 'bash' in kwargs else False
         save_best_only = kwargs.pop('save_best_only') if 'save_best_only' in kwargs else False
         finalize = False if not is_run_from_bash else True
-        progbar = tf.keras.utils.Progbar(
+        progress_bar = tf.keras.utils.Progbar(
             target, width=30, verbose=1, interval=0.05,
             stateful_metrics={'train_loss', 'reg_loss', 'b_loss', 'total_loss', 'accuracy'},
             unit_name='step'
         )
+
         val_accuracy = 0.0
         val_loss = 1.0
+
         train_ds = train_ds.map(resize_image)
         train_ds = train_ds.batch(batch_size=self.batch_size).cache()
+        validate_ds = validate_ds.map(resize_image)
+        validate_ds = validate_ds.batch(batch_size=self.batch_size).cache()
+
         for epoch in range(initial_epoch, epoches + 1):
             print('\nEpoch: {}/{}'.format(epoch, epoches))
 
@@ -181,7 +186,7 @@ class TrainClassifier:
                     logs = copy.copy(logs) if logs else {}
                     num_steps = logs.pop('num_steps', 1)
                     seen += num_steps
-                    progbar.update(seen, list(logs.items()), finalize=finalize)
+                    progress_bar.update(seen, list(logs.items()), finalize=finalize)
                 # else:
                 #     logging.error('\n{epoch}: Error batch size {b1} != {b2}.'.format(
                 #         epoch=epoch,
