@@ -14,6 +14,8 @@ from nets.constants import TRAIN_TEMPLATE
 from nets.mobilenet_v2 import PredictionLayer, default_image_size
 
 ORCHIDS_BASE_WEIGHT_PATH = 'https://ndownloader.figshare.com/files'
+WEIGHT_MOBILENET_V2 = 'orchids52_mobilenet_v2'
+WEIGHT_MOBILENET_V2_TOP_ONLY = 'orchids52_mobilenet_v2_only_top'
 logging = tf.compat.v1.logging
 
 
@@ -85,21 +87,39 @@ def load_from_v1(latest_checkpoint):
 
 
 def load_trained_weights(model,
-                         model_name='Orchids52MobilenetV2-140',
-                         weights='orchids52_140'):
-    if weights == 'orchids52_140':
-        weight_path = ORCHIDS_BASE_WEIGHT_PATH + '/25621319'
-        weights_path = data_utils.get_file(
-            model_name, weight_path, cache_subdir='models')
+                         weights,
+                         alpha=1.4,
+                         include_top=True):
+    model_name = None
+    weight_path = None
 
-        model_checkpoint_files = os.path.join(weights_path + '_weights', 'pretrain')
-        if not tf.io.gfile.exists(model_checkpoint_files):
-            with zipfile.ZipFile(weights_path, 'r') as zip_ref:
-                model_checkpoint_path = os.path.join(weights_path + '_weights')
-                zip_ref.extractall(model_checkpoint_path)
-        if tf.io.gfile.exists(model_checkpoint_files):
-            model_checkpoint_files = os.path.join(model_checkpoint_files, 'chk')
-            model.load_weights(model_checkpoint_files)
+    if weights == WEIGHT_MOBILENET_V2:
+        if alpha == 1.4 and include_top:
+            weight_path = ORCHIDS_BASE_WEIGHT_PATH + '/25621319'
+            model_name = weights + '_' + str(alpha)
+        elif alpha == 1.4 and not include_top:
+            weight_path = ORCHIDS_BASE_WEIGHT_PATH + '/25621319'
+            model_name = weights + '_' + str(alpha) + '_no_top'
+        else:
+            weight_path = ORCHIDS_BASE_WEIGHT_PATH + '/25621319'
+            model_name = weights + '_' + str(alpha) + '_no_top'
+    elif weights == WEIGHT_MOBILENET_V2_TOP_ONLY:
+        weight_path = ORCHIDS_BASE_WEIGHT_PATH + '/25621319'
+        model_name = weights + '_' + str(alpha) + '_only_top'
+
+    assert model_name and weight_path
+
+    weights_path = data_utils.get_file(
+        model_name, weight_path, cache_subdir='models')
+
+    model_checkpoint_files = os.path.join(weights_path + '_weights')
+    if not tf.io.gfile.exists(model_checkpoint_files):
+        with zipfile.ZipFile(weights_path, 'r') as zip_ref:
+            model_checkpoint_path = os.path.join(weights_path + '_weights')
+            zip_ref.extractall(model_checkpoint_path)
+    if tf.io.gfile.exists(model_checkpoint_files):
+        model_checkpoint_files = os.path.join(model_checkpoint_files, 'chk')
+        model.load_weights(model_checkpoint_files)
 
 
 class Orchids52Mobilenet140(object):
@@ -118,6 +138,7 @@ class Orchids52Mobilenet140(object):
         self.predict_layers = predict_layers
         self.training = training
         self.step = step
+        self.alpha = 1.4
         self.max_to_keep = 5
 
         self.checkpoint_path = None
@@ -167,11 +188,14 @@ class Orchids52Mobilenet140(object):
             predict_layer, save_dir = checkpoint
             predict_layer.save_weights(save_dir)
 
-    def load_trained_weights(self, model_name='Orchids52MobilenetV2-140',
-                             weights='orchids52_140'):
+    def load_trained_weights(self,
+                             weights=WEIGHT_MOBILENET_V2,
+                             alpha=1.4,
+                             include_top=True):
         load_trained_weights(self.model,
-                             model_name=model_name,
-                             weights=weights)
+                             weights=weights,
+                             alpha=alpha,
+                             include_top=include_top)
 
     def restore_model_from_latest_checkpoint_if_exist(self):
         result = False
@@ -223,7 +247,13 @@ class Orchids52Mobilenet140(object):
             self.load_model_step1()
 
     def load_model_step1(self):
-        load_trained_weights(self.model)
+        load_trained_weights(self.mobilenet,
+                             weights=WEIGHT_MOBILENET_V2,
+                             alpha=self.alpha,
+                             include_top=False)
+        for predict_layer in self.predict_layers:
+            load_trained_weights(predict_layer,
+                                 weights=WEIGHT_MOBILENET_V2_TOP_ONLY)
 
     def set_mobilenet_training_status(self, trainable):
         if self.mobilenet:
@@ -256,29 +286,37 @@ def create_mobilenet_v2_140(num_classes,
                             optimizer,
                             loss_fn,
                             training=False,
+                            alpha=1.0,
+                            include_top=True,
                             **kwargs):
     step = kwargs.pop('step') if 'step' in kwargs else TRAIN_TEMPLATE.format(step=1)
 
+    prediction_layers = []
     inputs = keras.Input(shape=nets.mobilenet_v2.IMG_SHAPE_224, dtype=tf.float32)
     mobilenet = nets.mobilenet_v2.create_mobilenet_v2_custom(
         input_shape=nets.mobilenet_v2.IMG_SHAPE_224,
-        alpha=1.4,
+        alpha=alpha,
         include_top=False,
         classes=num_classes)
-    prediction_layer = PredictionLayer(num_classes=num_classes)
 
-    x = mobilenet(inputs, training=training)
-    outputs = prediction_layer(x, training=training)
+    outputs = mobilenet(inputs, training=training)
+    if include_top:
+        prediction_layer = PredictionLayer(num_classes=num_classes)
+        outputs = prediction_layer(outputs, training=training)
+        prediction_layers.append(prediction_layer)
 
     model = Orchids52Mobilenet140(inputs, outputs,
                                   optimizer=optimizer,
                                   loss_fn=loss_fn,
                                   mobilenet=mobilenet,
-                                  predict_layers=[prediction_layer],
+                                  predict_layers=prediction_layers,
                                   training=training,
                                   step=step)
 
-    model.load_trained_weights()
+    if include_top:
+        model.load_trained_weights(alpha=alpha, include_top=include_top)
+    else:
+        model.load_trained_weights(alpha=alpha, include_top=include_top)
 
     return model
 

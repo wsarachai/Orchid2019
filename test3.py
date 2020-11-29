@@ -215,16 +215,26 @@ def main1(_):
 
 def main(_):
     workspace_path = os.environ['WORKSPACE'] if 'WORKSPACE' in os.environ else '/Volumes/Data/tmp'
+    no_top_save_path = os.path.join(workspace_path,
+                                    'orchids-models',
+                                    'orchids2019',
+                                    'mobilenet_v2_140',
+                                    'pretrain', 'no_top', 'chk')
+    top_save_path = os.path.join(workspace_path,
+                                 'orchids-models',
+                                 'orchids2019',
+                                 'mobilenet_v2_140',
+                                 'pretrain', 'top', 'chk')
     save_path = os.path.join(workspace_path, 'orchids-models', 'orchids2019', 'mobilenet_v2_140', 'pretrain', 'chk')
 
     num_classes = 52
     total_images = 739
     inputs = keras.layers.Input(shape=(224, 224, 3), dtype=tf.float32)
-    model = create_mobilenet_v2_custom(input_shape=(224, 224, 3), alpha=1.4, classes=num_classes)
-    predictionLayer = PredictionLayer(num_classes=num_classes)
+    modelnet = create_mobilenet_v2_custom(input_shape=(224, 224, 3), alpha=1.4, classes=num_classes)
+    prediction_layer = PredictionLayer(num_classes=num_classes)
 
-    x = model(inputs)
-    output = predictionLayer(x)
+    x = modelnet(inputs)
+    output = prediction_layer(x)
 
     model = keras.Model(inputs, output)
 
@@ -294,6 +304,8 @@ def main(_):
     sys.stdout.write('Accuracy: {:.4f}'.format(corrected / total_images))
     sys.stdout.flush()
 
+    modelnet.save_weights(no_top_save_path)
+    prediction_layer.save_weights(top_save_path)
     model.save_weights(save_path)
 
 

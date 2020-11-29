@@ -153,6 +153,8 @@ def main(unused_argv):
                          optimizer=None,
                          loss_fn=None,
                          batch_size=1,
+                         alpha=1.4,
+                         include_top=True,
                          step=training_step)
 
     model.summary()

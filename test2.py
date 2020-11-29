@@ -10,7 +10,7 @@ import tensorflow as tf
 from tensorflow import keras
 
 from nets.mobilenet_v2 import PredictionLayer, create_mobilenet_v2_custom, PreprocessLayer
-from nets.mobilenet_v2_140 import load_trained_weights
+from nets.mobilenet_v2_140 import load_trained_weights, WEIGHT_MOBILENET_V2
 from preprocesing.inception_preprocessing import preprocess_image
 
 flags = tf.compat.v1.flags
@@ -150,7 +150,10 @@ def main(_):
     preprocess_layer = PreprocessLayer(width=224, height=224)
     dataset_images = create_image_lists(image_dir=FLAGS.image_dir)
 
-    load_trained_weights(model)
+    load_trained_weights(model,
+                         weights=WEIGHT_MOBILENET_V2,
+                         alpha=1.4,
+                         include_top=True)
 
     count = 0
     corrected = 0
