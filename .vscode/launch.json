@@ -25,7 +25,11 @@
       "request": "launch",
       "program": "run-test.py",
       "console": "integratedTerminal",
-      "args": []
+      "args": [
+        "--model=mobilenet_v2_140_orchids52",
+        "--train_step=2",
+        "--image_dir=/Volumes/Data/tmp/orchids52_data/test/]"
+      ]
     },
     {
       "name": "Python: Gen Graph",
