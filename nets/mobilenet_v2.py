@@ -9,7 +9,7 @@ from tensorflow.python.keras.engine import training
 from tensorflow.python.keras.utils import data_utils
 from tensorflow.python.keras.utils import layer_utils
 from tensorflow.python.keras.applications import imagenet_utils
-from tensorflow.keras import layers, Model, Sequential
+from tensorflow.keras import layers, Model, Sequential, regularizers
 
 from preprocesing.inception_preprocessing import preprocess_image
 
@@ -68,7 +68,8 @@ class PredictionLayer(Model):
     def get_config(self):
         super(PredictionLayer, self).get_config()
 
-def _inverted_res_block(name, inputs, expansion, stride, alpha, filters, block_id):
+
+def _inverted_res_block(name, inputs, expansion, stride, alpha, filters, block_id, weight_decay=None):
     """Inverted ResNet block."""
     channel_axis = 1 if backend.image_data_format() == 'channels_first' else -1
 
@@ -86,6 +87,7 @@ def _inverted_res_block(name, inputs, expansion, stride, alpha, filters, block_i
             padding='same',
             use_bias=False,
             activation=None,
+            kernel_regularizer=regularizers.l2(weight_decay) if weight_decay is not None else None,
             name=prefix + 'expand')(
             x)
         x = layers.BatchNormalization(
@@ -127,6 +129,7 @@ def _inverted_res_block(name, inputs, expansion, stride, alpha, filters, block_i
         padding='same',
         use_bias=False,
         activation=None,
+        kernel_regularizer=regularizers.l2(weight_decay) if weight_decay is not None else None,
         name=prefix + 'project')(
         x)
     x = layers.BatchNormalization(
@@ -168,6 +171,7 @@ def create_mobilenet_v2_custom(input_shape,
                                classes,
                                include_top=False,
                                model_name='mobilenet_v2',
+                               weight_decay=0.00004,
                                suffix_name=None):
     if suffix_name is not None:
         model_name = "{}-{}".format(model_name, suffix_name)
@@ -181,51 +185,69 @@ def create_mobilenet_v2_custom(input_shape,
         strides=(2, 2),
         padding='same',
         use_bias=False,
+        kernel_regularizer=regularizers.l2(weight_decay),
         name='%s_Conv1' % model_name)(inputs)
     x = layers.BatchNormalization(
         axis=channel_axis, epsilon=1e-3, momentum=0.999, name='%s_bn_Conv1' % model_name)(x)
     x = layers.ReLU(6., name='%s_Conv1_relu' % model_name)(x)
 
     x = _inverted_res_block(model_name,
-                            x, filters=16, alpha=alpha, stride=1, expansion=1, block_id=0)
+                            x, filters=16, alpha=alpha, stride=1, expansion=1, block_id=0,
+                            weight_decay=weight_decay)
 
     x = _inverted_res_block(model_name,
-                            x, filters=24, alpha=alpha, stride=2, expansion=6, block_id=1)
+                            x, filters=24, alpha=alpha, stride=2, expansion=6, block_id=1,
+                            weight_decay=weight_decay)
     x = _inverted_res_block(model_name,
-                            x, filters=24, alpha=alpha, stride=1, expansion=6, block_id=2)
+                            x, filters=24, alpha=alpha, stride=1, expansion=6, block_id=2,
+                            weight_decay=weight_decay)
 
     x = _inverted_res_block(model_name,
-                            x, filters=32, alpha=alpha, stride=2, expansion=6, block_id=3)
+                            x, filters=32, alpha=alpha, stride=2, expansion=6, block_id=3,
+                            weight_decay=weight_decay)
     x = _inverted_res_block(model_name,
-                            x, filters=32, alpha=alpha, stride=1, expansion=6, block_id=4)
+                            x, filters=32, alpha=alpha, stride=1, expansion=6, block_id=4,
+                            weight_decay=weight_decay)
     x = _inverted_res_block(model_name,
-                            x, filters=32, alpha=alpha, stride=1, expansion=6, block_id=5)
+                            x, filters=32, alpha=alpha, stride=1, expansion=6, block_id=5,
+                            weight_decay=weight_decay)
 
     x = _inverted_res_block(model_name,
-                            x, filters=64, alpha=alpha, stride=2, expansion=6, block_id=6)
+                            x, filters=64, alpha=alpha, stride=2, expansion=6, block_id=6,
+                            weight_decay=weight_decay)
     x = _inverted_res_block(model_name,
-                            x, filters=64, alpha=alpha, stride=1, expansion=6, block_id=7)
+                            x, filters=64, alpha=alpha, stride=1, expansion=6, block_id=7,
+                            weight_decay=weight_decay)
     x = _inverted_res_block(model_name,
-                            x, filters=64, alpha=alpha, stride=1, expansion=6, block_id=8)
+                            x, filters=64, alpha=alpha, stride=1, expansion=6, block_id=8,
+                            weight_decay=weight_decay)
     x = _inverted_res_block(model_name,
-                            x, filters=64, alpha=alpha, stride=1, expansion=6, block_id=9)
+                            x, filters=64, alpha=alpha, stride=1, expansion=6, block_id=9,
+                            weight_decay=weight_decay)
 
     x = _inverted_res_block(model_name,
-                            x, filters=96, alpha=alpha, stride=1, expansion=6, block_id=10)
+                            x, filters=96, alpha=alpha, stride=1, expansion=6, block_id=10,
+                            weight_decay=weight_decay)
     x = _inverted_res_block(model_name,
-                            x, filters=96, alpha=alpha, stride=1, expansion=6, block_id=11)
+                            x, filters=96, alpha=alpha, stride=1, expansion=6, block_id=11,
+                            weight_decay=weight_decay)
     x = _inverted_res_block(model_name,
-                            x, filters=96, alpha=alpha, stride=1, expansion=6, block_id=12)
+                            x, filters=96, alpha=alpha, stride=1, expansion=6, block_id=12,
+                            weight_decay=weight_decay)
 
     x = _inverted_res_block(model_name,
-                            x, filters=160, alpha=alpha, stride=2, expansion=6, block_id=13)
+                            x, filters=160, alpha=alpha, stride=2, expansion=6, block_id=13,
+                            weight_decay=weight_decay)
     x = _inverted_res_block(model_name,
-                            x, filters=160, alpha=alpha, stride=1, expansion=6, block_id=14)
+                            x, filters=160, alpha=alpha, stride=1, expansion=6, block_id=14,
+                            weight_decay=weight_decay)
     x = _inverted_res_block(model_name,
-                            x, filters=160, alpha=alpha, stride=1, expansion=6, block_id=15)
+                            x, filters=160, alpha=alpha, stride=1, expansion=6, block_id=15,
+                            weight_decay=weight_decay)
 
     x = _inverted_res_block(model_name,
-                            x, filters=320, alpha=alpha, stride=1, expansion=6, block_id=16)
+                            x, filters=320, alpha=alpha, stride=1, expansion=6, block_id=16,
+                            weight_decay=weight_decay)
 
     if alpha > 1.0:
         last_block_filters = _make_divisible(1280 * alpha, 8)
@@ -233,7 +255,9 @@ def create_mobilenet_v2_custom(input_shape,
         last_block_filters = 1280
 
     x = layers.Conv2D(
-        last_block_filters, kernel_size=1, use_bias=False, name='%s_Conv_1' % model_name)(x)
+        last_block_filters,
+        kernel_regularizer=regularizers.l2(weight_decay),
+        kernel_size=1, use_bias=False, name='%s_Conv_1' % model_name)(x)
     x = layers.BatchNormalization(
         axis=channel_axis, epsilon=1e-3, momentum=0.999, name='%s_Conv_1_bn' % model_name)(x)
     x = layers.ReLU(6., name='%s_out_relu' % model_name)(x)

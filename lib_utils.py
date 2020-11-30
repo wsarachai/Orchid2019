@@ -106,8 +106,8 @@ class TrainClassifier:
             regularization_loss = tf.reduce_sum(self.model.get_regularization_loss())
             total_loss = regularization_loss + train_loss + boundary_loss
 
-        gradients = tape.gradient(total_loss, self.model.trainable_weights)
-        self.model.optimizer.apply_gradients(zip(gradients, self.model.trainable_weights))
+        gradients = tape.gradient(total_loss, self.model.get_trainable_weights())
+        self.model.optimizer.apply_gradients(zip(gradients, self.model.get_trainable_weights()))
 
         self.train_loss_metric.update_state(train_loss)
         self.regularization_loss_metric.update_state(regularization_loss)

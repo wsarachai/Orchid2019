@@ -278,6 +278,9 @@ class Orchids52Mobilenet140(object):
                         signatures=signatures,
                         options=options)
 
+    def get_trainable_weights(self):
+        return self.model.trainable_weights
+
 
 def create_mobilenet_v2_140(num_classes,
                             optimizer,
