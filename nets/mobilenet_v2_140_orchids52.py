@@ -139,15 +139,15 @@ class BranchBlock(keras.layers.Layer):
         inp1 = tf.squeeze(
             tf.slice(inputs,
                      [0, 0, 0, 0, 0],
-                     [1, self.batch_size, self.width, self.height, 3]))
+                     [1, self.batch_size, self.width, self.height, 3]), axis=0)
         inp2 = tf.squeeze(
             tf.slice(inputs,
                      [1, 0, 0, 0, 0],
-                     [1, self.batch_size, self.width, self.height, 3]))
+                     [1, self.batch_size, self.width, self.height, 3]), axis=0)
         inp3 = tf.squeeze(
             tf.slice(inputs,
                      [2, 0, 0, 0, 0],
-                     [1, self.batch_size, self.width, self.height, 3]))
+                     [1, self.batch_size, self.width, self.height, 3]), axis=0)
 
         logits = tf.stack([
             self.sub_process(inp1, self.branches_prediction_models[0]),
