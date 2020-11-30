@@ -174,15 +174,15 @@ class EstimationBlock(keras.layers.Layer):
         inp1 = tf.squeeze(
             tf.slice(inputs,
                      [0, 0, 0],
-                     [1, self.batch_size, self.num_classes]))
+                     [1, self.batch_size, self.num_classes]), axis=0)
         inp2 = tf.squeeze(
             tf.slice(inputs,
                      [1, 0, 0],
-                     [1, self.batch_size, self.num_classes]))
+                     [1, self.batch_size, self.num_classes]), axis=0)
         inp3 = tf.squeeze(
             tf.slice(inputs,
                      [2, 0, 0],
-                     [1, self.batch_size, self.num_classes]))
+                     [1, self.batch_size, self.num_classes]), axis=0)
 
         main_net = c_t = inp1
 

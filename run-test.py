@@ -145,6 +145,12 @@ def main1(unused_argv):
 
 def main(unused_argv):
     logging.debug(unused_argv)
+    workspace_path = os.environ['WORKSPACE'] if 'WORKSPACE' in os.environ else '/Volumes/Data/tmp'
+    checkpoint_path = os.path.join(workspace_path,
+                                   'orchids-models',
+                                   'orchids2019',
+                                   FLAGS.model)
+
     load_dataset = data_utils.dataset_mapping[FLAGS.dataset]
     create_model = utils.nets_mapping[FLAGS.model]
 
@@ -158,6 +164,13 @@ def main(unused_argv):
                          step=training_step)
 
     model.summary()
+
+    checkpoint = tf.train.Checkpoint(model=model.model)
+    checkpoint_prefix = os.path.join(checkpoint_path, training_step)
+    checkpoint_manager = tf.train.CheckpointManager(checkpoint,
+                                                    directory=checkpoint_prefix,
+                                                    max_to_keep=1)
+    checkpoint.restore(checkpoint_manager.latest_checkpoint)
 
     count = 0
     corrected = 0

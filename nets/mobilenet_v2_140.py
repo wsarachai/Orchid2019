@@ -283,9 +283,9 @@ def create_mobilenet_v2_140(num_classes,
                             optimizer,
                             loss_fn,
                             training=False,
-                            alpha=1.0,
                             include_top=True,
                             **kwargs):
+    alpha=1.4
     step = kwargs.pop('step') if 'step' in kwargs else TRAIN_TEMPLATE.format(step=1)
 
     prediction_layers = []
