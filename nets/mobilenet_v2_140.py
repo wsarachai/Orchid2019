@@ -4,6 +4,8 @@ from __future__ import print_function
 
 import os
 
+import numpy as np
+
 import nets
 import lib_utils
 import tensorflow as tf
@@ -152,9 +154,11 @@ class Orchids52Mobilenet140(object):
                 var_loaded = self.load_from_v1(latest_checkpoint)
                 all_vars = self.model.weights
                 for i, var in enumerate(all_vars):
-                    if i == 258:
-                        i = i
                     saved_var = var_loaded[i]
+                    if var.shape != saved_var.shape:
+                        saved_var = np.squeeze(saved_var)
+                        if var.shape != saved_var.shape:
+                            raise Exception("Incompatible shapes")
                     tf.assert_equal(var.shape, saved_var.shape)
                     var.assign(saved_var)
                 return True

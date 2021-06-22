@@ -54,6 +54,8 @@ def config_learning_rate(learning_rate=0.001, exp_decay=False, **kwargs):
 def config_optimizer(optimizer, learning_rate, **kwargs):
     if optimizer == "rmsprop":
         return tf.keras.optimizers.RMSprop(learning_rate=learning_rate)
+    elif optimizer == "adam":
+        return tf.keras.optimizers.Adam(learning_rate=learning_rate)
     else:
         return tf.keras.optimizers.SGD(learning_rate=learning_rate)
 
