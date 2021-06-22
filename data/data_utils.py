@@ -8,11 +8,11 @@ from data import orchids52_dataset_v1_tfrecord
 from data import orchids52_dataset_tfrecord
 
 
-ORCHIDS52_V2_FILE = 'orchids52_v2_file'
-ORCHIDS52_V3_FILE = 'orchids52_v3_file'
-ORCHIDS52_V1_TFRECORD = 'orchids52_v1_tf'
-ORCHIDS52_V2_TFRECORD = 'orchids52_v2_tf'
-ORCHIDS52_V3_TFRECORD = 'orchids52_v3_tf'
+ORCHIDS52_V2_FILE = "orchids52_v2_file"
+ORCHIDS52_V3_FILE = "orchids52_v3_file"
+ORCHIDS52_V1_TFRECORD = "orchids52_v1_tf"
+ORCHIDS52_V2_TFRECORD = "orchids52_v2_tf"
+ORCHIDS52_V3_TFRECORD = "orchids52_v3_tf"
 
 logging = tf.compat.v1.logging
 
@@ -35,18 +35,18 @@ def int64_feature(value):
 
 
 def get_data_files(data_sources):
-  if isinstance(data_sources, (list, tuple)):
-    data_files = []
-    for source in data_sources:
-      data_files += get_data_files(source)
-  else:
-    if '*' in data_sources or '?' in data_sources or '[' in data_sources:
-      data_files = tf.io.gfile.glob(data_sources)
+    if isinstance(data_sources, (list, tuple)):
+        data_files = []
+        for source in data_sources:
+            data_files += get_data_files(source)
     else:
-      data_files = [data_sources]
-  if not data_files:
-    raise ValueError('No data files found in %s' % (data_sources,))
-  return data_files
+        if "*" in data_sources or "?" in data_sources or "[" in data_sources:
+            data_files = tf.io.gfile.glob(data_sources)
+        else:
+            data_files = [data_sources]
+    if not data_files:
+        raise ValueError("No data files found in %s" % (data_sources,))
+    return data_files
 
 
 dataset_mapping = {
@@ -54,5 +54,5 @@ dataset_mapping = {
     ORCHIDS52_V3_FILE: orchids52_dataset_file.load_dataset_v3,
     ORCHIDS52_V1_TFRECORD: orchids52_dataset_v1_tfrecord.load_dataset_v1,
     ORCHIDS52_V2_TFRECORD: orchids52_dataset_tfrecord.load_dataset_v2,
-    ORCHIDS52_V3_TFRECORD: orchids52_dataset_tfrecord.load_dataset_v3
+    ORCHIDS52_V3_TFRECORD: orchids52_dataset_tfrecord.load_dataset_v3,
 }

@@ -12,13 +12,7 @@ from nets import mobilenet_v2_orchids
 
 
 class Orchids52Mobilenet140(object):
-    def __init__(self, inputs, outputs,
-                 optimizer,
-                 loss_fn,
-                 mobilenet,
-                 predict_layers,
-                 training,
-                 step):
+    def __init__(self, inputs, outputs, optimizer, loss_fn, mobilenet, predict_layers, training, step):
         super(Orchids52Mobilenet140, self).__init__()
         self.model = keras.Model(inputs, outputs, trainable=training)
         self.optimizer = optimizer
@@ -35,10 +29,8 @@ class Orchids52Mobilenet140(object):
 
     def compile(self, metrics):
         if self.optimizer and self.loss_fn:
-            self.model.compile(optimizer=self.optimizer,
-                               loss=self.loss_fn,
-                               metrics=metrics,
-                               run_eagerly=True)
+            self.model.compile(optimizer=self.optimizer, loss=self.loss_fn, metrics=metrics)
+            # run_eagerly=True)
 
     def process_step(self, inputs, training=False):
         return self.model(inputs, training=training)
@@ -56,27 +48,23 @@ class Orchids52Mobilenet140(object):
         self.model.summary()
 
     def config_checkpoint(self, checkpoint_path):
-        assert (self.optimizer is not None and self.predict_layers is not None)
+        assert self.optimizer is not None and self.predict_layers is not None
 
         self.checkpoint_path = checkpoint_path
-        checkpoint = tf.train.Checkpoint(
-            step=tf.Variable(1),
-            optimizer=self.optimizer,
-            model=self.model)
+        checkpoint = tf.train.Checkpoint(step=tf.Variable(1), optimizer=self.optimizer, model=self.model)
         checkpoint_prefix = os.path.join(checkpoint_path, self.step)
         checkpoint_manager = tf.train.CheckpointManager(
-            checkpoint, directory=checkpoint_prefix, max_to_keep=self.max_to_keep)
+            checkpoint, directory=checkpoint_prefix, max_to_keep=self.max_to_keep
+        )
         self.checkpoint = (checkpoint, checkpoint_manager)
 
-        predict_layers_path = os.path.join(checkpoint_path, 'predict_layers')
+        predict_layers_path = os.path.join(checkpoint_path, "predict_layers")
         for idx, predict_layer in enumerate(self.predict_layers):
-            checkpoint = tf.train.Checkpoint(
-                step=tf.Variable(1),
-                optimizer=self.optimizer,
-                model=predict_layer)
+            checkpoint = tf.train.Checkpoint(step=tf.Variable(1), optimizer=self.optimizer, model=predict_layer)
             prediction_layer_prefix = lib_utils.get_checkpoint_file(predict_layers_path, idx)
             predict_layers_checkpoint_managers = tf.train.CheckpointManager(
-                checkpoint, directory=prediction_layer_prefix, max_to_keep=self.max_to_keep)
+                checkpoint, directory=prediction_layer_prefix, max_to_keep=self.max_to_keep
+            )
             self.prediction_layer_checkpoints.append((checkpoint, predict_layers_checkpoint_managers))
 
     def save_model_variables(self):
@@ -96,20 +84,18 @@ class Orchids52Mobilenet140(object):
             key_to_numpy.update({key[0]: key[1]})
 
         keys = [
-            'weights',
-            'depthwise_weights',
-            'BatchNorm/beta',
-            'BatchNorm/gamma',
-            'BatchNorm/moving_mean',
-            'BatchNorm/moving_variance'
+            "weights",
+            "depthwise_weights",
+            "BatchNorm/beta",
+            "BatchNorm/gamma",
+            "BatchNorm/moving_mean",
+            "BatchNorm/moving_variance",
         ]
-        expds = [
-            'expand', 'depthwise', 'project'
-        ]
+        expds = ["expand", "depthwise", "project"]
 
         for k1 in keys:
             for _key in key_to_numpy:
-                if _key.startswith('MobilenetV2/Conv/{}'.format(k1)):
+                if _key.startswith("MobilenetV2/Conv/{}".format(k1)):
                     key_to_numpy.pop(_key)
                     value = reader.get_tensor(_key)
                     value_to_load.append(value)
@@ -119,9 +105,9 @@ class Orchids52Mobilenet140(object):
             for sub in expds:
                 for k2 in keys:
                     if i == 0:
-                        s_search = 'MobilenetV2/expanded_conv/{}/{}'.format(sub, k2)
+                        s_search = "MobilenetV2/expanded_conv/{}/{}".format(sub, k2)
                     else:
-                        s_search = 'MobilenetV2/expanded_conv_{}/{}/{}'.format(i, sub, k2)
+                        s_search = "MobilenetV2/expanded_conv_{}/{}/{}".format(i, sub, k2)
                     for _key in key_to_numpy:
                         if _key.startswith(s_search):
                             key_to_numpy.pop(_key)
@@ -131,14 +117,13 @@ class Orchids52Mobilenet140(object):
 
         for k1 in keys:
             for _key in key_to_numpy:
-                if _key.startswith('MobilenetV2/Conv_1/{}'.format(k1)):
+                if _key.startswith("MobilenetV2/Conv_1/{}".format(k1)):
                     key_to_numpy.pop(_key)
                     value = reader.get_tensor(_key)
                     value_to_load.append(value)
                     break
 
-        for s_search in ['MobilenetV2/Logits/Conv2d_1c_1x1/weights',
-                         'MobilenetV2/Logits/Conv2d_1c_1x1/biases']:
+        for s_search in ["MobilenetV2/Logits/Conv2d_1c_1x1/weights", "MobilenetV2/Logits/Conv2d_1c_1x1/biases"]:
             for _key in key_to_numpy:
                 if _key == s_search:
                     key_to_numpy.pop(_key)
@@ -162,7 +147,7 @@ class Orchids52Mobilenet140(object):
                 result = True
 
         if not result:
-            latest_checkpoint = kwargs.pop('checkpoint_path')
+            latest_checkpoint = kwargs.pop("checkpoint_path")
             if latest_checkpoint:
                 var_loaded = self.load_from_v1(latest_checkpoint)
                 all_vars = self.model.weights
@@ -179,7 +164,7 @@ class Orchids52Mobilenet140(object):
     def get_step_number_from_latest_checkpoint(self):
         try:
             _, checkpoint_manager = self.checkpoint
-            index = checkpoint_manager.latest_checkpoint.index('ckpt-')
+            index = checkpoint_manager.latest_checkpoint.index("ckpt-")
             step = checkpoint_manager.latest_checkpoint[index:][5:]
             step = int(step)
         except:
@@ -226,22 +211,18 @@ class Orchids52Mobilenet140(object):
             for p in self.predict_layers:
                 p.trainable = trainable
 
-    def save(self,
-             filepath,
-             overwrite=True,
-             include_optimizer=True,
-             save_format=None,
-             signatures=None,
-             options=None):
-        model_path = os.path.join(filepath, 'model')
+    def save(self, filepath, overwrite=True, include_optimizer=True, save_format=None, signatures=None, options=None):
+        model_path = os.path.join(filepath, "model")
         if not tf.io.gfile.exists(model_path):
             tf.io.gfile.mkdir(model_path)
-        self.model.save(filepath=model_path,
-                        overwrite=overwrite,
-                        include_optimizer=include_optimizer,
-                        save_format=save_format,
-                        signatures=signatures,
-                        options=options)
+        self.model.save(
+            filepath=model_path,
+            overwrite=overwrite,
+            include_optimizer=include_optimizer,
+            save_format=save_format,
+            signatures=signatures,
+            options=options,
+        )
 
 
 class PreprocessLayer(keras.layers.Layer):
@@ -249,28 +230,32 @@ class PreprocessLayer(keras.layers.Layer):
         super(PreprocessLayer, self).__init__()
 
     def call(self, inputs, **kwargs):
-        training = kwargs.pop('training')
+        training = kwargs.pop("training")
 
-        # mode = kwargs.pop('mode', 'horizontal')
-        # factor = kwargs.pop('factor', 0.2)
-        # if training:
-        #     data_augmentation = keras.Sequential([
-        #         keras.layers.experimental.preprocessing.RandomFlip(mode),
-        #         keras.layers.experimental.preprocessing.RandomRotation(factor),
-        #     ])
-        #     inputs = data_augmentation(inputs, training=training)
-        #     inputs = tf.image.convert_image_dtype(inputs, dtype=tf.float32)
+        if training:
+            sel = tf.random.uniform([], maxval=4, dtype=tf.int32)
+            inputs = tf.switch_case(sel, branch_fns={
+                0: lambda: tf.image.random_flip_left_right(inputs),
+                1: lambda: tf.image.random_flip_up_down(inputs),
+                2: lambda: tf.image.rot90(inputs),
+            }, default=lambda: inputs)
 
-        if not training:
-            shape = inputs.get_shape().as_list()
-            central_fraction = kwargs.pop('central_fraction', 0.875)
-            inputs = tf.image.central_crop(inputs, central_fraction=central_fraction)
-            inputs = tf.image.resize(images=inputs,
-                                     size=(shape[1], shape[2]),
-                                     method=tf.image.ResizeMethod.BILINEAR)
+            sel = tf.random.uniform([], maxval=5, dtype=tf.int32)
+            inputs = tf.switch_case(sel, branch_fns={
+                0: lambda: tf.image.random_brightness(inputs, max_delta=0.5),
+                1: lambda: tf.image.random_saturation(inputs, lower=1, upper=5),
+                2: lambda: tf.image.random_contrast(inputs, lower=0.2, upper=0.5),
+                3: lambda: tf.image.random_hue(inputs, max_delta=0.2),
+            }, default=lambda: inputs)
 
-        inputs = tf.subtract(inputs, 0.5)
-        inputs = tf.multiply(inputs, 2.0)
+        shape = inputs.get_shape().as_list()
+        central_fraction = kwargs.pop("central_fraction", 0.875)
+        inputs = tf.image.central_crop(inputs, central_fraction=central_fraction)
+        inputs = tf.image.resize(images=inputs, size=(shape[1], shape[2]), method=tf.image.ResizeMethod.BILINEAR)
+
+        #inputs = tf.subtract(inputs, 0.5)
+        #inputs = tf.multiply(inputs, 2.0)
+
         return inputs
 
 
@@ -279,18 +264,20 @@ class PredictionLayer(keras.layers.Layer):
         super(PredictionLayer, self).__init__()
         self.global_average_pooling = global_pool(shape=shape)
         self.dropout = keras.layers.Dropout(dropout_ratio)
-        self.dense = keras.layers.Conv2D(
-            num_classes,
-            kernel_size=1,
-            padding='same',
-            use_bias=True,
-            activation=activation,
-            bias_initializer=tf.zeros_initializer(),
-            name='dense-{}'.format(num_classes))
+        # self.dense = keras.layers.Conv2D(
+        #     num_classes,
+        #     kernel_size=1,
+        #     padding="same",
+        #     use_bias=True,
+        #     activation=activation,
+        #     bias_initializer=tf.zeros_initializer(),
+        #     name="dense-{}".format(num_classes),
+        # )
+        self.dense = keras.layers.Dense(num_classes)
         self.prediction_fn = keras.layers.Softmax()
 
     def call(self, inputs, **kwargs):
-        training = kwargs.pop('training')
+        training = kwargs.pop("training")
         inputs = self.global_average_pooling(inputs, training=training)
         if training:
             inputs = self.dropout(inputs, training=training)
@@ -302,38 +289,34 @@ class PredictionLayer(keras.layers.Layer):
 
 def global_pool(shape, pool_op=keras.layers.AvgPool2D):
     pool_size = [shape[1], shape[2]]
-    output = pool_op(pool_size=pool_size, strides=[1, 1], padding='valid')
+    output = pool_op(pool_size=pool_size, strides=[1, 1], padding="valid")
     return output
 
 
-def create_mobilenet_v2_14(num_classes,
-                           optimizer,
-                           loss_fn,
-                           training=False,
-                           **kwargs):
-    step = kwargs.pop('step') if 'step' in kwargs else nets.utils.TRAIN_TEMPLATE.format(1)
+def create_mobilenet_v2_14(num_classes, optimizer, loss_fn, training=False, **kwargs):
+    step = kwargs.pop("step") if "step" in kwargs else nets.utils.TRAIN_TEMPLATE.format(1)
 
     inputs = keras.Input(shape=nets.mobilenet_v2.IMG_SHAPE_224)
     preprocess_layer = PreprocessLayer()
     mobilenet = mobilenet_v2_orchids.create_mobilenet_v2(
-        input_shape=nets.mobilenet_v2.IMG_SHAPE_224,
-        alpha=1.4,
-        include_top=False,
-        weights=None)
+        input_shape=nets.mobilenet_v2.IMG_SHAPE_224, alpha=1.4, include_top=False, weights=None
+    )
     processed_inputs = preprocess_layer(inputs, training=training)
     mobilenet_logits = mobilenet(processed_inputs, training=training)
 
-    prediction_layer = PredictionLayer(num_classes=num_classes,
-                                       shape=mobilenet_logits.get_shape().as_list())
+    prediction_layer = PredictionLayer(num_classes=num_classes, shape=mobilenet_logits.get_shape().as_list())
 
     outputs = prediction_layer(mobilenet_logits, training=training)
 
-    model = Orchids52Mobilenet140(inputs, outputs,
-                                  optimizer=optimizer,
-                                  loss_fn=loss_fn,
-                                  mobilenet=mobilenet,
-                                  predict_layers=[prediction_layer],
-                                  training=training,
-                                  step=step)
+    model = Orchids52Mobilenet140(
+        inputs,
+        outputs,
+        optimizer=optimizer,
+        loss_fn=loss_fn,
+        mobilenet=mobilenet,
+        predict_layers=[prediction_layer],
+        training=training,
+        step=step,
+    )
 
     return model

@@ -11,12 +11,13 @@
       "program": "train.py",
       "console": "integratedTerminal",
       "args": [
-        "--start_state=4",
-        "--end_state=5",
-        "--dataset=orchids52_v1_tf",
+        "--start_state=1",
+        "--end_state=2",
+        "--dataset=orchids52_v2_tf",
         "--model=mobilenet_v2_140_orchids52",
-        "--learning_rate=0.001",
-        "--total_epochs=20"
+        "--learning_rate=0.1",
+        "--total_epochs=20",
+        "--aug_method=normal"
       ]
     },
     {
@@ -33,7 +34,9 @@
       "request": "launch",
       "program": "graph.py",
       "console": "integratedTerminal",
-      "args": ["--file=/Volumes/Data/tmp/orchids-models/orchids2019/mobilenet_v2_140_orchids52/11-15-2020-15-20-31-history-pretrain1"]
+      "args": [
+        "--file=/Volumes/Data/tmp/orchids-models/orchids2019/mobilenet_v2_140_orchids52/11-15-2020-15-20-31-history-pretrain1"
+      ]
     }
   ]
 }
