@@ -13,6 +13,14 @@ import tensorflow.keras as keras
 from nets import mobilenet_v2_orchids
 
 
+def preprocess_input(image_data, central_fraction=0.875):
+    image = tf.image.decode_jpeg(image_data, channels=3)
+    image = tf.image.convert_image_dtype(image, dtype=tf.float32)
+    image = tf.image.central_crop(image, central_fraction=central_fraction)
+    image = tf.image.resize(images=image, size=nets.mobilenet_v2.IMG_SIZE_224, method=tf.image.ResizeMethod.BILINEAR)
+    return tf.expand_dims(image, axis=0)
+
+
 class Orchids52Mobilenet140(object):
     def __init__(self, inputs, outputs, optimizer, loss_fn, mobilenet, predict_layers, training, step):
         super(Orchids52Mobilenet140, self).__init__()
@@ -76,67 +84,74 @@ class Orchids52Mobilenet140(object):
             _, checkpoint_manager = checkpoint
             checkpoint_manager.save()
 
-    def load_from_v1(self, latest_checkpoint):
-        # Try reading on v1 data format
+    def load_from_v1(self, latest_checkpoint, model_name="MobilenetV2"):
         reader = tf.compat.v1.train.NewCheckpointReader(latest_checkpoint)
         var_to_shape_map = reader.get_variable_to_shape_map()
-        value_to_load = []
+        value_to_load = {}
         key_to_numpy = {}
         for key in sorted(var_to_shape_map.items()):
             key_to_numpy.update({key[0]: key[1]})
 
-        keys = [
-            "weights",
-            "depthwise_weights",
-            "BatchNorm/beta",
-            "BatchNorm/gamma",
-            "BatchNorm/moving_mean",
-            "BatchNorm/moving_variance",
-        ]
-        expds = ["expand", "depthwise", "project"]
+        key_maps1 = {
+            "Conv1/kernel": "Conv/weights",
+            "bn_Conv1/gamma": "Conv/BatchNorm/gamma",
+            "bn_Conv1/beta": "Conv/BatchNorm/beta",
+            "bn_Conv1/moving_mean": "Conv/BatchNorm/moving_mean",
+            "bn_Conv1/moving_variance": "Conv/BatchNorm/moving_variance",
+            "expanded_conv_depthwise/depthwise_kernel": "expanded_conv/depthwise/depthwise_weights",
+            "expanded_conv_depthwise_BN/gamma": "expanded_conv/depthwise/BatchNorm/gamma",
+            "expanded_conv_depthwise_BN/beta": "expanded_conv/depthwise/BatchNorm/beta",
+            "expanded_conv_depthwise_BN/moving_mean": "expanded_conv/depthwise/BatchNorm/moving_mean",
+            "expanded_conv_depthwise_BN/moving_variance": "expanded_conv/depthwise/BatchNorm/moving_variance",
+            "expanded_conv_project/kernel": "expanded_conv/project/weights",
+            "expanded_conv_project_BN/gamma": "expanded_conv/project/BatchNorm/gamma",
+            "expanded_conv_project_BN/beta": "expanded_conv/project/BatchNorm/beta",
+            "expanded_conv_project_BN/moving_mean": "expanded_conv/project/BatchNorm/moving_mean",
+            "expanded_conv_project_BN/moving_variance": "expanded_conv/project/BatchNorm/moving_variance",
+            "Conv_1/kernel": "Conv_1/weights",
+            "Conv_1_bn/gamma": "Conv_1/BatchNorm/gamma",
+            "Conv_1_bn/beta": "Conv_1/BatchNorm/beta",
+            "Conv_1_bn/moving_mean": "Conv_1/BatchNorm/moving_mean",
+            "Conv_1_bn/moving_variance": "Conv_1/BatchNorm/moving_variance",
+            "prediction_layer/prediction_layer/kernel": "Logits/Conv2d_1c_1x1/weights",
+            "prediction_layer/prediction_layer/bias": "Logits/Conv2d_1c_1x1/biases",
+        }
+        key_maps2 = {
+            "block_{}_expand/kernel": "expanded_conv_{}/expand/weights",
+            "block_{}_expand_BN/gamma": "expanded_conv_{}/expand/BatchNorm/gamma",
+            "block_{}_expand_BN/beta": "expanded_conv_{}/expand/BatchNorm/beta",
+            "block_{}_expand_BN/moving_mean": "expanded_conv_{}/expand/BatchNorm/moving_mean",
+            "block_{}_expand_BN/moving_variance": "expanded_conv_{}/expand/BatchNorm/moving_variance",
+            "block_{}_depthwise/depthwise_kernel": "expanded_conv_{}/depthwise/depthwise_weights",
+            "block_{}_depthwise_BN/gamma": "expanded_conv_{}/depthwise/BatchNorm/gamma",
+            "block_{}_depthwise_BN/beta": "expanded_conv_{}/depthwise/BatchNorm/beta",
+            "block_{}_depthwise_BN/moving_mean": "expanded_conv_{}/depthwise/BatchNorm/moving_mean",
+            "block_{}_depthwise_BN/moving_variance": "expanded_conv_{}/depthwise/BatchNorm/moving_variance",
+            "block_{}_project/kernel": "expanded_conv_{}/project/weights",
+            "block_{}_project_BN/gamma": "expanded_conv_{}/project/BatchNorm/gamma",
+            "block_{}_project_BN/beta": "expanded_conv_{}/project/BatchNorm/beta",
+            "block_{}_project_BN/moving_mean": "expanded_conv_{}/project/BatchNorm/moving_mean",
+            "block_{}_project_BN/moving_variance": "expanded_conv_{}/project/BatchNorm/moving_variance",
 
-        for k1 in keys:
-            for _key in key_to_numpy:
-                if _key.startswith("MobilenetV2/Conv/{}".format(k1)):
-                    key_to_numpy.pop(_key)
-                    value = reader.get_tensor(_key)
-                    value_to_load.append(value)
-                    break
+        }
 
-        for i in range(0, 17):
-            for sub in expds:
-                for k2 in keys:
-                    if i == 0:
-                        s_search = "MobilenetV2/expanded_conv/{}/{}".format(sub, k2)
-                    else:
-                        s_search = "MobilenetV2/expanded_conv_{}/{}/{}".format(i, sub, k2)
-                    for _key in key_to_numpy:
-                        if _key.startswith(s_search):
-                            key_to_numpy.pop(_key)
-                            value = reader.get_tensor(_key)
-                            value_to_load.append(value)
-                            break
+        for key in key_maps1:
+            _key = model_name + "/" + key_maps1[key]
+            if _key in key_to_numpy:
+                value = reader.get_tensor(_key)
+                value_to_load[key] = value
+            else:
+                print("Can't find the key: {}".format(_key))
 
-        for k1 in keys:
-            for _key in key_to_numpy:
-                if _key.startswith("MobilenetV2/Conv_1/{}".format(k1)):
-                    key_to_numpy.pop(_key)
-                    value = reader.get_tensor(_key)
-                    value_to_load.append(value)
-                    break
-
-        for s_search in ["MobilenetV2/Logits/Conv2d_1c_1x1/weights", "MobilenetV2/Logits/Conv2d_1c_1x1/biases"]:
-            for _key in key_to_numpy:
-                if _key == s_search:
-                    key_to_numpy.pop(_key)
-                    value = reader.get_tensor(_key)
-                    value_to_load.append(value)
-                    break
-
-        for _key in key_to_numpy:
-            value = reader.get_tensor(_key)
-            value_to_load.append(value)
-
+        for i in range(1, 17):
+            for key in key_maps2:
+                _key = model_name + "/" + key_maps2[key]
+                _key_v = _key.format(i)
+                if _key_v in key_to_numpy:
+                    value = reader.get_tensor(_key_v)
+                    value_to_load[key.format(i)] = value
+                else:
+                    raise Exception("Can't find the key: {}".format(_key))
         return value_to_load
 
     def restore_model_from_latest_checkpoint_if_exist(self, **kwargs):
@@ -152,15 +167,22 @@ class Orchids52Mobilenet140(object):
             latest_checkpoint = kwargs.pop("checkpoint_path")
             if latest_checkpoint:
                 var_loaded = self.load_from_v1(latest_checkpoint)
+                var_loaded_fixed_name = {}
+                for key in var_loaded:
+                    var_loaded_fixed_name.update({key + ":0": var_loaded[key]})
                 all_vars = self.model.weights
                 for i, var in enumerate(all_vars):
-                    saved_var = var_loaded[i]
-                    if var.shape != saved_var.shape:
-                        saved_var = np.squeeze(saved_var)
+                    print("Loading: ", var.name, var.shape)
+                    if var.name in var_loaded_fixed_name:
+                        saved_var = var_loaded_fixed_name[var.name]
                         if var.shape != saved_var.shape:
-                            raise Exception("Incompatible shapes")
-                    tf.assert_equal(var.shape, saved_var.shape)
-                    var.assign(saved_var)
+                            saved_var = np.squeeze(saved_var)
+                            if var.shape != saved_var.shape:
+                                raise Exception("Incompatible shapes")
+                        tf.assert_equal(var.shape, saved_var.shape)
+                        var.assign(saved_var)
+                    else:
+                        print("Can't find: {}".format(var.name))
                 return True
             else:
                 return False
@@ -175,6 +197,9 @@ class Orchids52Mobilenet140(object):
             return 1
         else:
             return step
+
+    def load_weights(self, checkpoint_path):
+        self.model.load_weights(checkpoint_path)
 
     def restore_model_variables(self, load_from_checkpoint_first=True, checkpoint_path=None):
         step = 1
@@ -252,14 +277,8 @@ class PreprocessLayer(keras.layers.Layer):
                 3: lambda: tf.image.random_hue(inputs, max_delta=0.2),
             }, default=lambda: inputs)
 
-        shape = inputs.get_shape().as_list()
-        central_fraction = kwargs.pop("central_fraction", 0.875)
-        inputs = tf.image.central_crop(inputs, central_fraction=central_fraction)
-        inputs = tf.image.resize(images=inputs, size=(shape[1], shape[2]), method=tf.image.ResizeMethod.BILINEAR)
-
-        #inputs = tf.subtract(inputs, 0.5)
-        #inputs = tf.multiply(inputs, 2.0)
-
+        inputs = tf.subtract(inputs, 0.5)
+        inputs = tf.multiply(inputs, 2.0)
         return inputs
 
 
@@ -277,7 +296,7 @@ class PredictionLayer(keras.layers.Layer):
         #     bias_initializer=tf.zeros_initializer(),
         #     name="dense-{}".format(num_classes),
         # )
-        self.dense = keras.layers.Dense(num_classes)
+        self.dense = keras.layers.Dense(num_classes, name="prediction_layer")
         self.prediction_fn = keras.layers.Softmax()
 
     def call(self, inputs, **kwargs):

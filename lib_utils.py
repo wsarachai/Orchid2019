@@ -7,7 +7,8 @@ import copy
 import nets
 import tensorflow as tf
 
-logging = tf.compat.v1.logging
+from absl import app
+from absl import logging
 
 
 def get_checkpoint_file(checkpoint_dir, name):
@@ -36,7 +37,7 @@ def start(start_fn):
     # physical_devices = tf.config.experimental.list_physical_devices('GPU')
     # if len(physical_devices) > 0:
     #    config = tf.config.experimental.set_memory_growth(physical_devices[0], True)
-    tf.compat.v1.app.run(start_fn)
+    app.run(start_fn)
 
 
 def config_learning_rate(learning_rate=0.001, exp_decay=False, **kwargs):

@@ -6,17 +6,16 @@ import os
 import re
 import sys
 import collections
-import tensorflow as tf
 import numpy as np
-
+import tensorflow as tf
 import lib_utils
+
+from absl import flags
+from absl import logging
 from data import data_utils
 from nets import utils
 from nets.mobilenet_v2_140 import preprocess_input
 
-flags = tf.compat.v1.flags
-logging = tf.compat.v1.logging
-FLAGS = flags.FLAGS
 
 flags.DEFINE_boolean("bash", False, "Execute from bash")
 
@@ -40,6 +39,7 @@ flags.DEFINE_string(
     "The directory where the dataset images are locate",
 )
 
+FLAGS = flags.FLAGS
 
 def create_image_lists(image_dir):
     if not tf.io.gfile.exists(image_dir):
@@ -84,58 +84,11 @@ def create_image_lists(image_dir):
     return result
 
 
-def main1(unused_argv):
-    logging.debug(unused_argv)
-    workspace_path = os.environ["WORKSPACE"] if "WORKSPACE" in os.environ else "/Volumes/Data/tmp"
-    data_path = os.environ["DATA_DIR"] if "DATA_DIR" in os.environ else "/Volumes/Data/_dataset/_orchids_dataset"
-    data_dir = os.path.join(data_path, "orchids52_data")
-    checkpoint_path = os.path.join(workspace_path, "orchids-models", "orchids2019", FLAGS.model)
-    print("Model: {}".format(FLAGS.model))
-    print("Workspace: {}".format(workspace_path))
-    print("Data dir: {}".format(data_dir))
-    print("Checkpoint path: {}".format(checkpoint_path))
-
-    batch_size = 32
-    if FLAGS.train_step > 1:
-        batch_size = FLAGS.batch_size // 4
-    print(batch_size)
-
-    load_dataset = data_utils.dataset_mapping[FLAGS.dataset]
-    create_model = utils.nets_mapping[FLAGS.model]
-
-    test_ds = load_dataset(split="test", batch_size=batch_size, root_path=data_dir)
-    print(test_ds.size)
-    print(test_ds.num_of_classes)
-
-    training_step = utils.TRAIN_TEMPLATE.format(step=FLAGS.train_step)
-    print(training_step)
-
-    model = create_model(
-        num_classes=test_ds.num_of_classes, optimizer=None, loss_fn=None, batch_size=batch_size, step=training_step
-    )
-
-    train_model = lib_utils.TrainClassifier(model=model, batch_size=batch_size)
-
-    model.restore_model_variables(checkpoint_path=FLAGS.checkpoint_path)
-    model.summary()
-
-    print("Test accuracy: ")
-    train_model.evaluate(
-        datasets=test_ds,
-        bash=FLAGS.bash,
-    )
-
-
 def main(unused_argv):
     logging.debug(unused_argv)
     dataset_images = create_image_lists(image_dir=FLAGS.image_dir)
     load_dataset = data_utils.dataset_mapping[FLAGS.dataset]
-    create_model = utils.nets_mapping[FLAGS.model]
-
-    model = create_model(num_classes=load_dataset.num_of_classes, optimizer=None, loss_fn=None, batch_size=1, step="")
-    accuracy_metric = tf.keras.metrics.CategoricalAccuracy(name="train_accuracy")
-    model.compile(metrics=[accuracy_metric])
-    model.restore_model_variables(checkpoint_path=FLAGS.checkpoint_path)
+    model = tf.keras.models.load_model(FLAGS.checkpoint_path)
     model.summary()
 
     count = 0
@@ -146,7 +99,7 @@ def main(unused_argv):
             filename = os.path.join(FLAGS.image_dir, data["dir"], file)
             image_data = tf.io.gfile.GFile(filename, "rb").read()
             inputs = preprocess_input(image_data)
-            result = model.model(inputs).numpy()
+            result = model(inputs).numpy()
 
             count += 1
             predict = np.argmax(result, axis=1)[0]
