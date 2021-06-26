@@ -54,7 +54,12 @@ class Orchids52Mobilenet140STN(mobilenet_140.Orchids52Mobilenet140):
             )
             self.stn_dense_checkpoint = (stn_dense_checkpoint, stn_dense_checkpoint_manager)
 
-    def load_from_v1(self, latest_checkpoint, model_name="mobilenet_v2_140_stn_v15"):
+    def load_from_v1(self,
+                     latest_checkpoint,
+                     target_model="mobilenetv2",
+                     model_name="mobilenet_v2_140_stn_v15",
+                     **kwargs):
+
         var_maps = {
             "stn_conv2d_1/kernel": "dense-1/conv2d_resize_128/weights",
             "stn_conv2d_1/bias": "dense-1/conv2d_resize_128/biases",
@@ -79,9 +84,15 @@ class Orchids52Mobilenet140STN(mobilenet_140.Orchids52Mobilenet140):
             "branch_block/prediction_layer_2/prediction_layer/bias": "Logits/Conv2d_1c_1x1-2/biases",
         }
 
-        local_var_loaded = super().load_from_v1(latest_checkpoint, model_name + "/localization_params/MobilenetV2")
-        extract_var_loaded = super().load_from_v1(latest_checkpoint, model_name + "/features-extraction/MobilenetV2")
-        extract_comm_var_loaded = super().load_from_v1(latest_checkpoint, model_name + "/features-extraction-common/MobilenetV2")
+        local_var_loaded = super().load_from_v1(
+            latest_checkpoint, target_model + "_stn_base_1.40_224_",
+            model_name + "/localization_params/MobilenetV2", include_prediction_layer=False)
+        extract_var_loaded = super().load_from_v1(
+            latest_checkpoint, target_model + "_global_branch_1.40_224_",
+            model_name + "/features-extraction/MobilenetV2" , include_prediction_layer=False)
+        extract_comm_var_loaded = super().load_from_v1(
+            latest_checkpoint, target_model + "_shared_branch_1.40_224_",
+            model_name + "/features-extraction-common/MobilenetV2", include_prediction_layer=False)
 
         value_to_load = {}
         reader = tf.compat.v1.train.NewCheckpointReader(latest_checkpoint)
@@ -99,11 +110,11 @@ class Orchids52Mobilenet140STN(mobilenet_140.Orchids52Mobilenet140):
                 print("Can't find the key: {}".format(_key))
 
         for key in local_var_loaded:
-            value_to_load["mobilenetv2_stn_base_1.40_224_" + key] = local_var_loaded[key]
+            value_to_load[key] = local_var_loaded[key]
         for key in extract_var_loaded:
-            value_to_load["mobilenetv2_global_branch_1.40_224_" + key] = extract_var_loaded[key]
+            value_to_load[key] = extract_var_loaded[key]
         for key in extract_comm_var_loaded:
-            value_to_load["mobilenetv2_shared_branch_1.40_224_" + key] = extract_comm_var_loaded[key]
+            value_to_load[key] = extract_comm_var_loaded[key]
 
         return value_to_load
 
@@ -186,9 +197,9 @@ class BranchBlock(keras.layers.Layer):
             input_shape=mobilenet.IMG_SHAPE_224, alpha=1.4, include_top=False, weights="imagenet", sub_name="shared_branch"
         )
         self.branches_prediction_models = [
-            mobilenet_140.PredictionLayer(num_classes=num_classes, shape=[1, 7, 7], activation="softmax"),
-            mobilenet_140.PredictionLayer(num_classes=num_classes, shape=[1, 7, 7], activation="softmax"),
-            mobilenet_140.PredictionLayer(num_classes=num_classes, shape=[1, 7, 7], activation="softmax"),
+            mobilenet_140.PredictionLayer(num_classes=num_classes, activation="softmax"),
+            mobilenet_140.PredictionLayer(num_classes=num_classes, activation="softmax"),
+            mobilenet_140.PredictionLayer(num_classes=num_classes, activation="softmax"),
         ]
 
     def call(self, inputs, **kwargs):
@@ -462,7 +473,7 @@ def create_orchid_mobilenet_v2_15(num_classes, optimizer, loss_fn, training=Fals
 
     else:
         prediction_layer = mobilenet_140.PredictionLayer(
-            num_classes=num_classes, shape=[1, 7, 7], activation="softmax"
+            num_classes=num_classes, activation="softmax"
         )
         branches_prediction_models.append(prediction_layer)
         mobilenet_logits = stn_base_model(processed_inputs, training=training)

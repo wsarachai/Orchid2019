@@ -84,12 +84,20 @@ class Orchids52Mobilenet140(object):
             _, checkpoint_manager = checkpoint
             checkpoint_manager.save()
 
-    def load_from_v1(self, latest_checkpoint, model_name="MobilenetV2"):
+    def load_from_v1(self,
+                     latest_checkpoint,
+                     target_model="mobilenetv2_01_1.40_224_",
+                     model_name="MobilenetV2",
+                     **kwargs):
+
+        include_prediction_layer = kwargs.get("include_prediction_layer", True)
+
         reader = tf.compat.v1.train.NewCheckpointReader(latest_checkpoint)
         var_to_shape_map = reader.get_variable_to_shape_map()
         value_to_load = {}
         key_to_numpy = {}
         for key in sorted(var_to_shape_map.items()):
+            print(key)
             key_to_numpy.update({key[0]: key[1]})
 
         key_maps1 = {
@@ -113,10 +121,12 @@ class Orchids52Mobilenet140(object):
             "Conv_1_bn/beta": "Conv_1/BatchNorm/beta",
             "Conv_1_bn/moving_mean": "Conv_1/BatchNorm/moving_mean",
             "Conv_1_bn/moving_variance": "Conv_1/BatchNorm/moving_variance",
+        }
+        key_maps2 = {
             "prediction_layer/prediction_layer/kernel": "Logits/Conv2d_1c_1x1/weights",
             "prediction_layer/prediction_layer/bias": "Logits/Conv2d_1c_1x1/biases",
         }
-        key_maps2 = {
+        key_maps3 = {
             "block_{}_expand/kernel": "expanded_conv_{}/expand/weights",
             "block_{}_expand_BN/gamma": "expanded_conv_{}/expand/BatchNorm/gamma",
             "block_{}_expand_BN/beta": "expanded_conv_{}/expand/BatchNorm/beta",
@@ -139,19 +149,28 @@ class Orchids52Mobilenet140(object):
             _key = model_name + "/" + key_maps1[key]
             if _key in key_to_numpy:
                 value = reader.get_tensor(_key)
-                value_to_load[key] = value
+                value_to_load[target_model + key] = value
             else:
                 print("Can't find the key: {}".format(_key))
 
-        for i in range(1, 17):
+        if include_prediction_layer:
             for key in key_maps2:
                 _key = model_name + "/" + key_maps2[key]
-                _key_v = _key.format(i)
+                if _key in key_to_numpy:
+                    value = reader.get_tensor(_key)
+                    value_to_load[key] = value
+                else:
+                    print("Can't find the key: {}".format(_key))
+
+        for i in range(1, 17):
+            for key in key_maps3:
+                k = model_name + "/" + key_maps3[key]
+                _key_v = k.format(i)
                 if _key_v in key_to_numpy:
                     value = reader.get_tensor(_key_v)
-                    value_to_load[key.format(i)] = value
+                    value_to_load[target_model + key.format(i)] = value
                 else:
-                    raise Exception("Can't find the key: {}".format(_key))
+                    raise Exception("Can't find the key: {}".format(_key_v))
         return value_to_load
 
     def restore_model_from_latest_checkpoint_if_exist(self, **kwargs):
@@ -166,9 +185,10 @@ class Orchids52Mobilenet140(object):
         if not result:
             latest_checkpoint = kwargs.pop("checkpoint_path")
             if latest_checkpoint:
-                var_loaded = self.load_from_v1(latest_checkpoint)
+                var_loaded = self.load_from_v1(latest_checkpoint, **kwargs)
                 var_loaded_fixed_name = {}
                 for key in var_loaded:
+                    print(key)
                     var_loaded_fixed_name.update({key + ":0": var_loaded[key]})
                 all_vars = self.model.weights
                 for i, var in enumerate(all_vars):
@@ -176,9 +196,7 @@ class Orchids52Mobilenet140(object):
                     if var.name in var_loaded_fixed_name:
                         saved_var = var_loaded_fixed_name[var.name]
                         if var.shape != saved_var.shape:
-                            saved_var = np.squeeze(saved_var)
-                            if var.shape != saved_var.shape:
-                                raise Exception("Incompatible shapes")
+                            raise Exception("Incompatible shapes")
                         tf.assert_equal(var.shape, saved_var.shape)
                         var.assign(saved_var)
                     else:
@@ -283,20 +301,21 @@ class PreprocessLayer(keras.layers.Layer):
 
 
 class PredictionLayer(keras.layers.Layer):
-    def __init__(self, num_classes, shape, activation=None, dropout_ratio=0.2):
+    def __init__(self, num_classes, activation=None, dropout_ratio=0.2):
         super(PredictionLayer, self).__init__()
-        self.global_average_pooling = global_pool(shape=shape)
+        #self.global_average_pooling = global_pool(shape=shape)
+        self.global_average_pooling = tf.keras.layers.GlobalAveragePooling2D()
         self.dropout = keras.layers.Dropout(dropout_ratio)
-        # self.dense = keras.layers.Conv2D(
-        #     num_classes,
-        #     kernel_size=1,
-        #     padding="same",
-        #     use_bias=True,
-        #     activation=activation,
-        #     bias_initializer=tf.zeros_initializer(),
-        #     name="dense-{}".format(num_classes),
-        # )
-        self.dense = keras.layers.Dense(num_classes, name="prediction_layer")
+        self.dense = keras.layers.Conv2D(
+            num_classes,
+            kernel_size=1,
+            padding="same",
+            use_bias=True,
+            activation=activation,
+            bias_initializer=tf.zeros_initializer(),
+            name="prediction_layer",
+        )
+        # self.dense = keras.layers.Dense(num_classes, name="prediction_layer")
         self.prediction_fn = keras.layers.Softmax()
 
     def call(self, inputs, **kwargs):
@@ -304,6 +323,8 @@ class PredictionLayer(keras.layers.Layer):
         inputs = self.global_average_pooling(inputs, training=training)
         if training:
             inputs = self.dropout(inputs, training=training)
+        inputs = tf.expand_dims(input=inputs, axis=1)
+        inputs = tf.expand_dims(input=inputs, axis=1)
         inputs = self.dense(inputs, training=training)
         inputs = tf.squeeze(inputs, [1, 2])
         inputs = self.prediction_fn(inputs, training=training)
@@ -327,7 +348,7 @@ def create_mobilenet_v2_14(num_classes, optimizer, loss_fn, training=False, **kw
     processed_inputs = preprocess_layer(inputs, training=training)
     mobilenet_logits = mobilenet(processed_inputs, training=training)
 
-    prediction_layer = PredictionLayer(num_classes=num_classes, shape=mobilenet_logits.get_shape().as_list())
+    prediction_layer = PredictionLayer(num_classes=num_classes)
 
     outputs = prediction_layer(mobilenet_logits, training=training)
 
