@@ -24,17 +24,6 @@ def preprocess_input(image_data, central_fraction=0.875):
     image = tf.image.resize(images=image, size=nets.mobilenet_v2.IMG_SIZE_224, method=tf.image.ResizeMethod.BILINEAR)
     return tf.expand_dims(image, axis=0)
 
-    # image = tf.image.convert_image_dtype(image, dtype=tf.float32)
-    # image = tf.image.central_crop(image, central_fraction=central_fraction)
-    # image = tf.expand_dims(image, 0)
-    # image = tf.compat.v1.image.resize_bilinear(image, nets.mobilenet_v2.IMG_SIZE_224, align_corners=False)
-    # print(image[0][0][0])
-    #
-    # image = tf.subtract(image, 0.5)
-    # image = tf.multiply(image, 2.0)
-    #
-    # return image
-
 
 class Orchids52Mobilenet140(object):
     def __init__(self, inputs, outputs, optimizer, loss_fn, mobilenet, predict_layers, training, step):
