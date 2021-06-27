@@ -35,6 +35,8 @@ flags.DEFINE_string("model", MOBILENET_V2_140_ORCHIDS52, "Model")
 
 flags.DEFINE_string("checkpoint_path", None, "Checkpoint path")
 
+flags.DEFINE_string("dataset_type", "h5py", "Dataset type")
+
 flags.DEFINE_string(
     "image_dir",
     "/Users/watcharinsarachai/Documents/_datasets/orchids52_data/test/",

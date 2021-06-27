@@ -317,14 +317,15 @@ class PrintingNode(tf.keras.layers.Layer):
         return tf.compat.v1.Print(inputs, [inputs])
 
 
-def create_orchid_mobilenet_v2_15(num_classes, optimizer, loss_fn, training=False, drop_out_prop=0.8, **kwargs):
+def create_orchid_mobilenet_v2_15(num_classes, optimizer=None, loss_fn=None, training=False, drop_out_prop=0.8, **kwargs):
     stn_dense = None
     branch_base_model = None
     boundary_loss = None
     estimate_block = None
     branches_prediction_models = []
     step = kwargs.pop("step") if "step" in kwargs else ""
-    batch_size = kwargs.pop("batch_size") if "batch_size" in kwargs else 32
+    batch_size = kwargs.pop("batch_size") if "batch_size" in kwargs else 1
+    activation = kwargs.pop("activation") if "activation" in kwargs else None
 
     inputs = keras.Input(shape=IMG_SHAPE_224)
     preprocess_layer = PreprocessLayer()
@@ -411,6 +412,9 @@ def create_orchid_mobilenet_v2_15(num_classes, optimizer, loss_fn, training=Fals
         branches_prediction_models.append(prediction_layer)
         mobilenet_logits = stn_base_model(processed_inputs, training=training)
         outputs = prediction_layer(mobilenet_logits, training=training)
+
+    if activation == "softmax":
+        outputs = tf.keras.activations.softmax(outputs)
 
     model = Orchids52Mobilenet140STN(
         inputs,
