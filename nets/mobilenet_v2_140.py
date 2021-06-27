@@ -9,8 +9,8 @@ import lib_utils
 import tensorflow as tf
 import tensorflow.keras as keras
 
-from nets.mobilenet_v2_orchids import IMG_SHAPE_224
-from nets.mobilenet_v2_orchids import create_mobilenet_v2
+from nets.mobilenet_v2 import IMG_SHAPE_224
+from nets.mobilenet_v2 import create_mobilenet_v2
 
 
 def preprocess_input(image_data, central_fraction=0.875):

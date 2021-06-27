@@ -12,9 +12,9 @@ import nets
 from absl import logging
 from tensorflow.python.keras import initializers
 from tensorflow.python.keras import activations
-from nets.mobilenet_v2_orchids import IMG_SHAPE_224
-from nets.mobilenet_v2_orchids import default_image_size
-from nets.mobilenet_v2_orchids import create_mobilenet_v2
+from nets.mobilenet_v2 import IMG_SHAPE_224
+from nets.mobilenet_v2 import default_image_size
+from nets.mobilenet_v2 import create_mobilenet_v2
 from nets.mobilenet_v2_140 import PreprocessLayer
 from nets.mobilenet_v2_140 import PredictionLayer
 from nets.mobilenet_v2_140 import Orchids52Mobilenet140

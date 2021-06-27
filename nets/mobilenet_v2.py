@@ -10,6 +10,7 @@ from tensorflow.python.keras.engine import training
 from tensorflow.python.keras.utils import data_utils
 from tensorflow.python.keras.utils import layer_utils
 from tensorflow.python.keras.applications import imagenet_utils
+
 from absl import logging
 
 BASE_WEIGHT_PATH = ('https://storage.googleapis.com/tensorflow/'
@@ -17,7 +18,7 @@ BASE_WEIGHT_PATH = ('https://storage.googleapis.com/tensorflow/'
 default_image_size = 224
 IMG_SIZE_224 = (default_image_size, default_image_size)
 IMG_SHAPE_224 = IMG_SIZE_224 + (3,)
-regularizers_l2 = 0.00001
+regularizers_l2 = 0.00004
 
 
 def _inverted_res_block(name, inputs, expansion, stride, alpha, filters, block_id):
@@ -52,16 +53,17 @@ def _inverted_res_block(name, inputs, expansion, stride, alpha, filters, block_i
         prefix = '{}_expanded_conv_'.format(name)
 
     # Depthwise
-    if stride == 2:
-        x = keras.layers.ZeroPadding2D(
-            padding=imagenet_utils.correct_pad(x, 3),
-            name=prefix + 'pad')(x)
+    # if stride == 2:
+    #     x = keras.layers.ZeroPadding2D(
+    #         padding=imagenet_utils.correct_pad(x, 3),
+    #         name=prefix + 'pad')(x)
     x = keras.layers.DepthwiseConv2D(
         kernel_size=3,
         strides=stride,
         activation=None,
         use_bias=False,
-        padding='same' if stride == 1 else 'valid',
+        #padding='same' if stride == 1 else 'valid',
+        padding='same',
         name=prefix + 'depthwise')(
         x)
     x = keras.layers.BatchNormalization(
