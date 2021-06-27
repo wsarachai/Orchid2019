@@ -4,21 +4,33 @@ from __future__ import print_function
 
 import os
 
-import numpy as np
-
 import nets
 import lib_utils
 import tensorflow as tf
 import tensorflow.keras as keras
-from nets import mobilenet_v2_orchids
+
+from nets.mobilenet_v2_orchids import IMG_SHAPE_224
+from nets.mobilenet_v2_orchids import create_mobilenet_v2
 
 
 def preprocess_input(image_data, central_fraction=0.875):
     image = tf.image.decode_jpeg(image_data, channels=3)
+
     image = tf.image.convert_image_dtype(image, dtype=tf.float32)
     image = tf.image.central_crop(image, central_fraction=central_fraction)
     image = tf.image.resize(images=image, size=nets.mobilenet_v2.IMG_SIZE_224, method=tf.image.ResizeMethod.BILINEAR)
     return tf.expand_dims(image, axis=0)
+
+    # image = tf.image.convert_image_dtype(image, dtype=tf.float32)
+    # image = tf.image.central_crop(image, central_fraction=central_fraction)
+    # image = tf.expand_dims(image, 0)
+    # image = tf.compat.v1.image.resize_bilinear(image, nets.mobilenet_v2.IMG_SIZE_224, align_corners=False)
+    # print(image[0][0][0])
+    #
+    # image = tf.subtract(image, 0.5)
+    # image = tf.multiply(image, 2.0)
+    #
+    # return image
 
 
 class Orchids52Mobilenet140(object):
@@ -191,6 +203,11 @@ class Orchids52Mobilenet140(object):
                     print(key)
                     var_loaded_fixed_name.update({key + ":0": var_loaded[key]})
                 all_vars = self.model.weights
+
+                all_maps = {}
+                for i, var in enumerate(all_vars):
+                    all_maps.update({var.name: var})
+
                 for i, var in enumerate(all_vars):
                     print("Loading: ", var.name, var.shape)
                     if var.name in var_loaded_fixed_name:
@@ -199,6 +216,7 @@ class Orchids52Mobilenet140(object):
                             raise Exception("Incompatible shapes")
                         tf.assert_equal(var.shape, saved_var.shape)
                         var.assign(saved_var)
+                        all_maps.pop(var.name)
                     else:
                         print("Can't find: {}".format(var.name))
                 return True
@@ -294,9 +312,6 @@ class PreprocessLayer(keras.layers.Layer):
                 2: lambda: tf.image.random_contrast(inputs, lower=0.2, upper=0.5),
                 3: lambda: tf.image.random_hue(inputs, max_delta=0.2),
             }, default=lambda: inputs)
-
-        inputs = tf.subtract(inputs, 0.5)
-        inputs = tf.multiply(inputs, 2.0)
         return inputs
 
 
@@ -340,10 +355,10 @@ def global_pool(shape, pool_op=keras.layers.AvgPool2D):
 def create_mobilenet_v2_14(num_classes, optimizer, loss_fn, training=False, **kwargs):
     step = kwargs.pop("step") if "step" in kwargs else nets.utils.TRAIN_TEMPLATE.format(1)
 
-    inputs = keras.Input(shape=nets.mobilenet_v2.IMG_SHAPE_224)
+    inputs = keras.Input(shape=IMG_SHAPE_224)
     preprocess_layer = PreprocessLayer()
-    mobilenet = mobilenet_v2_orchids.create_mobilenet_v2(
-        input_shape=nets.mobilenet_v2.IMG_SHAPE_224, alpha=1.4, include_top=False, weights=None
+    mobilenet = create_mobilenet_v2(
+        input_shape=IMG_SHAPE_224, alpha=1.4, include_top=False, weights=None
     )
     processed_inputs = preprocess_layer(inputs, training=training)
     mobilenet_logits = mobilenet(processed_inputs, training=training)

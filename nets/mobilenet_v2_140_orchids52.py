@@ -9,15 +9,18 @@ import tensorflow as tf
 import tensorflow.keras as keras
 import nets
 
+from absl import logging
 from tensorflow.python.keras import initializers
 from tensorflow.python.keras import activations
-from nets import mobilenet_v2 as mobilenet
-from nets import mobilenet_v2_140 as mobilenet_140
+from nets.mobilenet_v2_orchids import IMG_SHAPE_224
+from nets.mobilenet_v2_orchids import default_image_size
+from nets.mobilenet_v2_orchids import create_mobilenet_v2
+from nets.mobilenet_v2_140 import PreprocessLayer
+from nets.mobilenet_v2_140 import PredictionLayer
+from nets.mobilenet_v2_140 import Orchids52Mobilenet140
 
-logging = tf.compat.v1.logging
 
-
-class Orchids52Mobilenet140STN(mobilenet_140.Orchids52Mobilenet140):
+class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
     def __init__(
         self,
         inputs,
@@ -184,22 +187,22 @@ class Orchids52Mobilenet140STN(mobilenet_140.Orchids52Mobilenet140):
 
 class BranchBlock(keras.layers.Layer):
     def __init__(
-        self, num_classes, batch_size, width=mobilenet.default_image_size, height=mobilenet.default_image_size
+        self, num_classes, batch_size, width=default_image_size, height=default_image_size
     ):
         super(BranchBlock, self).__init__()
         self.batch_size = batch_size
         self.width = width
         self.height = height
-        self.global_branch_model = mobilenet.create_mobilenet_v2(
-            input_shape=mobilenet.IMG_SHAPE_224, alpha=1.4, include_top=False, weights="imagenet", sub_name="global_branch"
+        self.global_branch_model = create_mobilenet_v2(
+            input_shape=IMG_SHAPE_224, alpha=1.4, include_top=False, weights="imagenet", sub_name="global_branch"
         )
-        self.branch_base_model = mobilenet.create_mobilenet_v2(
-            input_shape=mobilenet.IMG_SHAPE_224, alpha=1.4, include_top=False, weights="imagenet", sub_name="shared_branch"
+        self.branch_base_model = create_mobilenet_v2(
+            input_shape=IMG_SHAPE_224, alpha=1.4, include_top=False, weights="imagenet", sub_name="shared_branch"
         )
         self.branches_prediction_models = [
-            mobilenet_140.PredictionLayer(num_classes=num_classes, activation="softmax"),
-            mobilenet_140.PredictionLayer(num_classes=num_classes, activation="softmax"),
-            mobilenet_140.PredictionLayer(num_classes=num_classes, activation="softmax"),
+            PredictionLayer(num_classes=num_classes, activation="softmax"),
+            PredictionLayer(num_classes=num_classes, activation="softmax"),
+            PredictionLayer(num_classes=num_classes, activation="softmax"),
         ]
 
     def call(self, inputs, **kwargs):
@@ -284,10 +287,10 @@ def create_orchid_mobilenet_v2_14(num_classes, optimizer, loss_fn, training=Fals
     step = kwargs.pop("step") if "step" in kwargs else ""
     batch_size = kwargs.pop("batch_size") if "batch_size" in kwargs else 32
 
-    inputs = keras.Input(shape=mobilenet.IMG_SHAPE_224)
-    preprocess_layer = mobilenet_140.PreprocessLayer()
-    stn_base_model = mobilenet.create_mobilenet_v2(
-        input_shape=mobilenet.IMG_SHAPE_224, alpha=1.4, include_top=False, weights="imagenet", sub_name="stn"
+    inputs = keras.Input(shape=IMG_SHAPE_224)
+    preprocess_layer = PreprocessLayer()
+    stn_base_model = create_mobilenet_v2(
+        input_shape=IMG_SHAPE_224, alpha=1.4, include_top=False, weights="imagenet", sub_name="stn"
     )
 
     processed_inputs = preprocess_layer(inputs, training=training)
@@ -318,8 +321,8 @@ def create_orchid_mobilenet_v2_14(num_classes, optimizer, loss_fn, training=Fals
             input_map=processed_inputs,
             theta=loc_output,
             batch_size=batch_size,
-            width=mobilenet.default_image_size,
-            height=mobilenet.default_image_size,
+            width=default_image_size,
+            height=default_image_size,
             scales=scales,
         )
 
@@ -344,8 +347,8 @@ def create_orchid_mobilenet_v2_14(num_classes, optimizer, loss_fn, training=Fals
             outputs = estimate_block(logits)
 
     else:
-        prediction_layer = mobilenet_140.PredictionLayer(
-            num_classes=num_classes, shape=[1, 7, 7], activation="softmax"
+        prediction_layer = PredictionLayer(
+            num_classes=num_classes, activation="softmax"
         )
         branches_prediction_models.append(prediction_layer)
         mobilenet_logits = stn_base_model(processed_inputs, training=training)
@@ -394,10 +397,10 @@ def create_orchid_mobilenet_v2_15(num_classes, optimizer, loss_fn, training=Fals
     step = kwargs.pop("step") if "step" in kwargs else ""
     batch_size = kwargs.pop("batch_size") if "batch_size" in kwargs else 32
 
-    inputs = keras.Input(shape=mobilenet.IMG_SHAPE_224)
-    preprocess_layer = mobilenet_140.PreprocessLayer()
-    stn_base_model = mobilenet.create_mobilenet_v2(
-        input_shape=mobilenet.IMG_SHAPE_224, alpha=1.4, include_top=False, weights="imagenet", sub_name="stn_base"
+    inputs = keras.Input(shape=IMG_SHAPE_224)
+    preprocess_layer = PreprocessLayer()
+    stn_base_model = create_mobilenet_v2(
+        input_shape=IMG_SHAPE_224, alpha=1.4, include_top=False, weights="imagenet", sub_name="stn_base"
     )
 
     processed_inputs = preprocess_layer(inputs, training=training)
@@ -446,8 +449,8 @@ def create_orchid_mobilenet_v2_15(num_classes, optimizer, loss_fn, training=Fals
             input_map=processed_inputs,
             theta=loc_output,
             batch_size=batch_size,
-            width=mobilenet.default_image_size,
-            height=mobilenet.default_image_size,
+            width=default_image_size,
+            height=default_image_size,
             scales=scales,
         )
 
@@ -472,7 +475,7 @@ def create_orchid_mobilenet_v2_15(num_classes, optimizer, loss_fn, training=Fals
             outputs = estimate_block(logits)
 
     else:
-        prediction_layer = mobilenet_140.PredictionLayer(
+        prediction_layer = PredictionLayer(
             num_classes=num_classes, activation="softmax"
         )
         branches_prediction_models.append(prediction_layer)

@@ -8,6 +8,7 @@ import sys
 import collections
 import tensorflow as tf
 import numpy as np
+import h5py
 
 import lib_utils
 from data import data_utils
@@ -84,51 +85,8 @@ def create_image_lists(image_dir):
     return result
 
 
-def main1(unused_argv):
-    logging.debug(unused_argv)
-    workspace_path = os.environ["WORKSPACE"] if "WORKSPACE" in os.environ else "/Volumes/Data/tmp"
-    data_path = os.environ["DATA_DIR"] if "DATA_DIR" in os.environ else "/Volumes/Data/_dataset/_orchids_dataset"
-    data_dir = os.path.join(data_path, "orchids52_data")
-    checkpoint_path = os.path.join(workspace_path, "orchids-models", "orchids2019", FLAGS.model)
-    print("Model: {}".format(FLAGS.model))
-    print("Workspace: {}".format(workspace_path))
-    print("Data dir: {}".format(data_dir))
-    print("Checkpoint path: {}".format(checkpoint_path))
-
-    batch_size = 32
-    if FLAGS.train_step > 1:
-        batch_size = FLAGS.batch_size // 4
-    print(batch_size)
-
-    load_dataset = data_utils.dataset_mapping[FLAGS.dataset]
-    create_model = utils.nets_mapping[FLAGS.model]
-
-    test_ds = load_dataset(split="test", batch_size=batch_size, root_path=data_dir)
-    print(test_ds.size)
-    print(test_ds.num_of_classes)
-
-    training_step = utils.TRAIN_TEMPLATE.format(step=FLAGS.train_step)
-    print(training_step)
-
-    model = create_model(
-        num_classes=test_ds.num_of_classes, optimizer=None, loss_fn=None, batch_size=batch_size, step=training_step
-    )
-
-    train_model = lib_utils.TrainClassifier(model=model, batch_size=batch_size)
-
-    model.restore_model_variables(checkpoint_path=FLAGS.checkpoint_path)
-    model.summary()
-
-    print("Test accuracy: ")
-    train_model.evaluate(
-        datasets=test_ds,
-        bash=FLAGS.bash,
-    )
-
-
 def main(unused_argv):
     logging.debug(unused_argv)
-    dataset_images = create_image_lists(image_dir=FLAGS.image_dir)
     load_dataset = data_utils.dataset_mapping[FLAGS.dataset]
     create_model = utils.nets_mapping[FLAGS.model]
 
@@ -141,11 +99,14 @@ def main(unused_argv):
     count = 0
     corrected = 0
     total_images = load_dataset.test_size
-    for label, data in dataset_images.items():
-        for file in data["testing"]:
-            filename = os.path.join(FLAGS.image_dir, data["dir"], file)
-            image_data = tf.io.gfile.GFile(filename, "rb").read()
-            inputs = preprocess_input(image_data)
+
+    save_path = FLAGS.image_dir + '-new'
+    f = h5py.File(save_path + '/orchids52.h5', 'r')
+    dset = f['orchids52/test']
+
+    for label in dset:
+        for inputs in dset[label]:
+            inputs = np.expand_dims(inputs, axis=0)
             result = model.model(inputs).numpy()
 
             count += 1
