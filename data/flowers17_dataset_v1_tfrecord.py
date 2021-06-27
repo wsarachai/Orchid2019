@@ -7,7 +7,8 @@ import os
 import tensorflow as tf
 
 from nets import mobilenet_v2
-from data import orchids52_dataset
+from data import flowers17_dataset
+
 
 feature_description = {
     "image/height": tf.io.FixedLenFeature([], tf.int64, default_value=tf.zeros([], dtype=tf.int64)),
@@ -59,7 +60,7 @@ def _load_dataset(
     num_readers=1,
     num_map_threads=1
 ):
-    pattern = "orchids52_{split}*.tfrecord".format(split=split)
+    pattern = "flowers17_{split}*.tfrecord".format(split=split)
     pattern = os.path.join(root_path, data_dir, pattern)
     dataset = tf.data.Dataset.list_files(file_pattern=pattern)
     dataset = dataset.interleave(
@@ -72,7 +73,7 @@ def _load_dataset(
     decode_dataset = parsed_dataset.map(decode_example)
 
     preprocess_image = wrapped_partial(
-        orchids52_dataset.preprocess_image, image_size=mobilenet_v2.IMG_SIZE_224
+        flowers17_dataset.preprocess_image, image_size=mobilenet_v2.IMG_SIZE_224
     )
     decode_dataset = decode_dataset.map(preprocess_image)
     decode_dataset = decode_dataset.batch(batch_size=batch_size).cache()
@@ -85,25 +86,25 @@ def _load_dataset(
     elif split == "test":
         setattr(decode_dataset, "size", test_size)
 
-    meta_data_path = os.path.join(root_path, data_dir, "orchids52_metadata.txt")
+    meta_data_path = os.path.join(root_path, data_dir, "flowers17_metadata.txt")
     with open(meta_data_path, "r") as f:
         lines = [line.rstrip().split("\t") for line in f]
 
     setattr(decode_dataset, "classes", lines)
-    setattr(decode_dataset, "num_of_classes", orchids52_dataset.NUM_OF_CLASSES)
+    setattr(decode_dataset, "num_of_classes", flowers17_dataset.NUM_OF_CLASSES)
 
     return decode_dataset
 
 
-get_label = wrapped_partial(_get_label, depth=orchids52_dataset.NUM_OF_CLASSES)
+get_label = wrapped_partial(_get_label, depth=flowers17_dataset.NUM_OF_CLASSES)
 
 load_dataset_v1 = wrapped_partial(
     _load_dataset,
-    train_size=orchids52_dataset.TRAIN_SIZE_V1,
-    test_size=orchids52_dataset.TEST_SIZE_V1,
+    train_size=flowers17_dataset.TRAIN_SIZE_V1,
+    test_size=flowers17_dataset.TEST_SIZE_V1,
     data_dir="tf-records/v1",
 )
 
-load_dataset_v1.num_of_classes = orchids52_dataset.NUM_OF_CLASSES
-load_dataset_v1.train_size = orchids52_dataset.TRAIN_SIZE_V1
-load_dataset_v1.test_size = orchids52_dataset.TEST_SIZE_V1
+load_dataset_v1.num_of_classes = flowers17_dataset.NUM_OF_CLASSES
+load_dataset_v1.train_size = flowers17_dataset.TRAIN_SIZE_V1
+load_dataset_v1.test_size = flowers17_dataset.TEST_SIZE_V1

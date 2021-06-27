@@ -3,6 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 from nets.mobilenet_v2_140 import create_mobilenet_v2_14
+from nets.mobilenet_v2_140 import preprocess_input
 from nets.mobilenet_v2_140_orchids52 import create_orchid_mobilenet_v2_15
 
 TRAIN_TEMPLATE = 'pretrain{step}'
@@ -20,4 +21,8 @@ MOBILENET_V2_140_ORCHIDS52 = 'mobilenet_v2_140_orchids52'
 nets_mapping = {
     MOBILENET_V2_140: create_mobilenet_v2_14,
     MOBILENET_V2_140_ORCHIDS52: create_orchid_mobilenet_v2_15
+}
+
+preprocessing_mapping = {
+    'mobilenet_v2_140': preprocess_input,
 }
