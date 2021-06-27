@@ -4,11 +4,14 @@ from __future__ import print_function
 
 import os
 
+import numpy as np
+
 import nets
 import lib_utils
 import tensorflow as tf
 import tensorflow.keras as keras
 
+from tensorflow.python.keras import activations
 from nets.mobilenet_v2 import IMG_SHAPE_224
 from nets.mobilenet_v2 import create_mobilenet_v2
 
@@ -101,16 +104,17 @@ class Orchids52Mobilenet140(object):
                      target_model="mobilenetv2_01_1.40_224_",
                      model_name="MobilenetV2",
                      **kwargs):
-
+        value_to_load = kwargs.get("value_to_load", {})
+        key_to_numpy = kwargs.get("key_to_numpy", {})
         include_prediction_layer = kwargs.get("include_prediction_layer", True)
 
-        reader = tf.compat.v1.train.NewCheckpointReader(latest_checkpoint)
-        var_to_shape_map = reader.get_variable_to_shape_map()
-        value_to_load = {}
-        key_to_numpy = {}
-        for key in sorted(var_to_shape_map.items()):
-            print(key)
-            key_to_numpy.update({key[0]: key[1]})
+        if not bool(key_to_numpy):
+            reader = tf.compat.v1.train.NewCheckpointReader(latest_checkpoint)
+            var_to_shape_map = reader.get_variable_to_shape_map()
+            value_to_load = {}
+            key_to_numpy = {}
+            for key in sorted(var_to_shape_map.items()):
+                key_to_numpy.update({key[0]: reader.get_tensor(key[0])})
 
         key_maps1 = {
             "Conv1/kernel": "Conv/weights",
@@ -160,8 +164,9 @@ class Orchids52Mobilenet140(object):
         for key in key_maps1:
             _key = model_name + "/" + key_maps1[key]
             if _key in key_to_numpy:
-                value = reader.get_tensor(_key)
+                value = key_to_numpy[_key]
                 value_to_load[target_model + key] = value
+                key_to_numpy.pop(_key)
             else:
                 print("Can't find the key: {}".format(_key))
 
@@ -169,8 +174,9 @@ class Orchids52Mobilenet140(object):
             for key in key_maps2:
                 _key = model_name + "/" + key_maps2[key]
                 if _key in key_to_numpy:
-                    value = reader.get_tensor(_key)
+                    value = key_to_numpy[_key]
                     value_to_load[key] = value
+                    key_to_numpy.pop(_key)
                 else:
                     print("Can't find the key: {}".format(_key))
 
@@ -179,14 +185,17 @@ class Orchids52Mobilenet140(object):
                 k = model_name + "/" + key_maps3[key]
                 _key_v = k.format(i)
                 if _key_v in key_to_numpy:
-                    value = reader.get_tensor(_key_v)
+                    value = key_to_numpy[_key_v]
                     value_to_load[target_model + key.format(i)] = value
+                    key_to_numpy.pop(_key_v)
                 else:
                     raise Exception("Can't find the key: {}".format(_key_v))
         return value_to_load
 
     def restore_model_from_latest_checkpoint_if_exist(self, **kwargs):
         result = False
+        show_model_weights = kwargs.get("show_model_weights", False)
+
         if self.checkpoint:
             checkpoint, checkpoint_manager = self.checkpoint
             if checkpoint_manager.latest_checkpoint:
@@ -200,8 +209,8 @@ class Orchids52Mobilenet140(object):
                 var_loaded = self.load_from_v1(latest_checkpoint, **kwargs)
                 var_loaded_fixed_name = {}
                 for key in var_loaded:
-                    print(key)
                     var_loaded_fixed_name.update({key + ":0": var_loaded[key]})
+
                 all_vars = self.model.weights
 
                 all_maps = {}
@@ -209,16 +218,24 @@ class Orchids52Mobilenet140(object):
                     all_maps.update({var.name: var})
 
                 for i, var in enumerate(all_vars):
-                    print("Loading: ", var.name, var.shape)
                     if var.name in var_loaded_fixed_name:
                         saved_var = var_loaded_fixed_name[var.name]
                         if var.shape != saved_var.shape:
-                            raise Exception("Incompatible shapes")
-                        tf.assert_equal(var.shape, saved_var.shape)
+                            saved_var = np.squeeze(saved_var)
+                            if var.shape != saved_var.shape:
+                                raise Exception("Incompatible shapes")
                         var.assign(saved_var)
                         all_maps.pop(var.name)
+                        if show_model_weights:
+                            flat_var = np.reshape(saved_var, (-1))
+                            print("Loading: {} -> {}".format(var.name, flat_var[:4]))
                     else:
                         print("Can't find: {}".format(var.name))
+
+                for key in all_maps:
+                    var = all_maps[key]
+                    print("Variable {} {} was not init..".format(var.name, var.shape))
+
                 return True
             else:
                 return False
@@ -237,11 +254,11 @@ class Orchids52Mobilenet140(object):
     def load_weights(self, checkpoint_path):
         self.model.load_weights(checkpoint_path)
 
-    def restore_model_variables(self, load_from_checkpoint_first=True, checkpoint_path=None):
+    def restore_model_variables(self, load_from_checkpoint_first=True, checkpoint_path=None, **kwargs):
         step = 1
         loaded_successfully = False
         if load_from_checkpoint_first:
-            loaded_successfully = self.restore_model_from_latest_checkpoint_if_exist(checkpoint_path=checkpoint_path)
+            loaded_successfully = self.restore_model_from_latest_checkpoint_if_exist(checkpoint_path=checkpoint_path, **kwargs)
         if not loaded_successfully:
             self.load_model_variables()
         else:
@@ -296,7 +313,6 @@ class PreprocessLayer(keras.layers.Layer):
 
     def call(self, inputs, **kwargs):
         training = kwargs.pop("training")
-
         if training:
             sel = tf.random.uniform([], maxval=4, dtype=tf.int32)
             inputs = tf.switch_case(sel, branch_fns={
@@ -318,31 +334,18 @@ class PreprocessLayer(keras.layers.Layer):
 class PredictionLayer(keras.layers.Layer):
     def __init__(self, num_classes, activation=None, dropout_ratio=0.2):
         super(PredictionLayer, self).__init__()
-        #self.global_average_pooling = global_pool(shape=shape)
         self.global_average_pooling = tf.keras.layers.GlobalAveragePooling2D()
         self.dropout = keras.layers.Dropout(dropout_ratio)
-        self.dense = keras.layers.Conv2D(
-            num_classes,
-            kernel_size=1,
-            padding="same",
-            use_bias=True,
-            activation=activation,
-            bias_initializer=tf.zeros_initializer(),
-            name="prediction_layer",
-        )
-        # self.dense = keras.layers.Dense(num_classes, name="prediction_layer")
-        self.prediction_fn = keras.layers.Softmax()
+        self.dense = keras.layers.Dense(num_classes, name="prediction_layer")
+        self.prediction_fn = activations.get(activation)
 
     def call(self, inputs, **kwargs):
         training = kwargs.pop("training")
         inputs = self.global_average_pooling(inputs, training=training)
         if training:
             inputs = self.dropout(inputs, training=training)
-        inputs = tf.expand_dims(input=inputs, axis=1)
-        inputs = tf.expand_dims(input=inputs, axis=1)
         inputs = self.dense(inputs, training=training)
-        inputs = tf.squeeze(inputs, [1, 2])
-        inputs = self.prediction_fn(inputs, training=training)
+        inputs = self.prediction_fn(inputs)
         return inputs
 
 

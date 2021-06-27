@@ -3,13 +3,13 @@ from __future__ import division
 from __future__ import print_function
 
 import os
-import stn
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
 import nets
 
 from absl import logging
+from stn import pre_spatial_transformer_network
 from tensorflow.python.keras import initializers
 from tensorflow.python.keras import activations
 from nets.mobilenet_v2 import IMG_SHAPE_224
@@ -62,6 +62,12 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
                      target_model="mobilenetv2",
                      model_name="mobilenet_v2_140_stn_v15",
                      **kwargs):
+        value_to_load = {}
+        reader = tf.compat.v1.train.NewCheckpointReader(latest_checkpoint)
+        var_to_shape_map = reader.get_variable_to_shape_map()
+        key_to_numpy = {}
+        for key in sorted(var_to_shape_map.items()):
+            key_to_numpy.update({key[0]: reader.get_tensor(key[0])})
 
         var_maps = {
             "stn_conv2d_1/kernel": "dense-1/conv2d_resize_128/weights",
@@ -89,26 +95,26 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
 
         local_var_loaded = super().load_from_v1(
             latest_checkpoint, target_model + "_stn_base_1.40_224_",
-            model_name + "/localization_params/MobilenetV2", include_prediction_layer=False)
+            model_name + "/localization_params/MobilenetV2",
+            key_to_numpy=key_to_numpy,
+            include_prediction_layer=False)
         extract_var_loaded = super().load_from_v1(
             latest_checkpoint, target_model + "_global_branch_1.40_224_",
-            model_name + "/features-extraction/MobilenetV2" , include_prediction_layer=False)
+            model_name + "/features-extraction/MobilenetV2",
+            key_to_numpy=key_to_numpy,
+            include_prediction_layer=False)
         extract_comm_var_loaded = super().load_from_v1(
             latest_checkpoint, target_model + "_shared_branch_1.40_224_",
-            model_name + "/features-extraction-common/MobilenetV2", include_prediction_layer=False)
-
-        value_to_load = {}
-        reader = tf.compat.v1.train.NewCheckpointReader(latest_checkpoint)
-        var_to_shape_map = reader.get_variable_to_shape_map()
-        key_to_numpy = {}
-        for key in sorted(var_to_shape_map.items()):
-            key_to_numpy.update({key[0]: key[1]})
+            model_name + "/features-extraction-common/MobilenetV2",
+            key_to_numpy=key_to_numpy,
+            include_prediction_layer=False)
 
         for var_name in var_maps:
             _key = model_name + "/" + var_maps[var_name]
             if _key in key_to_numpy:
-                value = reader.get_tensor(_key)
+                value = key_to_numpy[_key]
                 value_to_load[var_name] = value
+                key_to_numpy.pop(_key)
             else:
                 print("Can't find the key: {}".format(_key))
 
@@ -118,6 +124,9 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
             value_to_load[key] = extract_var_loaded[key]
         for key in extract_comm_var_loaded:
             value_to_load[key] = extract_comm_var_loaded[key]
+
+        for key in key_to_numpy:
+            print("{} was not loaded".format(key))
 
         return value_to_load
 
@@ -200,9 +209,9 @@ class BranchBlock(keras.layers.Layer):
             input_shape=IMG_SHAPE_224, alpha=1.4, include_top=False, weights="imagenet", sub_name="shared_branch"
         )
         self.branches_prediction_models = [
-            PredictionLayer(num_classes=num_classes, activation="softmax"),
-            PredictionLayer(num_classes=num_classes, activation="softmax"),
-            PredictionLayer(num_classes=num_classes, activation="softmax"),
+            PredictionLayer(num_classes=num_classes),
+            PredictionLayer(num_classes=num_classes),
+            PredictionLayer(num_classes=num_classes),
         ]
 
     def call(self, inputs, **kwargs):
@@ -233,10 +242,11 @@ class BranchBlock(keras.layers.Layer):
     def sub_process(self, branch, inp, prediction):
         if branch == 1:
             x = self.global_branch_model(inp, training=False)
-            return prediction(x, training=False)
+            x = prediction(x, training=False)
         else:
             x = self.branch_base_model(inp, training=False)
-            return prediction(x, training=False)
+            x = prediction(x, training=False)
+        return x
 
 
 class EstimationBlock(keras.layers.Layer):
@@ -317,7 +327,7 @@ def create_orchid_mobilenet_v2_14(num_classes, optimizer, loss_fn, training=Fals
         loc_output = localization_network(processed_inputs)
 
         # TODO: Change this function to keras layer
-        stn_output, bound_err = stn.pre_spatial_transformer_network(
+        stn_output, bound_err = pre_spatial_transformer_network(
             input_map=processed_inputs,
             theta=loc_output,
             batch_size=batch_size,
@@ -372,20 +382,32 @@ def create_orchid_mobilenet_v2_14(num_classes, optimizer, loss_fn, training=Fals
 
 
 class FullyConnectedLayer(tf.keras.layers.Layer):
-    def __init__(self, num_outputs, kernel_initializer, activation, **kwargs):
+    def __init__(self, num_outputs, kernel_initializer, activation, normalizer_fn=None, **kwargs):
         super(FullyConnectedLayer, self).__init__(**kwargs)
         self.kernel = None
         self.num_outputs = num_outputs
         self.kernel_initializer = initializers.get(kernel_initializer)
+        self.normalizer_fn = normalizer_fn
         self.activation = activations.get(activation)
 
     def build(self, input_shape):
         self.kernel = self.add_weight("kernel",
-                                      shape=[int(input_shape[-1]),
-                                             self.num_outputs])
+                                      shape=[int(input_shape[-1]), self.num_outputs],
+                                      initializer=self.kernel_initializer)
 
     def call(self, inputs, **kwargs):
-        return tf.matmul(inputs, self.kernel)
+        x = tf.matmul(inputs, self.kernel)
+        if self.normalizer_fn is not None:
+            x = self.normalizer_fn(x)
+        return self.activation(x)
+
+
+class PrintDebug(tf.keras.layers.Layer):
+    def __init__(self, **kwargs):
+        super(PrintDebug, self).__init__(**kwargs)
+
+    def call(self, inputs, **kwargs):
+        return tf.compat.v1.Print(inputs, [inputs])
 
 
 def create_orchid_mobilenet_v2_15(num_classes, optimizer, loss_fn, training=False, drop_out_prop=0.8, **kwargs):
@@ -418,6 +440,7 @@ def create_orchid_mobilenet_v2_15(num_classes, optimizer, loss_fn, training=Fals
                 keras.layers.Dropout(rate=drop_out_prop),
                 FullyConnectedLayer(fc_num,
                                     kernel_initializer=tf.keras.initializers.TruncatedNormal(mean=0.0, stddev=0.4),
+                                    normalizer_fn=tf.math.l2_normalize,
                                     activation="tanh", name="stn_dense_3_1"),
             ],
             name="stn_dense1"
@@ -431,6 +454,7 @@ def create_orchid_mobilenet_v2_15(num_classes, optimizer, loss_fn, training=Fals
                 keras.layers.Dropout(rate=drop_out_prop),
                 FullyConnectedLayer(fc_num,
                                     kernel_initializer=tf.keras.initializers.TruncatedNormal(mean=0.0, stddev=0.4),
+                                    normalizer_fn=tf.math.l2_normalize,
                                     activation="tanh", name="stn_dense_3_2"),
             ],
             name="stn_dense2"
@@ -445,7 +469,7 @@ def create_orchid_mobilenet_v2_15(num_classes, optimizer, loss_fn, training=Fals
         loc_output = keras.layers.Concatenate(axis=1)([stn_logits1, stn_logits2])
 
         # TODO: Change this function to keras layer
-        stn_output, bound_err = stn.pre_spatial_transformer_network(
+        stn_output, bound_err = pre_spatial_transformer_network(
             input_map=processed_inputs,
             theta=loc_output,
             batch_size=batch_size,
