@@ -23,13 +23,16 @@ def main(unused_argv):
     create_model = nets_mapping[FLAGS.model]
     preprocess_input = preprocessing_mapping[FLAGS.model]
 
+    dataset_images = None
     is_h5py = bool(FLAGS.dataset_type == "h5py")
 
     if is_h5py:
-        save_path = FLAGS.image_dir + '-new'
-        f = h5py.File(save_path + '/orchids52.h5', 'r')
+        save_path = "{}-h5/{}.h5".format(FLAGS.image_dir, FLAGS.dataset.split("_")[0])
+        f = h5py.File(save_path, 'r')
         dataset_images = f['orchids52/test']
-    else:
+
+    if dataset_images is None:
+        is_h5py = False
         dataset_images = create_image_lists(image_dir=FLAGS.image_dir)
 
     model = create_model(num_classes=load_dataset.num_of_classes, activation="softmax")

@@ -344,7 +344,7 @@ def global_pool(shape, pool_op=keras.layers.AvgPool2D):
     return output
 
 
-def create_mobilenet_v2_14(num_classes, optimizer, loss_fn, training=False, **kwargs):
+def create_mobilenet_v2_14(num_classes, optimizer=None, loss_fn=None, training=False, **kwargs):
     step = kwargs.pop("step") if "step" in kwargs else nets.utils.TRAIN_TEMPLATE.format(1)
 
     inputs = keras.Input(shape=IMG_SHAPE_224)
