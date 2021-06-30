@@ -7,6 +7,8 @@ import os
 import re
 import copy
 import sys
+
+from tensorflow._api.v2.compat import v1
 import nets
 import numpy as np
 import tensorflow as tf
@@ -14,7 +16,8 @@ import tensorflow as tf
 from absl import app
 from absl import logging
 from absl import flags
-from data.data_utils import ORCHIDS52_V1_TFRECORD
+from data.data_utils import DATASET_VERSION_V1, DATA_FORMAT_H5
+from data.data_utils import ORCHIDS52
 from nets.utils import MOBILENET_V2_140_ORCHIDS52
 
 FLAGS = flags.FLAGS
@@ -29,19 +32,15 @@ flags.DEFINE_integer("train_step", 1, "Training step")
 
 flags.DEFINE_float("learning_rate", 0.001, "Learning Rate")
 
-flags.DEFINE_string("dataset", ORCHIDS52_V1_TFRECORD, "Dataset")
+flags.DEFINE_string("dataset_format", DATA_FORMAT_H5, "Dataset format")
+
+flags.DEFINE_string("dataset", ORCHIDS52, "Dataset")
+
+flags.DEFINE_string("dataset_version", DATASET_VERSION_V1, "Dataset version")
 
 flags.DEFINE_string("model", MOBILENET_V2_140_ORCHIDS52, "Model")
 
-flags.DEFINE_string("checkpoint_path", None, "Checkpoint path")
-
-flags.DEFINE_string("dataset_type", "h5py", "Dataset type")
-
-flags.DEFINE_string(
-    "image_dir",
-    "/Users/watcharinsarachai/Documents/_datasets/orchids52_data/test/",
-    "The directory where the dataset images are locate",
-)
+flags.DEFINE_string("checkpoint_path", "mobilenet_v2_140_orchids52_0001", "Checkpoint path")
 
 
 def create_image_lists(image_dir):
@@ -301,6 +300,8 @@ class DisplayInfo(object):
         predict = np.argmax(result, axis=1)[0]
         confident = result[0][predict]
         predict_string = "n{:04d}".format(predict)
+        if label.dtype != tf.string:
+            label = "n{:04d}".format(label[0])
         if predict_string == label:
             self.corrected += 1
         sys.stdout.write(

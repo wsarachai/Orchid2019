@@ -31,9 +31,12 @@ def wrapped_partial(func, *args, **kwargs):
     return partial_func
 
 
-def _get_label(serialize_example, depth):
+def _get_label(serialize_example, depth, one_hot=False):
     label = serialize_example["image/class/label"]
-    label_values = tf.one_hot(label, depth=depth)
+    if one_hot:
+        label_values = tf.one_hot(label, depth=depth)
+    else:
+        label_values = label
     return label_values
 
 
@@ -48,19 +51,9 @@ def parse_function(example_proto):
     return tf.io.parse_single_example(example_proto, feature_description)
 
 
-def _load_dataset(
-    split,
-    root_path,
-    data_dir,
-    batch_size,
-    train_size,
-    test_size,
-    repeat=False,
-    num_readers=1,
-    num_map_threads=1
-):
+def _load_dataset(split, root_path, batch_size, train_size, test_size, repeat=False, num_readers=1, num_map_threads=1):
     pattern = "orchids52_{split}*.tfrecord".format(split=split)
-    pattern = os.path.join(root_path, data_dir, pattern)
+    pattern = os.path.join(root_path, pattern)
     dataset = tf.data.Dataset.list_files(file_pattern=pattern)
     dataset = dataset.interleave(
         lambda x: tf.data.TFRecordDataset(x),
@@ -71,9 +64,7 @@ def _load_dataset(
     parsed_dataset = dataset.map(parse_function, num_parallel_calls=num_map_threads)
     decode_dataset = parsed_dataset.map(decode_example)
 
-    preprocess_image = wrapped_partial(
-        orchids52_dataset.preprocess_image, image_size=mobilenet_v2.IMG_SIZE_224
-    )
+    preprocess_image = wrapped_partial(orchids52_dataset.preprocess_image, image_size=mobilenet_v2.IMG_SIZE_224)
     decode_dataset = decode_dataset.map(preprocess_image)
     decode_dataset = decode_dataset.batch(batch_size=batch_size).cache()
 
@@ -85,7 +76,7 @@ def _load_dataset(
     elif split == "test":
         setattr(decode_dataset, "size", test_size)
 
-    meta_data_path = os.path.join(root_path, data_dir, "orchids52_metadata.txt")
+    meta_data_path = os.path.join(root_path, "orchids52_metadata.txt")
     with open(meta_data_path, "r") as f:
         lines = [line.rstrip().split("\t") for line in f]
 
@@ -98,10 +89,7 @@ def _load_dataset(
 get_label = wrapped_partial(_get_label, depth=orchids52_dataset.NUM_OF_CLASSES)
 
 load_dataset_v1 = wrapped_partial(
-    _load_dataset,
-    train_size=orchids52_dataset.TRAIN_SIZE_V1,
-    test_size=orchids52_dataset.TEST_SIZE_V1,
-    data_dir="tf-records/v1",
+    _load_dataset, train_size=orchids52_dataset.TRAIN_SIZE_V1, test_size=orchids52_dataset.TEST_SIZE_V1
 )
 
 load_dataset_v1.num_of_classes = orchids52_dataset.NUM_OF_CLASSES

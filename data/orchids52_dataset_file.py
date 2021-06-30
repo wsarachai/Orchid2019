@@ -7,26 +7,8 @@ import pathlib
 import functools
 import numpy as np
 import tensorflow as tf
-import nets
 from data import orchids52_dataset
-
-logging = tf.compat.v1.logging
-already_wrap = False
-_process_path = None
-
-preprocess_for_train = None
-preprocess_for_eval = None
-
-
-def check_wrap_process_path(data_dir, image_size):
-    global already_wrap, _process_path
-    if not already_wrap:
-        class_names = np.array(sorted([item.name for item in data_dir.glob('n*')]))
-        _process_path = wrapped_partial(
-            process_path,
-            class_names=class_names,
-            image_size=image_size)
-        already_wrap = True
+from nets.mobilenet_v2 import IMG_SIZE_224
 
 
 def wrapped_partial(func, *args, **kwargs):
@@ -41,17 +23,15 @@ def decode_img(image, size):
     return img
 
 
-def get_label(file_path, class_names):
+def get_label_one_hot(file_path, class_names):
     parts = tf.strings.split(file_path, os.path.sep)
     one_hot = parts[-2] == class_names
     return tf.cast(one_hot, tf.float32)
 
 
-def process_path(file_path, class_names, image_size):
-    label = get_label(file_path, class_names)
-    img = tf.io.read_file(file_path)
-    img = decode_img(img, image_size)
-    return img, label
+def get_label(file_path, class_names):
+    parts = tf.strings.split(file_path, os.path.sep)
+    return parts[-2]
 
 
 def configure_for_performance(ds, batch_size=32):
@@ -62,104 +42,78 @@ def configure_for_performance(ds, batch_size=32):
     return ds
 
 
-def _load_dataset(split,
-                  root_path,
-                  data_dir,
-                  batch_size,
-                  train_size,
-                  test_size,
-                  validate_size,
-                  aug_method='fast',
-                  repeat=False,
-                  **kwargs):
-    dataset = None
-    image_path = os.path.join(root_path, data_dir)
-    if 'v1' == data_dir:
-        if 'train' == split:
-            images_dir = pathlib.Path(os.path.join(image_path, "train-en"))
-            dataset = tf.data.Dataset.list_files(str(images_dir / '*/*'), shuffle=False)
-        elif 'test' == split:
-            images_dir = pathlib.Path(os.path.join(image_path, "test-en"))
-            dataset = tf.data.Dataset.list_files(str(images_dir / '*/*'), shuffle=False)
-            val_batches = tf.data.experimental.cardinality(dataset)
-            dataset = dataset.take(val_batches // 5)
-        elif 'validate' == split:
-            images_dir = pathlib.Path(os.path.join(image_path, "train-en"))
-            dataset = tf.data.Dataset.list_files(str(images_dir / '*/*'), shuffle=False)
-            val_batches = tf.data.experimental.cardinality(dataset)
-            dataset = dataset.skip(val_batches // 5)
+class OrchidsDataset(object):
+    def __init__(self):
+        self.extracting_label = None
 
-    elif 'v2' == data_dir:
-        image_path = pathlib.Path(image_path)
-        dataset = tf.data.Dataset.list_files(os.path.join(str(image_path), '*/*'), shuffle=False)
-        if 'train' == split:
-            dataset = dataset.take(train_size)
-        elif 'test' == split:
-            dataset = dataset.skip(train_size)
-            dataset = dataset.skip(validate_size)
-            dataset = dataset.take(test_size)
-        elif 'validate' == split:
-            dataset = dataset.skip(train_size)
-            dataset = dataset.take(validate_size)
+    def _extracting_label(self, file_path, class_names, one_hot):
+        if one_hot:
+            label = get_label_one_hot(file_path, class_names)
+        else:
+            label = get_label(file_path, class_names)
+        img = tf.io.read_file(file_path)
+        return img, label
 
-    check_wrap_process_path(data_dir=image_path, image_size=nets.mobilenet_v2.IMG_SIZE_224)
-    decode_dataset = dataset.map(_process_path, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    def extracting_label_warping(self, data_dir):
+        class_names = np.array(sorted([item.name for item in data_dir.glob("n*")]))
+        self.extracting_label = wrapped_partial(self._extracting_label, class_names=class_names, one_hot=False)
 
-    if split == 'train':
-        global preprocess_for_train
-        if not preprocess_for_train:
-            preprocess_for_train = wrapped_partial(
-                orchids52_dataset._preprocess_for_train,
-                aug_method=aug_method,
-                image_size=nets.mobilenet_v2.IMG_SIZE_224
-            )
-        decode_dataset = decode_dataset.map(preprocess_for_train)
-    else:
-        global preprocess_for_eval
-        if not preprocess_for_eval:
-            preprocess_for_eval = wrapped_partial(
-                orchids52_dataset._preprocess_for_eval,
-                image_size=nets.mobilenet_v2.IMG_SIZE_224
-            )
-        decode_dataset = decode_dataset.map(preprocess_for_eval)
+    def _load_dataset(
+        self,
+        split,
+        root_path,
+        batch_size,
+        num_of_class,
+        train_size,
+        test_size,
+        validate_size=0,
+        repeat=False,
+        **kwargs
+    ):
+        dataset = None
+        image_path = os.path.join(root_path, split)
+        images_dir = pathlib.Path(image_path)
+        dataset = tf.data.Dataset.list_files(str(images_dir / "*/*"), shuffle=False)
 
-    dataset = configure_for_performance(decode_dataset, batch_size=batch_size)
+        self.extracting_label_warping(data_dir=images_dir)
+        decode_dataset = dataset.map(self.extracting_label, num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
-    if repeat:
-        dataset = dataset.repeat()
+        dataset = configure_for_performance(dataset, batch_size=batch_size)
 
-    if split:
-        if split == 'train':
-            setattr(dataset, 'size', train_size)
-        elif split == 'test':
-            setattr(dataset, 'size', test_size)
-        elif split == 'validate':
-            setattr(dataset, 'size', validate_size)
+        if repeat:
+            decode_dataset = decode_dataset.repeat()
 
-    setattr(dataset, 'num_of_classes', orchids52_dataset.NUM_OF_CLASSES)
+        if split:
+            if split == "train":
+                setattr(decode_dataset, "size", train_size)
+            elif split == "test":
+                setattr(decode_dataset, "size", test_size)
+            elif split == "validate":
+                setattr(decode_dataset, "size", validate_size)
 
-    return dataset
+        setattr(decode_dataset, "num_of_classes", num_of_class)
+
+        return decode_dataset
 
 
-load_dataset_v2 = wrapped_partial(
-    _load_dataset,
-    train_size=orchids52_dataset.TRAIN_SIZE_V2,
-    test_size=orchids52_dataset.TEST_SIZE_V2,
-    validate_size=orchids52_dataset.VALIDATE_SIZE_V2,
-    data_dir='v1')
-load_dataset_v3 = wrapped_partial(
-    _load_dataset,
-    train_size=orchids52_dataset.TRAIN_SIZE_V3,
-    test_size=orchids52_dataset.TEST_SIZE_V3,
-    validate_size=orchids52_dataset.VALIDATE_SIZE_V3,
-    data_dir='v2')
+def load_dataset_v1(split, batch_size, root_path):
+    return OrchidsDataset()._load_dataset(
+        split=split,
+        root_path=root_path,
+        batch_size=batch_size,
+        num_of_class=orchids52_dataset.NUM_OF_CLASSES,
+        train_size=orchids52_dataset.TRAIN_SIZE_V1,
+        test_size=orchids52_dataset.TEST_SIZE_V1,
+    )
 
-load_dataset_v2.num_of_class = orchids52_dataset.NUM_OF_CLASSES
-load_dataset_v2.train_size = orchids52_dataset.TRAIN_SIZE_V2
-load_dataset_v2.test_size = orchids52_dataset.TEST_SIZE_V2
-load_dataset_v2.validate_size = orchids52_dataset.VALIDATE_SIZE_V2
 
-load_dataset_v3.num_of_class = orchids52_dataset.NUM_OF_CLASSES
-load_dataset_v3.train_size = orchids52_dataset.TRAIN_SIZE_V3
-load_dataset_v3.test_size = orchids52_dataset.TEST_SIZE_V3
-load_dataset_v3.validate_size = orchids52_dataset.VALIDATE_SIZE_V3
+def load_dataset_v2(split, batch_size, root_path):
+    return OrchidsDataset()._load_dataset(
+        split=split,
+        root_path=root_path,
+        batch_size=batch_size,
+        num_of_class=orchids52_dataset.NUM_OF_CLASSES,
+        train_size=orchids52_dataset.TRAIN_SIZE_V2,
+        test_size=orchids52_dataset.TEST_SIZE_V2,
+        validate_size=orchids52_dataset.VALIDATE_SIZE_V2,
+    )
