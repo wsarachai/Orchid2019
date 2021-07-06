@@ -2,11 +2,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import functools
 import os
 import data
 import nets
 import tensorflow as tf
+from utils.wrapped_tools import wrapped_partial
 
 feature_description = {
     "image/colorspace": tf.io.FixedLenFeature([], tf.string, default_value=""),
@@ -18,12 +18,6 @@ feature_description = {
 
 preprocess_for_train = None
 preprocess_for_eval = None
-
-
-def wrapped_partial(func, *args, **kwargs):
-    partial_func = functools.partial(func, *args, **kwargs)
-    functools.update_wrapper(partial_func, func)
-    return partial_func
 
 
 def get_label(serialize_example):
@@ -54,7 +48,8 @@ def _load_dataset(
     validate_size,
     repeat=False,
     num_readers=1,
-    num_map_threads=1
+    num_map_threads=1,
+    **kwargs
 ):
     pattern = "orchids52-{split}*.tfrecord".format(split=split)
     pattern = os.path.join(root_path, data_dir, pattern)

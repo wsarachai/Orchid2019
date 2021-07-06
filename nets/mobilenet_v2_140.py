@@ -3,17 +3,17 @@ from __future__ import division
 from __future__ import print_function
 
 import os
-
-import numpy as np
-
 import nets
-import lib_utils
+import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
 
 from tensorflow.python.keras import activations
 from nets.mobilenet_v2 import IMG_SHAPE_224
 from nets.mobilenet_v2 import create_mobilenet_v2
+from utils import lib_utils
+from utils.const import TRAIN_STEP1
+from utils.const import TRAIN_TEMPLATE
 
 
 def preprocess_input(image_data, central_fraction=0.875):
@@ -88,11 +88,9 @@ class Orchids52Mobilenet140(object):
             _, checkpoint_manager = checkpoint
             checkpoint_manager.save()
 
-    def load_from_v1(self,
-                     latest_checkpoint,
-                     target_model="mobilenetv2_01_1.40_224_",
-                     model_name="MobilenetV2",
-                     **kwargs):
+    def load_from_v1(
+        self, latest_checkpoint, target_model="mobilenetv2_01_1.40_224_", model_name="MobilenetV2", **kwargs
+    ):
         value_to_load = kwargs.get("value_to_load", {})
         key_to_numpy = kwargs.get("key_to_numpy", {})
         include_prediction_layer = kwargs.get("include_prediction_layer", True)
@@ -147,7 +145,6 @@ class Orchids52Mobilenet140(object):
             "block_{}_project_BN/beta": "expanded_conv_{}/project/BatchNorm/beta",
             "block_{}_project_BN/moving_mean": "expanded_conv_{}/project/BatchNorm/moving_mean",
             "block_{}_project_BN/moving_variance": "expanded_conv_{}/project/BatchNorm/moving_variance",
-
         }
 
         for key in key_maps1:
@@ -178,7 +175,7 @@ class Orchids52Mobilenet140(object):
                     value_to_load[target_model + key.format(i)] = value
                     key_to_numpy.pop(_key_v)
                 else:
-                    raise Exception("Can't find the key: {}".format(_key_v))
+                    print("Can't find the key: {}".format(_key_v))
         return value_to_load
 
     def restore_model_from_latest_checkpoint_if_exist(self, **kwargs):
@@ -195,7 +192,20 @@ class Orchids52Mobilenet140(object):
         if not result:
             latest_checkpoint = kwargs.pop("checkpoint_path")
             if latest_checkpoint:
-                var_loaded = self.load_from_v1(latest_checkpoint, **kwargs)
+                if self.training:
+                    if self.step == TRAIN_STEP1:
+                        var_loaded = Orchids52Mobilenet140.load_from_v1(
+                            self,
+                            latest_checkpoint=latest_checkpoint,
+                            target_model="mobilenetv2_stn_base_1.40_224_",
+                            model_name="MobilenetV2",
+                            include_prediction_layer=False,
+                        )
+
+                    elif self.step == nets.utils.TRAIN_STEP2:
+                        var_loaded = []
+                else:
+                    var_loaded = self.load_from_v1(latest_checkpoint, **kwargs)
                 var_loaded_fixed_name = {}
                 for key in var_loaded:
                     var_loaded_fixed_name.update({key + ":0": var_loaded[key]})
@@ -247,7 +257,9 @@ class Orchids52Mobilenet140(object):
         step = 1
         loaded_successfully = False
         if load_from_checkpoint_first:
-            loaded_successfully = self.restore_model_from_latest_checkpoint_if_exist(checkpoint_path=checkpoint_path, **kwargs)
+            loaded_successfully = self.restore_model_from_latest_checkpoint_if_exist(
+                checkpoint_path=checkpoint_path, **kwargs
+            )
         if not loaded_successfully:
             self.load_model_variables()
         else:
@@ -304,19 +316,27 @@ class PreprocessLayer(keras.layers.Layer):
         training = kwargs.pop("training")
         if training:
             sel = tf.random.uniform([], maxval=4, dtype=tf.int32)
-            inputs = tf.switch_case(sel, branch_fns={
-                0: lambda: tf.image.random_flip_left_right(inputs),
-                1: lambda: tf.image.random_flip_up_down(inputs),
-                2: lambda: tf.image.rot90(inputs),
-            }, default=lambda: inputs)
+            inputs = tf.switch_case(
+                sel,
+                branch_fns={
+                    0: lambda: tf.image.random_flip_left_right(inputs),
+                    1: lambda: tf.image.random_flip_up_down(inputs),
+                    2: lambda: tf.image.rot90(inputs),
+                },
+                default=lambda: inputs,
+            )
 
             sel = tf.random.uniform([], maxval=5, dtype=tf.int32)
-            inputs = tf.switch_case(sel, branch_fns={
-                0: lambda: tf.image.random_brightness(inputs, max_delta=0.5),
-                1: lambda: tf.image.random_saturation(inputs, lower=1, upper=5),
-                2: lambda: tf.image.random_contrast(inputs, lower=0.2, upper=0.5),
-                3: lambda: tf.image.random_hue(inputs, max_delta=0.2),
-            }, default=lambda: inputs)
+            inputs = tf.switch_case(
+                sel,
+                branch_fns={
+                    0: lambda: tf.image.random_brightness(inputs, max_delta=0.5),
+                    1: lambda: tf.image.random_saturation(inputs, lower=1, upper=5),
+                    2: lambda: tf.image.random_contrast(inputs, lower=0.2, upper=0.5),
+                    3: lambda: tf.image.random_hue(inputs, max_delta=0.2),
+                },
+                default=lambda: inputs,
+            )
         return inputs
 
 
@@ -345,13 +365,11 @@ def global_pool(shape, pool_op=keras.layers.AvgPool2D):
 
 
 def create_mobilenet_v2_14(num_classes, optimizer=None, loss_fn=None, training=False, **kwargs):
-    step = kwargs.pop("step") if "step" in kwargs else nets.utils.TRAIN_TEMPLATE.format(1)
+    step = kwargs.pop("step") if "step" in kwargs else TRAIN_TEMPLATE.format(1)
 
     inputs = keras.Input(shape=IMG_SHAPE_224)
     preprocess_layer = PreprocessLayer()
-    mobilenet = create_mobilenet_v2(
-        input_shape=IMG_SHAPE_224, alpha=1.4, include_top=False, weights=None
-    )
+    mobilenet = create_mobilenet_v2(input_shape=IMG_SHAPE_224, alpha=1.4, include_top=False, weights=None)
     processed_inputs = preprocess_layer(inputs, training=training)
     mobilenet_logits = mobilenet(processed_inputs, training=training)
 

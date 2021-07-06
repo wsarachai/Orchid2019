@@ -7,12 +7,11 @@ import h5py
 import numpy as np
 import tensorflow as tf
 
-from lib_utils import start
-from lib_utils import FLAGS
-from lib_utils import create_image_lists
-from lib_utils import DisplayInfo
-from nets.utils import nets_mapping
-from nets.utils import preprocessing_mapping
+from utils.lib_utils import start
+from utils.lib_utils import FLAGS
+from utils.lib_utils import DisplayInfo
+from nets.mapping import nets_mapping
+from nets.mapping import preprocessing_mapping
 from data import data_utils
 from absl import logging
 
@@ -49,5 +48,5 @@ def main(unused_argv):
 
 
 if __name__ == "__main__":
-    tf.config.run_functions_eagerly(True)
+    # tf.config.run_functions_eagerly(True)
     start(main)

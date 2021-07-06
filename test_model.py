@@ -3,17 +3,13 @@ from __future__ import division
 from __future__ import print_function
 
 import os
-import re
-import sys
-import collections
 import numpy as np
 import tensorflow as tf
-import lib_utils
 
 from absl import logging
 from data import data_utils
-from lib_utils import create_image_lists
-from lib_utils import FLAGS
+from utils.lib_utils import create_image_lists
+from utils.lib_utils import FLAGS
 from nets.mobilenet_v2_140 import preprocess_input
 
 

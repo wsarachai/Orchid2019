@@ -2,12 +2,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import functools
 import os
 import tensorflow as tf
 
 from nets import mobilenet_v2
 from data import flowers102_dataset
+from utils.wrapped_tools import wrapped_partial
 
 
 feature_description = {
@@ -24,12 +24,6 @@ feature_description = {
     "bottleneck/inception_v1": tf.io.FixedLenFeature((), tf.string, default_value=""),
     "bottleneck/inception_v3": tf.io.FixedLenFeature((), tf.string, default_value=""),
 }
-
-
-def wrapped_partial(func, *args, **kwargs):
-    partial_func = functools.partial(func, *args, **kwargs)
-    functools.update_wrapper(partial_func, func)
-    return partial_func
 
 
 def _get_label(serialize_example, depth):
@@ -50,15 +44,7 @@ def parse_function(example_proto):
 
 
 def _load_dataset(
-    split,
-    root_path,
-    data_dir,
-    batch_size,
-    train_size,
-    test_size,
-    repeat=False,
-    num_readers=1,
-    num_map_threads=1
+    split, root_path, data_dir, batch_size, train_size, test_size, repeat=False, num_readers=1, num_map_threads=1
 ):
     pattern = "flowers17_{split}*.tfrecord".format(split=split)
     pattern = os.path.join(root_path, data_dir, pattern)
@@ -72,9 +58,7 @@ def _load_dataset(
     parsed_dataset = dataset.map(parse_function, num_parallel_calls=num_map_threads)
     decode_dataset = parsed_dataset.map(decode_example)
 
-    preprocess_image = wrapped_partial(
-        flowers102_dataset.preprocess_image, image_size=mobilenet_v2.IMG_SIZE_224
-    )
+    preprocess_image = wrapped_partial(flowers102_dataset.preprocess_image, image_size=mobilenet_v2.IMG_SIZE_224)
     decode_dataset = decode_dataset.map(preprocess_image)
     decode_dataset = decode_dataset.batch(batch_size=batch_size).cache()
 

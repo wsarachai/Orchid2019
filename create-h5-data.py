@@ -8,20 +8,10 @@ import collections
 import h5py
 import tensorflow as tf
 import numpy as np
-import lib_utils
 
-from absl import flags
 from absl import logging
-
 from nets.mobilenet_v2_140 import preprocess_input
-
-flags.DEFINE_string(
-    "image_dir",
-    "/Users/watcharinsarachai/Documents/_datasets/orchids52_data/test/",
-    "The directory where the dataset images are locate",
-)
-
-FLAGS = flags.FLAGS
+from utils.lib_utils import FLAGS
 
 
 def create_image_lists(image_dir):
@@ -68,22 +58,27 @@ def create_image_lists(image_dir):
 
 
 def main(_):
-    dataset_images = create_image_lists(image_dir=FLAGS.image_dir)
-    save_path = FLAGS.image_dir + '-new'
+    split = "train"
+    workspace_path = os.environ["WORKSPACE"] if "WORKSPACE" in os.environ else "/Users/watcharinsarachai/Documents/"
+    image_dir = os.path.join(
+        workspace_path, "_datasets", FLAGS.dataset, FLAGS.dataset_format, FLAGS.dataset_version, split
+    )
+    save_path = os.path.join(workspace_path, "_datasets", FLAGS.dataset, "h5", FLAGS.dataset_version, split)
+    dataset_images = create_image_lists(image_dir=image_dir)
     if not tf.io.gfile.exists(save_path):
         os.makedirs(save_path)
-    f = h5py.File(save_path + '/orchids52.h5', 'w')
+    f = h5py.File(save_path + "/orchids52.h5", "w")
     for label, data in dataset_images.items():
         print(label, ": ", len(data))
         elems = []
         for file in sorted(data["testing"]):
-            filename = os.path.join(FLAGS.image_dir, data["dir"], file)
+            filename = os.path.join(image_dir, data["dir"], file)
             image_data = tf.io.gfile.GFile(filename, "rb").read()
             inputs = preprocess_input(image_data)
             elems.append(tf.squeeze(inputs))
         elems = np.stack([e for e in elems])
         print(elems.shape)
-        dset = f.create_dataset("orchids52/test/" + label, elems.shape)
+        dset = f.create_dataset("orchids52/{}/".format(split) + label, elems.shape)
         for i, e in enumerate(elems):
             dset[i] = e
 
@@ -96,5 +91,5 @@ def main(_):
 
 
 if __name__ == "__main__":
-    #tf.config.run_functions_eagerly(True)
+    # tf.config.run_functions_eagerly(True)
     lib_utils.start(main)

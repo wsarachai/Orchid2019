@@ -2,12 +2,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import functools
-import os
 import tensorflow as tf
 
 from nets import mobilenet_v2
 from data import orchids52_dataset
+from utils.wrapped_tools import wrapped_partial
 
 feature_description = {
     "image/height": tf.io.FixedLenFeature([], tf.int64, default_value=tf.zeros([], dtype=tf.int64)),
@@ -23,12 +22,6 @@ feature_description = {
     "bottleneck/inception_v1": tf.io.FixedLenFeature((), tf.string, default_value=""),
     "bottleneck/inception_v3": tf.io.FixedLenFeature((), tf.string, default_value=""),
 }
-
-
-def wrapped_partial(func, *args, **kwargs):
-    partial_func = functools.partial(func, *args, **kwargs)
-    functools.update_wrapper(partial_func, func)
-    return partial_func
 
 
 def _get_label(serialize_example, depth, one_hot=False):

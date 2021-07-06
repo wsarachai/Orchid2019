@@ -7,9 +7,6 @@ import os
 import re
 import copy
 import sys
-
-from tensorflow._api.v2.compat import v1
-import nets
 import numpy as np
 import tensorflow as tf
 
@@ -18,7 +15,8 @@ from absl import logging
 from absl import flags
 from data.data_utils import DATASET_VERSION_V1, DATA_FORMAT_H5
 from data.data_utils import ORCHIDS52
-from nets.utils import MOBILENET_V2_140_ORCHIDS52
+from utils.const import MOBILENET_V2_140_ORCHIDS52
+from utils.const import TRAIN_V2_STEP2, TRAIN_STEP4
 
 FLAGS = flags.FLAGS
 
@@ -41,6 +39,28 @@ flags.DEFINE_string("dataset_version", DATASET_VERSION_V1, "Dataset version")
 flags.DEFINE_string("model", MOBILENET_V2_140_ORCHIDS52, "Model")
 
 flags.DEFINE_string("checkpoint_path", "mobilenet_v2_140_orchids52_0001", "Checkpoint path")
+
+flags.DEFINE_boolean("save_best_only", False, "Save the checkpoint only best result.")
+
+flags.DEFINE_boolean("save_model", False, "Save the model on each state.")
+
+flags.DEFINE_string("total_epochs", "100,200,200,200", "Total epochs")
+
+flags.DEFINE_integer("start_state", 1, "Start state")
+
+flags.DEFINE_integer("end_state", 2, "End state")
+
+flags.DEFINE_string(
+    "optimizer",
+    "rmsprop",
+    'The name of the optimizer, one of "adadelta", "adagrad", "adam",' '"ftrl", "momentum", "sgd" or "rmsprop".',
+)
+
+flags.DEFINE_string(
+    "trained_path",
+    "/home/keng/Documents/_trained_models/model-v1/mobilenet_v2_140_orchids52_0001/pretrain2/model.ckpt-12000",
+    "Checkpoint Path",
+)
 
 
 def create_image_lists(image_dir):
@@ -109,9 +129,6 @@ def apply_with_random_selector(x, func, num_cases):
 def start(start_fn):
     logging.set_verbosity(logging.INFO)
     logging.info("tf.version %s" % tf.version.VERSION)
-    # physical_devices = tf.config.experimental.list_physical_devices('GPU')
-    # if len(physical_devices) > 0:
-    #    config = tf.config.experimental.set_memory_growth(physical_devices[0], True)
     app.run(start_fn)
 
 
@@ -122,7 +139,7 @@ def config_learning_rate(learning_rate=0.001, exp_decay=False, **kwargs):
             initial_learning_rate=learning_rate, decay_steps=10, decay_rate=0.96
         )
     else:
-        if training_step in [nets.utils.TRAIN_STEP4, nets.utils.TRAIN_V2_STEP2]:
+        if training_step in [TRAIN_STEP4, TRAIN_V2_STEP2]:
             learning_rate = 0.000001
     return learning_rate
 
@@ -201,7 +218,7 @@ class TrainClassifier:
         self.total_loss_metric.reset_states()
         self.accuracy_metric.reset_states()
 
-    def fit(self, initial_epoch, epoches, train_ds, validate_ds, **kwargs):
+    def fit(self, initial_epoch, epoches, train_ds, validate_ds=None, **kwargs):
         history = {
             "train_loss": [],
             "reg_loss": [],
@@ -254,14 +271,15 @@ class TrainClassifier:
             self.reset_metric()
 
             logs = None
-            for inputs, labels in validate_ds:
-                if inputs.shape.as_list()[0] == self.batch_size:
-                    logs = self.evaluate_step(inputs, labels)
+            if validate_ds:
+                for inputs, labels in validate_ds:
+                    if inputs.shape.as_list()[0] == self.batch_size:
+                        logs = self.evaluate_step(inputs, labels)
 
-            logs = copy.copy(logs) if logs else {}
-            history["val_loss"].append(logs["loss"].numpy())
-            history["val_accuracy"].append(logs["accuracy"].numpy())
-            print("\nValidation: val_loss: {:.3f}, val_accuracy: {:.3f}\n".format(logs["loss"], logs["accuracy"]))
+                logs = copy.copy(logs) if logs else {}
+                history["val_loss"].append(logs["loss"].numpy())
+                history["val_accuracy"].append(logs["accuracy"].numpy())
+                print("\nValidation: val_loss: {:.3f}, val_accuracy: {:.3f}\n".format(logs["loss"], logs["accuracy"]))
 
             if save_best_only and val_accuracy < logs["accuracy"].numpy() or val_loss > logs["loss"].numpy():
                 val_accuracy = logs["accuracy"].numpy()

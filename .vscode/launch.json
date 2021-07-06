@@ -13,11 +13,13 @@
       "args": [
         "--start_state=1",
         "--end_state=2",
-        "--dataset=orchids52_v2_tf",
-        "--model=mobilenet_v2_140_orchids52",
+        "--dataset_format=h5",
+        "--dataset=orchids52_data",
+        "--dataset_version=v1",
+        "--model=mobilenet_v2_140_stn_v15",
         "--learning_rate=0.1",
         "--total_epochs=20",
-        "--aug_method=normal"
+        "--trained_path=/home/keng/Documents/_trained_models/model-v1/mobilenet_v2_140_orchids52_0001/pretrain2/model.ckpt-12000"
       ]
     },
     {
@@ -58,6 +60,18 @@
       "console": "integratedTerminal",
       "args": [
         "--file=/Volumes/Data/tmp/orchids-models/orchids2019/mobilenet_v2_140_orchids52/11-15-2020-15-20-31-history-pretrain1"
+      ]
+    },
+    {
+      "name": "Python: Gen dataset",
+      "type": "python",
+      "request": "launch",
+      "program": "create-h5-data.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--dataset_format=files",
+        "--dataset=orchids52_data",
+        "--dataset_version=v1",
       ]
     }
   ]

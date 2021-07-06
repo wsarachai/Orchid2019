@@ -4,7 +4,7 @@ from __future__ import print_function
 
 import os
 import tensorflow as tf
-import lib_utils
+import utils.lib_utils
 import data
 import nets
 from datetime import datetime

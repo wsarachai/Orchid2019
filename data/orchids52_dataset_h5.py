@@ -3,19 +3,10 @@ from __future__ import division
 from __future__ import print_function
 
 import os
-import pathlib
-import functools
 import h5py
-import numpy as np
 import tensorflow as tf
+from tensorflow.python.ops.gen_array_ops import one_hot
 from data import orchids52_dataset
-from nets.mobilenet_v2 import IMG_SIZE_224
-
-
-def wrapped_partial(func, *args, **kwargs):
-    partial_func = functools.partial(func, *args, **kwargs)
-    functools.update_wrapper(partial_func, func)
-    return partial_func
 
 
 def decode_img(image, size):
@@ -24,15 +15,15 @@ def decode_img(image, size):
     return img
 
 
-def get_label_one_hot(file_path, class_names):
-    parts = tf.strings.split(file_path, os.path.sep)
-    one_hot = parts[-2] == class_names
-    return tf.cast(one_hot, tf.float32)
+def get_label_one_hot(image, label):
+    label = tf.strings.substr(label, 1, 4)
+    label = tf.strings.to_number(label, out_type=tf.int32)
+    label = tf.one_hot(label, depth=orchids52_dataset.NUM_OF_CLASSES)
+    return image, label
 
 
-def get_label(file_path, class_names):
-    parts = tf.strings.split(file_path, os.path.sep)
-    return parts[-2]
+def get_label(image, label):
+    return image, label
 
 
 def configure_for_performance(ds, batch_size=32):
@@ -43,13 +34,11 @@ def configure_for_performance(ds, batch_size=32):
     return ds
 
 
-def _extracting_label(self, file_path, class_names, one_hot):
+def extracting_label(ds, one_hot):
     if one_hot:
-        label = get_label_one_hot(file_path, class_names)
+        return ds.map(get_label_one_hot)
     else:
-        label = get_label(file_path, class_names)
-    img = tf.io.read_file(file_path)
-    return img, label
+        return ds.map(get_label)
 
 
 class OrchidsGenerator(object):
@@ -64,7 +53,8 @@ class OrchidsGenerator(object):
                 yield im, label
 
 
-def load_dataset_v1(split, batch_size, root_path):
+def load_dataset_v1(split, batch_size, root_path, **kwargs):
+    one_hot = kwargs.get("one_hot", False)
     file = os.path.join(root_path, split, "orchids52.h5")
     with h5py.File(file, "r") as hf:
         labels = [label for label in hf["orchids52/" + split]]
@@ -80,6 +70,8 @@ def load_dataset_v1(split, batch_size, root_path):
             args=(label,),
         )
     )
+
+    ds = extracting_label(ds, one_hot)
     ds = configure_for_performance(ds, batch_size=batch_size)
 
     if split:
@@ -93,7 +85,7 @@ def load_dataset_v1(split, batch_size, root_path):
     return ds
 
 
-def load_dataset_v2(split, batch_size, root_path):
+def load_dataset_v2(split, batch_size, root_path, **kwargs):
     with h5py.File(root_path, "r") as hf:
         labels = [label for label in hf["orchids52/" + split]]
 

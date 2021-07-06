@@ -4,17 +4,9 @@ from __future__ import print_function
 
 import os
 import pathlib
-import functools
 import numpy as np
 import tensorflow as tf
 from data import orchids52_dataset
-from nets.mobilenet_v2 import IMG_SIZE_224
-
-
-def wrapped_partial(func, *args, **kwargs):
-    partial_func = functools.partial(func, *args, **kwargs)
-    functools.update_wrapper(partial_func, func)
-    return partial_func
 
 
 def decode_img(image, size):
@@ -56,7 +48,9 @@ class OrchidsDataset(object):
 
     def extracting_label_warping(self, data_dir):
         class_names = np.array(sorted([item.name for item in data_dir.glob("n*")]))
-        self.extracting_label = wrapped_partial(self._extracting_label, class_names=class_names, one_hot=False)
+        self.extracting_label = lib_utils.wrapped_partial(
+            self._extracting_label, class_names=class_names, one_hot=False
+        )
 
     def _load_dataset(
         self,
@@ -96,7 +90,7 @@ class OrchidsDataset(object):
         return decode_dataset
 
 
-def load_dataset_v1(split, batch_size, root_path):
+def load_dataset_v1(split, batch_size, root_path, **kwargs):
     return OrchidsDataset()._load_dataset(
         split=split,
         root_path=root_path,
@@ -107,7 +101,7 @@ def load_dataset_v1(split, batch_size, root_path):
     )
 
 
-def load_dataset_v2(split, batch_size, root_path):
+def load_dataset_v2(split, batch_size, root_path, **kwargs):
     return OrchidsDataset()._load_dataset(
         split=split,
         root_path=root_path,

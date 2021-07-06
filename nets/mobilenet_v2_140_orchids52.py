@@ -18,6 +18,8 @@ from nets.mobilenet_v2 import create_mobilenet_v2
 from nets.mobilenet_v2_140 import PreprocessLayer
 from nets.mobilenet_v2_140 import PredictionLayer
 from nets.mobilenet_v2_140 import Orchids52Mobilenet140
+from utils.const import TRAIN_STEP1, TRAIN_STEP2, TRAIN_STEP3
+from utils.const import TRAIN_V2_STEP1, TRAIN_V2_STEP2
 
 
 class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
@@ -57,11 +59,9 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
             )
             self.stn_dense_checkpoint = (stn_dense_checkpoint, stn_dense_checkpoint_manager)
 
-    def load_from_v1(self,
-                     latest_checkpoint,
-                     target_model="mobilenetv2",
-                     model_name="mobilenet_v2_140_stn_v15",
-                     **kwargs):
+    def load_from_v1(
+        self, latest_checkpoint, target_model="mobilenetv2", model_name="mobilenet_v2_140_stn_v15", **kwargs
+    ):
         value_to_load = {}
         reader = tf.compat.v1.train.NewCheckpointReader(latest_checkpoint)
         var_to_shape_map = reader.get_variable_to_shape_map()
@@ -94,20 +94,26 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
         }
 
         local_var_loaded = super().load_from_v1(
-            latest_checkpoint, target_model + "_stn_base_1.40_224_",
+            latest_checkpoint,
+            target_model + "_stn_base_1.40_224_",
             model_name + "/localization_params/MobilenetV2",
             key_to_numpy=key_to_numpy,
-            include_prediction_layer=False)
+            include_prediction_layer=False,
+        )
         extract_var_loaded = super().load_from_v1(
-            latest_checkpoint, target_model + "_global_branch_1.40_224_",
+            latest_checkpoint,
+            target_model + "_global_branch_1.40_224_",
             model_name + "/features-extraction/MobilenetV2",
             key_to_numpy=key_to_numpy,
-            include_prediction_layer=False)
+            include_prediction_layer=False,
+        )
         extract_comm_var_loaded = super().load_from_v1(
-            latest_checkpoint, target_model + "_shared_branch_1.40_224_",
+            latest_checkpoint,
+            target_model + "_shared_branch_1.40_224_",
             model_name + "/features-extraction-common/MobilenetV2",
             key_to_numpy=key_to_numpy,
-            include_prediction_layer=False)
+            include_prediction_layer=False,
+        )
 
         for var_name in var_maps:
             _key = model_name + "/" + var_maps[var_name]
@@ -142,18 +148,18 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
             self.branch_model.trainable = trainable
 
     def config_layers(self):
-        if self.step == nets.utils.TRAIN_STEP1:
+        if self.step == TRAIN_STEP1:
             self.set_mobilenet_training_status(False)
         elif self.step == nets.utils.TRAIN_STEP2:
             self.set_mobilenet_training_status(False)
             self.set_prediction_training_status(False)
-        elif self.step == nets.utils.TRAIN_STEP3:
+        elif self.step == TRAIN_STEP3:
             self.set_mobilenet_training_status(False)
             self.set_prediction_training_status(False)
             self.stn_dense.trainable = False
-        elif self.step == nets.utils.TRAIN_V2_STEP1:
+        elif self.step == TRAIN_V2_STEP1:
             self.set_mobilenet_training_status(False)
-        elif self.step == nets.utils.TRAIN_V2_STEP2:
+        elif self.step == TRAIN_V2_STEP2:
             self.set_mobilenet_training_status(True)
 
     def load_model_step2(self):
@@ -195,9 +201,7 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
 
 
 class BranchBlock(keras.layers.Layer):
-    def __init__(
-        self, num_classes, batch_size, width=default_image_size, height=default_image_size
-    ):
+    def __init__(self, num_classes, batch_size, width=default_image_size, height=default_image_size):
         super(BranchBlock, self).__init__()
         self.batch_size = batch_size
         self.width = width
@@ -254,13 +258,15 @@ class EstimationBlock(keras.layers.Layer):
         super(EstimationBlock, self).__init__()
         self.num_classes = num_classes
         self.batch_size = batch_size
-        self.dense = FullyConnectedLayer(self.num_classes,
-                                         kernel_initializer=tf.keras.initializers.TruncatedNormal(mean=0.5),
-                                         activation=None)
-        self.batch_norm = tf.keras.layers.BatchNormalization(beta_initializer='zeros',
-                                                             gamma_initializer='ones',
-                                                             moving_mean_initializer='zeros',
-                                                             moving_variance_initializer='ones')
+        self.dense = FullyConnectedLayer(
+            self.num_classes, kernel_initializer=tf.keras.initializers.TruncatedNormal(mean=0.5), activation=None
+        )
+        self.batch_norm = tf.keras.layers.BatchNormalization(
+            beta_initializer="zeros",
+            gamma_initializer="ones",
+            moving_mean_initializer="zeros",
+            moving_variance_initializer="ones",
+        )
 
     def call(self, inputs, **kwargs):
         inp1 = tf.reshape(
@@ -298,9 +304,9 @@ class FullyConnectedLayer(tf.keras.layers.Layer):
         self.activation = activations.get(activation)
 
     def build(self, input_shape):
-        self.kernel = self.add_weight("kernel",
-                                      shape=[int(input_shape[-1]), self.num_outputs],
-                                      initializer=self.kernel_initializer)
+        self.kernel = self.add_weight(
+            "kernel", shape=[int(input_shape[-1]), self.num_outputs], initializer=self.kernel_initializer
+        )
 
     def call(self, inputs, **kwargs):
         x = tf.matmul(inputs, self.kernel)
@@ -317,7 +323,9 @@ class PrintingNode(tf.keras.layers.Layer):
         return tf.compat.v1.Print(inputs, [inputs])
 
 
-def create_orchid_mobilenet_v2_15(num_classes, optimizer=None, loss_fn=None, training=False, drop_out_prop=0.8, **kwargs):
+def create_orchid_mobilenet_v2_15(
+    num_classes, optimizer=None, loss_fn=None, training=False, drop_out_prop=0.8, **kwargs
+):
     stn_dense = None
     branch_base_model = None
     boundary_loss = None
@@ -335,7 +343,7 @@ def create_orchid_mobilenet_v2_15(num_classes, optimizer=None, loss_fn=None, tra
 
     processed_inputs = preprocess_layer(inputs, training=training)
 
-    if step != nets.utils.TRAIN_STEP1:
+    if step != TRAIN_STEP1:
         scales = [0.5, 0.3]
         fc_num = 3
 
@@ -345,12 +353,15 @@ def create_orchid_mobilenet_v2_15(num_classes, optimizer=None, loss_fn=None, tra
                 keras.layers.Flatten(),
                 keras.layers.Dense(128, activation="tanh", name="stn_dense_128_1"),
                 keras.layers.Dropout(rate=drop_out_prop),
-                FullyConnectedLayer(fc_num,
-                                    kernel_initializer=tf.keras.initializers.TruncatedNormal(mean=0.0, stddev=0.4),
-                                    normalizer_fn=tf.math.l2_normalize,
-                                    activation="tanh", name="stn_dense_3_1"),
+                FullyConnectedLayer(
+                    fc_num,
+                    kernel_initializer=tf.keras.initializers.TruncatedNormal(mean=0.0, stddev=0.4),
+                    normalizer_fn=tf.math.l2_normalize,
+                    activation="tanh",
+                    name="stn_dense_3_1",
+                ),
             ],
-            name="stn_dense1"
+            name="stn_dense1",
         )
 
         stn_dense2 = keras.Sequential(
@@ -359,12 +370,15 @@ def create_orchid_mobilenet_v2_15(num_classes, optimizer=None, loss_fn=None, tra
                 keras.layers.Flatten(),
                 keras.layers.Dense(128, activation="tanh", name="stn_dense_128_2"),
                 keras.layers.Dropout(rate=drop_out_prop),
-                FullyConnectedLayer(fc_num,
-                                    kernel_initializer=tf.keras.initializers.TruncatedNormal(mean=0.0, stddev=0.4),
-                                    normalizer_fn=tf.math.l2_normalize,
-                                    activation="tanh", name="stn_dense_3_2"),
+                FullyConnectedLayer(
+                    fc_num,
+                    kernel_initializer=tf.keras.initializers.TruncatedNormal(mean=0.0, stddev=0.4),
+                    normalizer_fn=tf.math.l2_normalize,
+                    activation="tanh",
+                    name="stn_dense_3_2",
+                ),
             ],
-            name="stn_dense2"
+            name="stn_dense2",
         )
 
         stn_out1 = keras.Sequential([stn_base_model, stn_dense1])
@@ -399,16 +413,14 @@ def create_orchid_mobilenet_v2_15(num_classes, optimizer=None, loss_fn=None, tra
         logits = branches_block(stn_output)
 
         # # with tf.name_scope('estimate_block'):
-        if step == nets.utils.TRAIN_STEP2:
+        if step == TRAIN_STEP2:
             outputs = tf.reduce_mean(logits, axis=0)
         else:
             estimate_block = EstimationBlock(num_classes=num_classes, batch_size=batch_size)
             outputs = estimate_block(logits)
 
     else:
-        prediction_layer = PredictionLayer(
-            num_classes=num_classes, activation="softmax"
-        )
+        prediction_layer = PredictionLayer(num_classes=num_classes, activation="softmax")
         branches_prediction_models.append(prediction_layer)
         mobilenet_logits = stn_base_model(processed_inputs, training=training)
         outputs = prediction_layer(mobilenet_logits, training=training)
