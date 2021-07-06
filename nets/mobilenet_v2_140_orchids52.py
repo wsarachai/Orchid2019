@@ -70,7 +70,6 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
         var_to_shape_map = reader.get_variable_to_shape_map()
         key_to_numpy = {}
         for key in sorted(var_to_shape_map.items()):
-            print(key)
             key_to_numpy.update({key[0]: reader.get_tensor(key[0])})
 
         var_maps = {
@@ -182,7 +181,8 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
     def set_mobilenet_training_status(self, trainable):
         super(Orchids52Mobilenet140STN, self).set_mobilenet_training_status(trainable)
         if self.branch_model:
-            self.branch_model.trainable = trainable
+            self.branch_model.set_trainable_for_global_branch(trainable)
+            self.branch_model.set_trainable_for_share_branch(trainable)
 
     def config_layers(self):
         if self.step == TRAIN_STEP1:
@@ -248,7 +248,7 @@ class BranchBlock(keras.layers.Layer):
         self.global_branch_model = create_mobilenet_v2(
             input_shape=IMG_SHAPE_224, alpha=1.4, include_top=False, weights="imagenet", sub_name="global_branch"
         )
-        self.branch_base_model = create_mobilenet_v2(
+        self.shared_branch_model = create_mobilenet_v2(
             input_shape=IMG_SHAPE_224, alpha=1.4, include_top=False, weights="imagenet", sub_name="shared_branch"
         )
         self.branches_prediction_models = [
@@ -287,9 +287,15 @@ class BranchBlock(keras.layers.Layer):
             x = self.global_branch_model(inp, training=False)
             x = prediction(x, training=False)
         else:
-            x = self.branch_base_model(inp, training=False)
+            x = self.shared_branch_model(inp, training=False)
             x = prediction(x, training=False)
         return x
+
+    def set_trainable_for_global_branch(self, trainable):
+        self.global_branch_model.trainable = trainable
+
+    def set_trainable_for_share_branch(self, trainable):
+        self.shared_branch_model.trainable = trainable
 
 
 class EstimationBlock(keras.layers.Layer):
@@ -448,7 +454,6 @@ def create_orchid_mobilenet_v2_15(
 
         # with tf.name_scope('branches'):
         branches_block = BranchBlock(num_classes=num_classes, batch_size=batch_size)
-        branch_base_model = branches_block.branch_base_model
         branches_prediction_models = branches_block.branches_prediction_models
 
         logits = branches_block(stn_output)
@@ -478,7 +483,7 @@ def create_orchid_mobilenet_v2_15(
         stn_denses=stn_denses,
         estimate_block=estimate_block,
         predict_models=branches_prediction_models,
-        branch_model=branch_base_model,
+        branch_model=branches_block,
         boundary_loss=boundary_loss,
         training=training,
         step=step,

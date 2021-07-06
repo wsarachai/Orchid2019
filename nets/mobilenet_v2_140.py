@@ -275,6 +275,8 @@ class Orchids52Mobilenet140(object):
         else:
             step = self.get_step_number_from_latest_checkpoint() + 1
         self.config_layers()
+        for var in self.model.trainable_variables:
+            print("trainable variable: ", var.name)
         return step
 
     def config_layers(self):
