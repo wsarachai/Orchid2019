@@ -154,7 +154,7 @@ def config_optimizer(optimizer, learning_rate, **kwargs):
 
 
 def config_loss(**kwargs):
-    loss_fn = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
+    loss_fn = tf.keras.losses.CategoricalCrossentropy(from_logits=False)
     return loss_fn
 
 
@@ -178,10 +178,10 @@ class TrainClassifier:
         self.model.compile(self.metrics)
 
     def train_step(self, inputs, labels):
-        print(inputs)
         boundary_loss = 0.0
         with tf.GradientTape() as tape:
             predictions = self.model.process_step(inputs, training=True)
+            # print(predictions[0], labels[0])
             if hasattr(self.model, "boundary_loss") and self.model.boundary_loss:
                 boundary_loss = self.model.boundary_loss(inputs, training=True)
             train_loss = self.model.get_loss(labels, predictions)
@@ -219,7 +219,7 @@ class TrainClassifier:
         self.total_loss_metric.reset_states()
         self.accuracy_metric.reset_states()
 
-    def fit(self, initial_epoch, epoches, train_ds, validate_ds=None, **kwargs):
+    def fit(self, initial_epoch, epoches, train_ds, **kwargs):
         history = {
             "train_loss": [],
             "reg_loss": [],
@@ -231,7 +231,7 @@ class TrainClassifier:
         }
         target = train_ds.size // self.batch_size
         is_run_from_bash = kwargs.pop("bash") if "bash" in kwargs else False
-        save_best_only = kwargs.pop("save_best_only") if "save_best_only" in kwargs else False
+        # save_best_only = kwargs.pop("save_best_only") if "save_best_only" in kwargs else False
         finalize = False if not is_run_from_bash else True
         progbar = tf.keras.utils.Progbar(
             target,
@@ -241,8 +241,7 @@ class TrainClassifier:
             stateful_metrics={"train_loss", "reg_loss", "b_loss", "total_loss", "accuracy"},
             unit_name="step",
         )
-        val_accuracy = 0.0
-        val_loss = 1.0
+
         for epoch in range(initial_epoch, epoches + 1):
             print("\nEpoch: {}/{}".format(epoch, epoches))
 
@@ -256,12 +255,6 @@ class TrainClassifier:
                     num_steps = logs.pop("num_steps", 1)
                     seen += num_steps
                     progbar.update(seen, list(logs.items()), finalize=finalize)
-                # else:
-                #     logging.error('\n{epoch}: Error batch size {b1} != {b2}.'.format(
-                #         epoch=epoch,
-                #         b1=batch_size,
-                #         b2=inputs.shape.as_list()[0]
-                #     ))
 
             history["train_loss"].append(self.train_loss_metric.result().numpy())
             history["reg_loss"].append(self.regularization_loss_metric.result().numpy())
@@ -271,23 +264,6 @@ class TrainClassifier:
 
             self.reset_metric()
 
-            logs = None
-            if validate_ds:
-                for inputs, labels in validate_ds:
-                    if inputs.shape.as_list()[0] == self.batch_size:
-                        logs = self.evaluate_step(inputs, labels)
-
-                logs = copy.copy(logs) if logs else {}
-                history["val_loss"].append(logs["loss"].numpy())
-                history["val_accuracy"].append(logs["accuracy"].numpy())
-                print("\nValidation: val_loss: {:.3f}, val_accuracy: {:.3f}\n".format(logs["loss"], logs["accuracy"]))
-
-                if save_best_only and val_accuracy < logs["accuracy"].numpy() or val_loss > logs["loss"].numpy():
-                    val_accuracy = logs["accuracy"].numpy()
-                    val_loss = logs["loss"].numpy()
-                    self.model.save_model_variables()
-                else:
-                    self.model.save_model_variables()
         return {"history": history}
 
     def evaluate(self, datasets, **kwargs):

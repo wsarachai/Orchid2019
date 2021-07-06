@@ -18,7 +18,7 @@ from nets.mobilenet_v2 import create_mobilenet_v2
 from nets.mobilenet_v2_140 import PreprocessLayer
 from nets.mobilenet_v2_140 import PredictionLayer
 from nets.mobilenet_v2_140 import Orchids52Mobilenet140
-from utils.const import TRAIN_STEP1, TRAIN_STEP2, TRAIN_STEP3
+from utils.const import TRAIN_STEP1, TRAIN_STEP2, TRAIN_STEP3, TRAIN_STEP4
 from utils.const import TRAIN_V2_STEP1, TRAIN_V2_STEP2
 
 
@@ -30,7 +30,7 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
         optimizer,
         loss_fn,
         base_model,
-        stn_dense,
+        stn_denses,
         estimate_block,
         predict_models,
         branch_model,
@@ -41,32 +41,36 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
         super(Orchids52Mobilenet140STN, self).__init__(
             inputs, outputs, optimizer, loss_fn, base_model, predict_models, training, step
         )
-        self.stn_dense = stn_dense
+        self.stn_denses = stn_denses
         self.branch_model = branch_model
         self.estimate_block = estimate_block
         self.boundary_loss = boundary_loss
-        self.stn_dense_checkpoint = None
+        self.stn_dense_checkpoints = []
 
     def config_checkpoint(self, checkpoint_path):
         super(Orchids52Mobilenet140STN, self).config_checkpoint(checkpoint_path)
-        if self.stn_dense:
-            stn_dense_checkpoint = tf.train.Checkpoint(
-                step=tf.Variable(1), optimizer=self.optimizer, model=self.stn_dense
-            )
-            checkpoint_prefix = os.path.join(checkpoint_path, "stn_dense_layer")
-            stn_dense_checkpoint_manager = tf.train.CheckpointManager(
-                stn_dense_checkpoint, directory=checkpoint_prefix, max_to_keep=self.max_to_keep
-            )
-            self.stn_dense_checkpoint = (stn_dense_checkpoint, stn_dense_checkpoint_manager)
+        if self.stn_denses and len(self.stn_denses) > 0:
+            for i, stn_dense in enumerate(self.stn_denses):
+                stn_dense_checkpoint = tf.train.Checkpoint(
+                    step=tf.Variable(1), optimizer=self.optimizer, model=stn_dense
+                )
+                checkpoint_prefix = os.path.join(checkpoint_path, "stn_dense_layer_{}".format(i))
+                stn_dense_checkpoint_manager = tf.train.CheckpointManager(
+                    stn_dense_checkpoint, directory=checkpoint_prefix, max_to_keep=self.max_to_keep
+                )
+                self.stn_dense_checkpoints.append((stn_dense_checkpoint, stn_dense_checkpoint_manager))
 
     def load_from_v1(
         self, latest_checkpoint, target_model="mobilenetv2", model_name="mobilenet_v2_140_stn_v15", **kwargs
     ):
+        training_for_tf25 = kwargs.get("training_for_tf25", False)
+        pop_key = kwargs.get("pop_key", True)
         value_to_load = {}
         reader = tf.compat.v1.train.NewCheckpointReader(latest_checkpoint)
         var_to_shape_map = reader.get_variable_to_shape_map()
         key_to_numpy = {}
         for key in sorted(var_to_shape_map.items()):
+            print(key)
             key_to_numpy.update({key[0]: reader.get_tensor(key[0])})
 
         var_maps = {
@@ -85,42 +89,73 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
             "estimation_block/batch_normalization/beta": "Estimation/fully_connected_logits/BatchNorm/beta",
             "estimation_block/batch_normalization/moving_mean": "Estimation/fully_connected_logits/BatchNorm/moving_mean",
             "estimation_block/batch_normalization/moving_variance": "Estimation/fully_connected_logits/BatchNorm/moving_variance",
-            "branch_block/prediction_layer/prediction_layer/kernel": "Logits/Conv2d_1c_1x1-0/weights",
-            "branch_block/prediction_layer/prediction_layer/bias": "Logits/Conv2d_1c_1x1-0/biases",
-            "branch_block/prediction_layer_1/prediction_layer/kernel": "Logits/Conv2d_1c_1x1-1/weights",
-            "branch_block/prediction_layer_1/prediction_layer/bias": "Logits/Conv2d_1c_1x1-1/biases",
-            "branch_block/prediction_layer_2/prediction_layer/kernel": "Logits/Conv2d_1c_1x1-2/weights",
-            "branch_block/prediction_layer_2/prediction_layer/bias": "Logits/Conv2d_1c_1x1-2/biases",
         }
+
+        if training_for_tf25:
+            var_maps_ext = {
+                "branch_block/prediction_layer/prediction_layer/kernel": "Logits/Conv2d_1c_1x1/weights",
+                "branch_block/prediction_layer/prediction_layer/bias": "Logits/Conv2d_1c_1x1/biases",
+                "branch_block/prediction_layer_1/prediction_layer/kernel": "Logits/Conv2d_1c_1x1/weights",
+                "branch_block/prediction_layer_1/prediction_layer/bias": "Logits/Conv2d_1c_1x1/biases",
+                "branch_block/prediction_layer_2/prediction_layer/kernel": "Logits/Conv2d_1c_1x1/weights",
+                "branch_block/prediction_layer_2/prediction_layer/bias": "Logits/Conv2d_1c_1x1/biases",
+            }
+        else:
+            var_maps_ext = {
+                "branch_block/prediction_layer/prediction_layer/kernel": "Logits/Conv2d_1c_1x1-0/weights",
+                "branch_block/prediction_layer/prediction_layer/bias": "Logits/Conv2d_1c_1x1-0/biases",
+                "branch_block/prediction_layer_1/prediction_layer/kernel": "Logits/Conv2d_1c_1x1-1/weights",
+                "branch_block/prediction_layer_1/prediction_layer/bias": "Logits/Conv2d_1c_1x1-1/biases",
+                "branch_block/prediction_layer_2/prediction_layer/kernel": "Logits/Conv2d_1c_1x1-2/weights",
+                "branch_block/prediction_layer_2/prediction_layer/bias": "Logits/Conv2d_1c_1x1-2/biases",
+            }
+
+        var_maps.update(var_maps_ext)
+
+        if training_for_tf25:
+            localization_params = "MobilenetV2"
+            features_extraction = "MobilenetV2"
+            features_extraction_common = "MobilenetV2"
+        else:
+            localization_params = model_name + "/localization_params/MobilenetV2"
+            features_extraction = model_name + "/features-extraction/MobilenetV2"
+            features_extraction_common = model_name + "/features-extraction-common/MobilenetV2"
 
         local_var_loaded = super().load_from_v1(
             latest_checkpoint,
             target_model + "_stn_base_1.40_224_",
-            model_name + "/localization_params/MobilenetV2",
+            localization_params,
             key_to_numpy=key_to_numpy,
             include_prediction_layer=False,
+            **kwargs
         )
         extract_var_loaded = super().load_from_v1(
             latest_checkpoint,
             target_model + "_global_branch_1.40_224_",
-            model_name + "/features-extraction/MobilenetV2",
+            features_extraction,
             key_to_numpy=key_to_numpy,
             include_prediction_layer=False,
+            **kwargs
         )
         extract_comm_var_loaded = super().load_from_v1(
             latest_checkpoint,
             target_model + "_shared_branch_1.40_224_",
-            model_name + "/features-extraction-common/MobilenetV2",
+            features_extraction_common,
             key_to_numpy=key_to_numpy,
             include_prediction_layer=False,
+            **kwargs
         )
 
         for var_name in var_maps:
-            _key = model_name + "/" + var_maps[var_name]
+            if training_for_tf25:
+                _key = "MobilenetV2/" + var_maps[var_name]
+            else:
+                _key = model_name + "/" + var_maps[var_name]
             if _key in key_to_numpy:
                 value = key_to_numpy[_key]
                 value_to_load[var_name] = value
-                key_to_numpy.pop(_key)
+                if pop_key:
+                    key_to_numpy.pop(_key)
             else:
                 print("Can't find the key: {}".format(_key))
 
@@ -131,16 +166,18 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
         for key in extract_comm_var_loaded:
             value_to_load[key] = extract_comm_var_loaded[key]
 
-        for key in key_to_numpy:
-            print("{} was not loaded".format(key))
+        if pop_key:
+            for key in key_to_numpy:
+                print("{} was not loaded".format(key))
 
         return value_to_load
 
     def save_model_variables(self):
         super(Orchids52Mobilenet140STN, self).save_model_variables()
-        if self.stn_dense:
-            _, stn_dense_checkpoint_manager = self.stn_dense_checkpoint
-            stn_dense_checkpoint_manager.save()
+        if len(self.stn_dense_checkpoints) > 0:
+            for checkpoint in self.stn_dense_checkpoints:
+                _, stn_dense_checkpoint_manager = checkpoint
+                stn_dense_checkpoint_manager.save()
 
     def set_mobilenet_training_status(self, trainable):
         super(Orchids52Mobilenet140STN, self).set_mobilenet_training_status(trainable)
@@ -150,13 +187,14 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
     def config_layers(self):
         if self.step == TRAIN_STEP1:
             self.set_mobilenet_training_status(False)
-        elif self.step == nets.utils.TRAIN_STEP2:
+        elif self.step == TRAIN_STEP2:
             self.set_mobilenet_training_status(False)
             self.set_prediction_training_status(False)
         elif self.step == TRAIN_STEP3:
             self.set_mobilenet_training_status(False)
             self.set_prediction_training_status(False)
-            self.stn_dense.trainable = False
+            for stn_dense in self.stn_denses:
+                stn_dense.trainable = False
         elif self.step == TRAIN_V2_STEP1:
             self.set_mobilenet_training_status(False)
         elif self.step == TRAIN_V2_STEP2:
@@ -164,10 +202,11 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
 
     def load_model_step2(self):
         self.load_model_step1()
-        stn_dense_checkpoint, stn_dense_checkpoint_manager = self.stn_dense_checkpoint
-        if stn_dense_checkpoint_manager.latest_checkpoint:
-            status = stn_dense_checkpoint.restore(stn_dense_checkpoint_manager.latest_checkpoint)
-            status.assert_existing_objects_matched()
+        for checkpoint in self.stn_dense_checkpoints:
+            stn_dense_checkpoint, stn_dense_checkpoint_manager = checkpoint
+            if stn_dense_checkpoint_manager.latest_checkpoint:
+                status = stn_dense_checkpoint.restore(stn_dense_checkpoint_manager.latest_checkpoint)
+                status.assert_existing_objects_matched()
 
     def load_model_step3(self):
         self.load_model_step2()
@@ -188,15 +227,15 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
         pass
 
     def load_model_variables(self):
-        if self.step == nets.utils.TRAIN_STEP1:
+        if self.step == TRAIN_STEP1:
             self.load_model_step1()
-        elif self.step == nets.utils.TRAIN_STEP2:
+        elif self.step == TRAIN_STEP2:
             self.load_model_step2()
-        elif self.step == nets.utils.TRAIN_STEP3:
+        elif self.step == TRAIN_STEP3:
             self.load_model_step3()
-        elif self.step == nets.utils.TRAIN_STEP4:
+        elif self.step == TRAIN_STEP4:
             self.load_model_step4()
-        elif self.step == nets.utils.TRAIN_V2_STEP2:
+        elif self.step == TRAIN_V2_STEP2:
             self.load_model_v2_step2()
 
 
@@ -326,7 +365,7 @@ class PrintingNode(tf.keras.layers.Layer):
 def create_orchid_mobilenet_v2_15(
     num_classes, optimizer=None, loss_fn=None, training=False, drop_out_prop=0.8, **kwargs
 ):
-    stn_dense = None
+    stn_denses = None
     branch_base_model = None
     boundary_loss = None
     estimate_block = None
@@ -381,6 +420,8 @@ def create_orchid_mobilenet_v2_15(
             name="stn_dense2",
         )
 
+        stn_denses = [stn_dense1, stn_dense2]
+
         stn_out1 = keras.Sequential([stn_base_model, stn_dense1])
         stn_out2 = keras.Sequential([stn_base_model, stn_dense2])
 
@@ -434,7 +475,7 @@ def create_orchid_mobilenet_v2_15(
         optimizer=optimizer,
         loss_fn=loss_fn,
         base_model=stn_base_model,
-        stn_dense=stn_dense,
+        stn_denses=stn_denses,
         estimate_block=estimate_block,
         predict_models=branches_prediction_models,
         branch_model=branch_base_model,

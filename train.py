@@ -4,9 +4,10 @@ from __future__ import print_function
 
 import os
 import tensorflow as tf
+from pickle import dump
+from datetime import datetime
 from absl import logging
 from nets.mapping import nets_mapping
-from nets.mapping import preprocessing_mapping
 from data.data_utils import load_dataset
 from utils.lib_utils import FLAGS
 from utils.lib_utils import start
@@ -29,6 +30,7 @@ def main(unused_argv):
     )
 
     train_ds = load_dataset(flags=FLAGS, workspace_path=workspace_path, split=split, preprocessing=True, one_hot=True)
+    test_ds = load_dataset(flags=FLAGS, workspace_path=workspace_path, split="test", preprocessing=True, one_hot=True)
 
     create_model = nets_mapping[FLAGS.model]
 
@@ -41,12 +43,13 @@ def main(unused_argv):
     num_state = FLAGS.end_state - FLAGS.start_state
     assert num_state == len(total_epochs)
     for idx, train_step in enumerate(range(FLAGS.start_state, FLAGS.end_state)):
-        if train_step == 1:
-            batch_size = FLAGS.batch_size
-        elif train_step == 4:
-            batch_size = FLAGS.batch_size // 8
-        else:
-            batch_size = FLAGS.batch_size // 4
+        # if train_step == 1:
+        #     batch_size = FLAGS.batch_size
+        # elif train_step == 4:
+        #     batch_size = FLAGS.batch_size // 8
+        # else:
+        #     batch_size = FLAGS.batch_size // 4
+        batch_size = FLAGS.batch_size
 
         training_step = const.TRAIN_TEMPLATE.format(train_step)
 
@@ -63,12 +66,15 @@ def main(unused_argv):
             training=True,
             step=training_step,
             activation="softmax",
+            batch_size=FLAGS.batch_size,
         )
 
         train_model = TrainClassifier(model=model, batch_size=batch_size)
 
         model.config_checkpoint(checkpoint_path)
-        epoch = model.restore_model_variables(checkpoint_path=FLAGS.trained_path)
+        epoch = model.restore_model_variables(
+            checkpoint_path=FLAGS.trained_path, training_for_tf25=True, pop_key=False
+        )
         model.summary()
 
         history_fine = train_model.fit(
@@ -79,12 +85,19 @@ def main(unused_argv):
             save_best_only=FLAGS.save_best_only,
         )
 
-        model.config_checkpoint(checkpoint_path)
-        epoch = model.restore_model_variables(checkpoint_path=FLAGS.trained_path)
-        model.summary()
+        # timestamp = datetime.now().strftime("%m-%d-%Y-%H-%M-%S")
+        timestamp = datetime.now().strftime("%m-%d-%Y")
+        history_path = os.path.join(checkpoint_path, "{}-history-{}.pack".format(timestamp, training_step))
+        with open(history_path, "wb") as handle:
+            dump(history_fine["history"], handle)
 
-    if FLAGS.save_model and model:
-        model.save(checkpoint_path)
+        print("Test accuracy: ")
+        train_model.evaluate(datasets=test_ds)
+
+    model.save_model_variables()
+
+    # if FLAGS.save_model and model:
+    #     model.save(checkpoint_path)
 
 
 if __name__ == "__main__":

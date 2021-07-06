@@ -11,7 +11,7 @@ import tensorflow.keras as keras
 from tensorflow.python.keras import activations
 from nets.mobilenet_v2 import IMG_SHAPE_224
 from nets.mobilenet_v2 import create_mobilenet_v2
-from utils.const import TRAIN_STEP1
+from utils.const import TRAIN_STEP1, TRAIN_STEP2
 from utils.const import TRAIN_TEMPLATE
 from utils.lib_utils import get_checkpoint_file
 
@@ -96,6 +96,7 @@ class Orchids52Mobilenet140(object):
     ):
         value_to_load = kwargs.get("value_to_load", {})
         key_to_numpy = kwargs.get("key_to_numpy", {})
+        pop_key = kwargs.get("pop_key", True)
         include_prediction_layer = kwargs.get("include_prediction_layer", True)
 
         if not bool(key_to_numpy):
@@ -155,7 +156,8 @@ class Orchids52Mobilenet140(object):
             if _key in key_to_numpy:
                 value = key_to_numpy[_key]
                 value_to_load[target_model + key] = value
-                key_to_numpy.pop(_key)
+                if pop_key:
+                    key_to_numpy.pop(_key)
             else:
                 print("Can't find the key: {}".format(_key))
 
@@ -165,7 +167,8 @@ class Orchids52Mobilenet140(object):
                 if _key in key_to_numpy:
                     value = key_to_numpy[_key]
                     value_to_load[key] = value
-                    key_to_numpy.pop(_key)
+                    if pop_key:
+                        key_to_numpy.pop(_key)
                 else:
                     print("Can't find the key: {}".format(_key))
 
@@ -176,7 +179,8 @@ class Orchids52Mobilenet140(object):
                 if _key_v in key_to_numpy:
                     value = key_to_numpy[_key_v]
                     value_to_load[target_model + key.format(i)] = value
-                    key_to_numpy.pop(_key_v)
+                    if pop_key:
+                        key_to_numpy.pop(_key_v)
                 else:
                     print("Can't find the key: {}".format(_key_v))
         return value_to_load
@@ -193,6 +197,7 @@ class Orchids52Mobilenet140(object):
                 result = True
 
         if not result:
+            var_loaded = None
             latest_checkpoint = kwargs.pop("checkpoint_path")
             if latest_checkpoint:
                 if self.training:
@@ -202,45 +207,47 @@ class Orchids52Mobilenet140(object):
                             latest_checkpoint=latest_checkpoint,
                             target_model="mobilenetv2_stn_base_1.40_224_",
                             model_name="MobilenetV2",
-                            include_prediction_layer=False,
+                            include_prediction_layer=True,
                         )
-
-                    elif self.step == nets.utils.TRAIN_STEP2:
-                        var_loaded = []
+                    elif self.step == TRAIN_STEP2:
+                        var_loaded = self.load_from_v1(latest_checkpoint=latest_checkpoint, **kwargs)
                 else:
                     var_loaded = self.load_from_v1(latest_checkpoint, **kwargs)
-                var_loaded_fixed_name = {}
-                for key in var_loaded:
-                    var_loaded_fixed_name.update({key + ":0": var_loaded[key]})
 
-                all_vars = self.model.weights
+                if var_loaded:
+                    var_loaded_fixed_name = {}
+                    for key in var_loaded:
+                        var_loaded_fixed_name.update({key + ":0": var_loaded[key]})
 
-                all_maps = {}
-                for i, var in enumerate(all_vars):
-                    all_maps.update({var.name: var})
+                    all_vars = self.model.weights
 
-                for i, var in enumerate(all_vars):
-                    if var.name in var_loaded_fixed_name:
-                        saved_var = var_loaded_fixed_name[var.name]
-                        if var.shape != saved_var.shape:
-                            saved_var = np.squeeze(saved_var)
+                    all_maps = {}
+                    for _, var in enumerate(all_vars):
+                        all_maps.update({var.name: var})
+
+                    for _, var in enumerate(all_vars):
+                        if var.name in var_loaded_fixed_name:
+                            saved_var = var_loaded_fixed_name[var.name]
                             if var.shape != saved_var.shape:
-                                raise Exception("Incompatible shapes")
-                        var.assign(saved_var)
-                        all_maps.pop(var.name)
-                        if show_model_weights:
-                            flat_var = np.reshape(saved_var, (-1))
-                            print("Loading: {} -> {}".format(var.name, flat_var[:4]))
-                    else:
-                        print("Can't find: {}".format(var.name))
+                                saved_var = np.squeeze(saved_var)
+                                if var.shape != saved_var.shape:
+                                    raise Exception("Incompatible shapes")
+                            var.assign(saved_var)
+                            all_maps.pop(var.name)
+                            if show_model_weights:
+                                flat_var = np.reshape(saved_var, (-1))
+                                print("Loading: {} -> {}".format(var.name, flat_var[:4]))
+                        else:
+                            print("Can't find: {}".format(var.name))
 
-                for key in all_maps:
-                    var = all_maps[key]
-                    print("Variable {} {} was not init..".format(var.name, var.shape))
+                    for key in all_maps:
+                        var = all_maps[key]
+                        print("Variable {} {} was not init..".format(var.name, var.shape))
 
-                return True
+                    result = True
             else:
-                return False
+                result = False
+        return result
 
     def get_step_number_from_latest_checkpoint(self):
         try:
@@ -249,7 +256,7 @@ class Orchids52Mobilenet140(object):
             step = checkpoint_manager.latest_checkpoint[index:][5:]
             step = int(step)
         except:
-            return 1
+            return 0
         else:
             return step
 
@@ -271,11 +278,11 @@ class Orchids52Mobilenet140(object):
         return step
 
     def config_layers(self):
-        if self.step == nets.utils.TRAIN_STEP1:
+        if self.step == TRAIN_STEP1:
             self.set_mobilenet_training_status(False)
 
     def load_model_variables(self):
-        if self.step == nets.utils.TRAIN_STEP1:
+        if self.step == TRAIN_STEP1:
             self.load_model_step1()
 
     def load_model_step1(self):
