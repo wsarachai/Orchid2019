@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
 import tensorflow as tf
 
 from nets import mobilenet_v2
@@ -44,7 +45,9 @@ def parse_function(example_proto):
     return tf.io.parse_single_example(example_proto, feature_description)
 
 
-def _load_dataset(split, root_path, batch_size, train_size, test_size, repeat=False, num_readers=1, num_map_threads=1):
+def _load_dataset(
+    split, root_path, batch_size, train_size, test_size, repeat=False, num_readers=1, num_map_threads=1, **kwargs
+):
     pattern = "orchids52_{split}*.tfrecord".format(split=split)
     pattern = os.path.join(root_path, pattern)
     dataset = tf.data.Dataset.list_files(file_pattern=pattern)

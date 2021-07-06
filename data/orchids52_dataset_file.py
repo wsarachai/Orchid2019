@@ -7,6 +7,22 @@ import pathlib
 import numpy as np
 import tensorflow as tf
 from data import orchids52_dataset
+from utils.wrapped_tools import wrapped_partial
+from nets.mobilenet_v2 import IMG_SIZE_224
+
+
+@tf.function
+def preprocess_input(image_data, central_fraction=0.875):
+    image = tf.image.decode_jpeg(image_data, channels=3)
+
+    image = tf.image.convert_image_dtype(image, dtype=tf.float32)
+    image = tf.image.central_crop(image, central_fraction=central_fraction)
+    image = tf.image.resize(images=image, size=IMG_SIZE_224, method=tf.image.ResizeMethod.BILINEAR)
+
+    image = tf.subtract(image, 0.5)
+    image = tf.multiply(image, 2.0)
+
+    return image
 
 
 def decode_img(image, size):
@@ -38,18 +54,22 @@ class OrchidsDataset(object):
     def __init__(self):
         self.extracting_label = None
 
-    def _extracting_label(self, file_path, class_names, one_hot):
+    def _extracting_label(self, file_path, class_names, preprocessing, one_hot):
         if one_hot:
             label = get_label_one_hot(file_path, class_names)
         else:
             label = get_label(file_path, class_names)
         img = tf.io.read_file(file_path)
+        if preprocessing:
+            img = preprocess_input(img)
         return img, label
 
-    def extracting_label_warping(self, data_dir):
+    def extracting_label_warping(self, data_dir, **kwargs):
+        preprocessing = kwargs.get("preprocessing", False)
+        one_hot = kwargs.get("one_hot", False)
         class_names = np.array(sorted([item.name for item in data_dir.glob("n*")]))
-        self.extracting_label = lib_utils.wrapped_partial(
-            self._extracting_label, class_names=class_names, one_hot=False
+        self.extracting_label = wrapped_partial(
+            self._extracting_label, class_names=class_names, preprocessing=preprocessing, one_hot=one_hot
         )
 
     def _load_dataset(
@@ -69,10 +89,10 @@ class OrchidsDataset(object):
         images_dir = pathlib.Path(image_path)
         dataset = tf.data.Dataset.list_files(str(images_dir / "*/*"), shuffle=False)
 
-        self.extracting_label_warping(data_dir=images_dir)
+        self.extracting_label_warping(data_dir=images_dir, **kwargs)
         decode_dataset = dataset.map(self.extracting_label, num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
-        dataset = configure_for_performance(dataset, batch_size=batch_size)
+        decode_dataset = configure_for_performance(decode_dataset, batch_size=batch_size)
 
         if repeat:
             decode_dataset = decode_dataset.repeat()
@@ -98,6 +118,7 @@ def load_dataset_v1(split, batch_size, root_path, **kwargs):
         num_of_class=orchids52_dataset.NUM_OF_CLASSES,
         train_size=orchids52_dataset.TRAIN_SIZE_V1,
         test_size=orchids52_dataset.TEST_SIZE_V1,
+        **kwargs
     )
 
 

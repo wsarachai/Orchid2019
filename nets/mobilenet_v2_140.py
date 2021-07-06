@@ -11,17 +11,20 @@ import tensorflow.keras as keras
 from tensorflow.python.keras import activations
 from nets.mobilenet_v2 import IMG_SHAPE_224
 from nets.mobilenet_v2 import create_mobilenet_v2
-from utils import lib_utils
 from utils.const import TRAIN_STEP1
 from utils.const import TRAIN_TEMPLATE
+from utils.lib_utils import get_checkpoint_file
 
 
 def preprocess_input(image_data, central_fraction=0.875):
     image = tf.image.decode_jpeg(image_data, channels=3)
-
     image = tf.image.convert_image_dtype(image, dtype=tf.float32)
     image = tf.image.central_crop(image, central_fraction=central_fraction)
     image = tf.image.resize(images=image, size=nets.mobilenet_v2.IMG_SIZE_224, method=tf.image.ResizeMethod.BILINEAR)
+
+    image = tf.subtract(image, 0.5)
+    image = tf.multiply(image, 2.0)
+
     return tf.expand_dims(image, axis=0)
 
 
@@ -75,7 +78,7 @@ class Orchids52Mobilenet140(object):
         predict_layers_path = os.path.join(checkpoint_path, "predict_layers")
         for idx, predict_layer in enumerate(self.predict_layers):
             checkpoint = tf.train.Checkpoint(step=tf.Variable(1), optimizer=self.optimizer, model=predict_layer)
-            prediction_layer_prefix = lib_utils.get_checkpoint_file(predict_layers_path, idx)
+            prediction_layer_prefix = get_checkpoint_file(predict_layers_path, idx)
             predict_layers_checkpoint_managers = tf.train.CheckpointManager(
                 checkpoint, directory=prediction_layer_prefix, max_to_keep=self.max_to_keep
             )

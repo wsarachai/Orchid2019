@@ -10,6 +10,8 @@ from absl import logging
 from data import data_utils
 from utils.lib_utils import create_image_lists
 from utils.lib_utils import FLAGS
+from utils.lib_utils import DisplayInfo
+from utils.lib_utils import start
 from nets.mobilenet_v2_140 import preprocess_input
 
 
@@ -20,7 +22,7 @@ def main(unused_argv):
     model = tf.keras.models.load_model(FLAGS.checkpoint_path)
     model.summary()
 
-    info = lib_utils.DisplayInfo(load_dataset.test_size)
+    info = DisplayInfo(load_dataset.test_size)
 
     count = 0
     for label, data in dataset_images.items():
@@ -38,4 +40,4 @@ def main(unused_argv):
 
 if __name__ == "__main__":
     # tf.config.run_functions_eagerly(True)
-    lib_utils.start(main)
+    start(main)

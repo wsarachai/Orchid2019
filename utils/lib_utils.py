@@ -178,6 +178,7 @@ class TrainClassifier:
         self.model.compile(self.metrics)
 
     def train_step(self, inputs, labels):
+        print(inputs)
         boundary_loss = 0.0
         with tf.GradientTape() as tape:
             predictions = self.model.process_step(inputs, training=True)
@@ -281,12 +282,12 @@ class TrainClassifier:
                 history["val_accuracy"].append(logs["accuracy"].numpy())
                 print("\nValidation: val_loss: {:.3f}, val_accuracy: {:.3f}\n".format(logs["loss"], logs["accuracy"]))
 
-            if save_best_only and val_accuracy < logs["accuracy"].numpy() or val_loss > logs["loss"].numpy():
-                val_accuracy = logs["accuracy"].numpy()
-                val_loss = logs["loss"].numpy()
-                self.model.save_model_variables()
-            else:
-                self.model.save_model_variables()
+                if save_best_only and val_accuracy < logs["accuracy"].numpy() or val_loss > logs["loss"].numpy():
+                    val_accuracy = logs["accuracy"].numpy()
+                    val_loss = logs["loss"].numpy()
+                    self.model.save_model_variables()
+                else:
+                    self.model.save_model_variables()
         return {"history": history}
 
     def evaluate(self, datasets, **kwargs):

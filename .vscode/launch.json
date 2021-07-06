@@ -13,7 +13,7 @@
       "args": [
         "--start_state=1",
         "--end_state=2",
-        "--dataset_format=h5",
+        "--dataset_format=files",
         "--dataset=orchids52_data",
         "--dataset_version=v1",
         "--model=mobilenet_v2_140_stn_v15",
@@ -29,7 +29,7 @@
       "program": "run-test.py",
       "console": "integratedTerminal",
       "args": [
-        "--dataset_format=h5",
+        "--dataset_format=tf-records",
         "--batch_size=1",
         "--dataset=orchids52_data",
         "--dataset_version=v1",
@@ -44,7 +44,7 @@
       "program": "run-test.py",
       "console": "integratedTerminal",
       "args": [
-        "--dataset_format=h5",
+        "--dataset_format=tf-records",
         "--batch_size=1",
         "--dataset=orchids52_data",
         "--dataset_version=v1",

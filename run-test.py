@@ -24,9 +24,9 @@ def main(unused_argv):
         workspace_path, "_trained_models", "orchids2019", FLAGS.checkpoint_path, "variables", "variables"
     )
 
-    datasets = data_utils.load_dataset(flags=FLAGS, workspace_path=workspace_path, split="test")
+    datasets = data_utils.load_dataset(flags=FLAGS, workspace_path=workspace_path, split="test", preprocessing=True)
+
     create_model = nets_mapping[FLAGS.model]
-    preprocess_input = preprocessing_mapping[FLAGS.model]
 
     model = create_model(num_classes=datasets.num_of_classes, activation="softmax")
     accuracy_metric = tf.keras.metrics.CategoricalAccuracy(name="train_accuracy")
@@ -38,8 +38,6 @@ def main(unused_argv):
 
     count = 0
     for inputs, label in datasets:
-        if FLAGS.dataset_format == "files":
-            inputs = preprocess_input(inputs)
         result = model.model(inputs).numpy()
         count = count + 1
         info.display_info(result, label, count)

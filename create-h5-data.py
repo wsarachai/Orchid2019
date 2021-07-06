@@ -12,6 +12,7 @@ import numpy as np
 from absl import logging
 from nets.mobilenet_v2_140 import preprocess_input
 from utils.lib_utils import FLAGS
+from utils.lib_utils import start
 
 
 def create_image_lists(image_dir):
@@ -92,4 +93,4 @@ def main(_):
 
 if __name__ == "__main__":
     # tf.config.run_functions_eagerly(True)
-    lib_utils.start(main)
+    start(main)

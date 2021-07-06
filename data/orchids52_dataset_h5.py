@@ -5,7 +5,6 @@ from __future__ import print_function
 import os
 import h5py
 import tensorflow as tf
-from tensorflow.python.ops.gen_array_ops import one_hot
 from data import orchids52_dataset
 
 
