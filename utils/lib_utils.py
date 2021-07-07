@@ -181,7 +181,6 @@ class TrainClassifier:
         boundary_loss = 0.0
         with tf.GradientTape() as tape:
             predictions = self.model.process_step(inputs, training=True)
-            # print(predictions[0], labels[0])
             if hasattr(self.model, "boundary_loss") and self.model.boundary_loss:
                 boundary_loss = self.model.boundary_loss(inputs, training=True)
             train_loss = self.model.get_loss(labels, predictions)
@@ -254,7 +253,16 @@ class TrainClassifier:
                     logs = copy.copy(logs) if logs else {}
                     num_steps = logs.pop("num_steps", 1)
                     seen += num_steps
-                    progbar.update(seen, list(logs.items()), finalize=finalize)
+
+                    _dynamic_display = (
+                        (hasattr(sys.stdout, "isatty") and sys.stdout.isatty())
+                        or "ipykernel" in sys.modules
+                        or "posix" in sys.modules
+                        or "PYCHARM_HOSTED" in os.environ
+                    )
+
+                    if _dynamic_display:
+                        progbar.update(seen, list(logs.items()), finalize=finalize)
 
             history["train_loss"].append(self.train_loss_metric.result().numpy())
             history["reg_loss"].append(self.regularization_loss_metric.result().numpy())
@@ -263,6 +271,7 @@ class TrainClassifier:
             history["accuracy"].append(self.accuracy_metric.result().numpy())
 
             self.reset_metric()
+            self.model.save_model_variables()
 
         return {"history": history}
 

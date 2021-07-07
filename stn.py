@@ -51,20 +51,20 @@ def bilinear_sampler(img, x, y):
     """
     H = tf.shape(img)[1]
     W = tf.shape(img)[2]
-    max_y = tf.cast(H - 1, 'int32')
-    max_x = tf.cast(W - 1, 'int32')
-    zero = tf.zeros([], dtype='int32')
+    max_y = tf.cast(H - 1, "int32")
+    max_x = tf.cast(W - 1, "int32")
+    zero = tf.zeros([], dtype="int32")
 
     # rescale x and y to [0, W-1/H-1]
-    x = tf.cast(x, 'float32')
-    y = tf.cast(y, 'float32')
-    x = 0.5 * ((x + 1.0) * tf.cast(max_x - 1, 'float32'))
-    y = 0.5 * ((y + 1.0) * tf.cast(max_y - 1, 'float32'))
+    x = tf.cast(x, "float32")
+    y = tf.cast(y, "float32")
+    x = 0.5 * ((x + 1.0) * tf.cast(max_x - 1, "float32"))
+    y = 0.5 * ((y + 1.0) * tf.cast(max_y - 1, "float32"))
 
     # grab 4 nearest corner points for each (x_i, y_i)
-    x0 = tf.cast(tf.floor(x), 'int32')
+    x0 = tf.cast(tf.floor(x), "int32")
     x1 = x0 + 1
-    y0 = tf.cast(tf.floor(y), 'int32')
+    y0 = tf.cast(tf.floor(y), "int32")
     y1 = y0 + 1
 
     # clip to range [0, H-1/W-1] to not violate img boundaries
@@ -80,10 +80,10 @@ def bilinear_sampler(img, x, y):
     Id = get_pixel_value(img, x1, y1)
 
     # recast as float for delta calculation
-    x0 = tf.cast(x0, 'float32')
-    x1 = tf.cast(x1, 'float32')
-    y0 = tf.cast(y0, 'float32')
-    y1 = tf.cast(y1, 'float32')
+    x0 = tf.cast(x0, "float32")
+    x1 = tf.cast(x1, "float32")
+    y0 = tf.cast(y0, "float32")
+    y1 = tf.cast(y1, "float32")
 
     # calculate deltas
     wa = (x1 - x) * (y1 - y)
@@ -149,8 +149,8 @@ def affine_grid_generator(height, width, theta):
     sampling_grid = tf.tile(sampling_grid, tf.stack([num_batch, 1, 1]))
 
     # cast to float32 (required for matmul)
-    theta = tf.cast(theta, 'float32')
-    sampling_grid = tf.cast(sampling_grid, 'float32')
+    theta = tf.cast(theta, "float32")
+    sampling_grid = tf.cast(sampling_grid, "float32")
 
     # transform the sampling grid - batch multiply
     batch_grids = tf.matmul(theta, sampling_grid)
@@ -162,7 +162,7 @@ def affine_grid_generator(height, width, theta):
     return batch_grids
 
 
-def spatial_transformer_network(input_fmap, theta, out_dims=None, **kwargs):
+def stn(input_fmap, theta, out_dims=None, **kwargs):
     """
     Spatial Transformer Network layer implementation as described in [1].
     The layer is composed of 3 elements:
@@ -215,67 +215,7 @@ def spatial_transformer_network(input_fmap, theta, out_dims=None, **kwargs):
     return out_fmap
 
 
-# def pre_spatial_transformer_network(input_map,
-#                                     theta,
-#                                     batch_size,
-#                                     width,
-#                                     height,
-#                                     scales=None):
-#     # grab input dimensions
-#     _, _w = theta.shape
-#     out_size = (width, height)
-#
-#     thetas = []
-#     bound_err = []
-#     range_values = range(0, _w, 3)
-#     for idx, i in enumerate(range_values):
-#         x_zero = tf.constant(np.full((batch_size, 1), 0.00, dtype=np.float32))
-#         y_zero = tf.constant(np.full((batch_size, 1), 0.00, dtype=np.float32))
-#
-#         if scales is None:
-#             scale = tf.constant(np.full((batch_size, 1), 1.00, dtype=np.float32))
-#             x_t_flat = tf.constant(np.full((batch_size, 1), 0.00, dtype=np.float32))
-#             y_t_flat = tf.constant(np.full((batch_size, 1), 0.00, dtype=np.float32))
-#         else:
-#             x_t_flat = tf.slice(theta, [0, i], [batch_size, 1])
-#             y_t_flat = tf.slice(theta, [0, i + 1], [batch_size, 1])
-#
-#             scale = tf.slice(theta, [0, i + 2], [batch_size, 1])
-#             scale = tf.exp(scale) * scales[idx]
-#
-#             x_t_flat = -x_t_flat / scale
-#             y_t_flat = -y_t_flat / scale
-#
-#         bound_err_x = tf.maximum(0.0, (tf.abs(x_t_flat) + scale) - 1.0)
-#         bound_err_y = tf.maximum(0.0, (tf.abs(y_t_flat) + scale) - 1.0)
-#         bound_err_scale = tf.maximum(0.0, scale - 1.0)
-#         bound_err.append(bound_err_x)
-#         bound_err.append(bound_err_y)
-#         bound_err.append(bound_err_scale)
-#
-#         parameters = tf.concat((scale, x_zero, x_t_flat,
-#                                 y_zero, scale, y_t_flat), axis=1)
-#
-#         parameters = tf.reshape(parameters, [batch_size, 1, 2, 3])
-#         thetas.append(parameters)
-#
-#     bound_err = tf.squeeze(tf.concat(bound_err, axis=0), [1])
-#
-#     # with tf.name_scope('transformed'):
-#     h_trans = [input_map]
-#     for i in range(len(thetas)):
-#         _theta = thetas[i][:, 0, :, :]
-#         h_trans.append(spatial_transformer_network(input_map, _theta, out_size))
-#
-#     return tf.stack(h_trans, axis=0), bound_err
-
-
-def pre_spatial_transformer_network(input_map,
-                                    theta,
-                                    batch_size,
-                                    width,
-                                    height,
-                                    scales=None):
+def pre_spatial_transformer_network(input_map, theta, batch_size, width, height, scales=None):
     B = batch_size
 
     out_size = (width, height)
@@ -318,18 +258,64 @@ def pre_spatial_transformer_network(input_map,
         bound_err.append(bound_err_y)
         bound_err.append(bound_err_scale)
 
-        parameters = tf.concat((scale, x_zero, x_t_flat,
-                                y_zero, scale, y_t_flat), axis=1)
+        parameters = tf.concat((scale, x_zero, x_t_flat, y_zero, scale, y_t_flat), axis=1)
 
         parameters = tf.reshape(parameters, [B, 1, 2, 3])
         thetas.append(parameters)
 
     bound_err = tf.squeeze(tf.concat(bound_err, axis=0), [1])
 
-    with tf.compat.v1.variable_scope('stn'):
+    with tf.compat.v1.variable_scope("stn"):
         h_trans = [input_map]
         for i in range(len(thetas)):
             _theta = thetas[i][:, 0, :, :]
-            h_trans.append(spatial_transformer_network(input_map, _theta, out_size))
+            h_trans.append(stn(input_map, _theta, out_size))
+
+    return tf.stack(h_trans, axis=0), bound_err
+
+
+def spatial_transformer_network(input_map, theta, batch_size, width, height, scales=None):
+    B = batch_size
+    out_size = (width, height)
+    _td = theta.get_shape().as_list()
+    _w = _td[1]
+
+    thetas = []
+    bound_err = []
+    range_values = range(0, _w, 2)
+    for idx, i in enumerate(range_values):
+        x_zero = tf.constant(np.full((B, 1), 0.00, dtype=np.float32))
+        y_zero = tf.constant(np.full((B, 1), 0.00, dtype=np.float32))
+        scale = tf.constant(np.full((B, 1), scales[idx], dtype=np.float32))
+
+        if scales is None:
+            x_t_flat = tf.constant(np.full((B, 1), 0.00, dtype=np.float32))
+            y_t_flat = tf.constant(np.full((B, 1), 0.00, dtype=np.float32))
+        else:
+            x_t_flat = tf.slice(theta, [0, i], [B, 1])
+            y_t_flat = tf.slice(theta, [0, i + 1], [B, 1])
+
+            tf.compat.v1.add_to_collection("boundary", x_t_flat)
+            tf.compat.v1.add_to_collection("boundary", y_t_flat)
+
+        bound_err_x = tf.maximum(0.0, (tf.abs(x_t_flat) + scale) - 1.0)
+        bound_err_y = tf.maximum(0.0, (tf.abs(y_t_flat) + scale) - 1.0)
+        bound_err_scale = tf.maximum(0.0, scale - 1.0)
+        bound_err.append(bound_err_x)
+        bound_err.append(bound_err_y)
+        bound_err.append(bound_err_scale)
+
+        parameters = tf.concat((scale, x_zero, x_t_flat, y_zero, scale, y_t_flat), axis=1)
+
+        parameters = tf.reshape(parameters, [B, 1, 2, 3])
+        thetas.append(parameters)
+
+    bound_err = tf.squeeze(tf.concat(bound_err, axis=0), [1])
+
+    with tf.compat.v1.variable_scope("stn"):
+        h_trans = [input_map]
+        for i in range(len(thetas)):
+            _theta = thetas[i][:, 0, :, :]
+            h_trans.append(stn(input_map, _theta, out_size))
 
     return tf.stack(h_trans, axis=0), bound_err

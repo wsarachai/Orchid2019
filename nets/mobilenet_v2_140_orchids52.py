@@ -9,7 +9,7 @@ import tensorflow.keras as keras
 import nets
 
 from absl import logging
-from stn import pre_spatial_transformer_network
+from stn import spatial_transformer_network
 from tensorflow.python.keras import initializers
 from tensorflow.python.keras import activations
 from nets.mobilenet_v2 import IMG_SHAPE_224
@@ -190,6 +190,7 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
         elif self.step == TRAIN_STEP2:
             self.set_mobilenet_training_status(False)
             self.set_prediction_training_status(False)
+            self.stn_denses[0].trainable = False
         elif self.step == TRAIN_STEP3:
             self.set_mobilenet_training_status(False)
             self.set_prediction_training_status(False)
@@ -372,7 +373,6 @@ def create_orchid_mobilenet_v2_15(
     num_classes, optimizer=None, loss_fn=None, training=False, drop_out_prop=0.8, **kwargs
 ):
     stn_denses = None
-    branch_base_model = None
     boundary_loss = None
     estimate_block = None
     branches_prediction_models = []
@@ -390,7 +390,10 @@ def create_orchid_mobilenet_v2_15(
 
     if step != TRAIN_STEP1:
         scales = [0.5, 0.3]
-        fc_num = 3
+        fc_num = 2
+
+        if step == TRAIN_STEP2:
+            scales = [1.0, 0.3]
 
         stn_dense1 = keras.Sequential(
             [
@@ -437,7 +440,7 @@ def create_orchid_mobilenet_v2_15(
         loc_output = keras.layers.Concatenate(axis=1)([stn_logits1, stn_logits2])
 
         # TODO: Change this function to keras layer
-        stn_output, bound_err = pre_spatial_transformer_network(
+        stn_output, bound_err = spatial_transformer_network(
             input_map=processed_inputs,
             theta=loc_output,
             batch_size=batch_size,
