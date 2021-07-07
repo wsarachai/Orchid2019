@@ -11,15 +11,14 @@
       "program": "train.py",
       "console": "integratedTerminal",
       "args": [
-        "--start_state=2",
-        "--end_state=3",
+        "--train_step=5",
         "--batch_size=4",
         "--dataset_format=files",
         "--dataset=orchids52_data",
         "--dataset_version=v1",
         "--model=mobilenet_v2_140_stn_v15",
         "--learning_rate=0.0001",
-        "--total_epochs=3",
+        "--total_epochs=5",
         "--save_model=True",
         "--bash=False",
         "--trained_path=/home/keng/Documents/_trained_models/model-v1/mobilenet_v2_140_orchids52_0001/pretrain2/model.ckpt-12000"

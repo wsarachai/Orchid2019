@@ -44,7 +44,7 @@ flags.DEFINE_boolean("save_best_only", False, "Save the checkpoint only best res
 
 flags.DEFINE_boolean("save_model", False, "Save the model on each state.")
 
-flags.DEFINE_string("total_epochs", "100,200,200,200", "Total epochs")
+flags.DEFINE_integer("total_epochs", 1, "Total epochs")
 
 flags.DEFINE_integer("start_state", 1, "Start state")
 
@@ -126,10 +126,10 @@ def apply_with_random_selector(x, func, num_cases):
     )[0]
 
 
-def start(start_fn):
+def start(start_fn, **kwargs):
     logging.set_verbosity(logging.INFO)
     logging.info("tf.version %s" % tf.version.VERSION)
-    app.run(start_fn)
+    app.run(start_fn, **kwargs)
 
 
 def config_learning_rate(learning_rate=0.001, exp_decay=False, **kwargs):
@@ -253,16 +253,7 @@ class TrainClassifier:
                     logs = copy.copy(logs) if logs else {}
                     num_steps = logs.pop("num_steps", 1)
                     seen += num_steps
-
-                    _dynamic_display = (
-                        (hasattr(sys.stdout, "isatty") and sys.stdout.isatty())
-                        or "ipykernel" in sys.modules
-                        or "posix" in sys.modules
-                        or "PYCHARM_HOSTED" in os.environ
-                    )
-
-                    if _dynamic_display:
-                        progbar.update(seen, list(logs.items()), finalize=finalize)
+                    progbar.update(seen, list(logs.items()), finalize=finalize)
 
             history["train_loss"].append(self.train_loss_metric.result().numpy())
             history["reg_loss"].append(self.regularization_loss_metric.result().numpy())
@@ -270,7 +261,6 @@ class TrainClassifier:
             history["total_loss"].append(self.total_loss_metric.result().numpy())
             history["accuracy"].append(self.accuracy_metric.result().numpy())
 
-            self.reset_metric()
             self.model.save_model_variables()
 
         return {"history": history}
