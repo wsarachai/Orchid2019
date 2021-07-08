@@ -194,6 +194,10 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
         elif self.step == TRAIN_STEP3:
             self.set_mobilenet_training_status(False)
             self.set_prediction_training_status(False)
+            self.stn_denses[1].trainable = False
+        elif self.step == TRAIN_STEP4:
+            self.set_mobilenet_training_status(False)
+            self.set_prediction_training_status(False)
             for stn_dense in self.stn_denses:
                 stn_dense.trainable = False
         elif self.step == TRAIN_V2_STEP1:
@@ -374,6 +378,7 @@ def create_orchid_mobilenet_v2_15(
 ):
     stn_denses = None
     boundary_loss = None
+    branches_block = None
     estimate_block = None
     branches_prediction_models = []
     step = kwargs.pop("step") if "step" in kwargs else ""
@@ -394,6 +399,9 @@ def create_orchid_mobilenet_v2_15(
 
         if step == TRAIN_STEP2:
             scales = [1.0, 0.3]
+
+        if step == TRAIN_STEP3:
+            scales = [0.5, 1.0]
 
         stn_dense1 = keras.Sequential(
             [
@@ -462,7 +470,7 @@ def create_orchid_mobilenet_v2_15(
         logits = branches_block(stn_output)
 
         # # with tf.name_scope('estimate_block'):
-        if step == TRAIN_STEP2:
+        if step == TRAIN_STEP2 or step == TRAIN_STEP3:
             outputs = tf.reduce_mean(logits, axis=0)
         else:
             estimate_block = EstimationBlock(num_classes=num_classes, batch_size=batch_size)

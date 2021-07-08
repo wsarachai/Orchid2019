@@ -11,7 +11,7 @@ import tensorflow.keras as keras
 from tensorflow.python.keras import activations
 from nets.mobilenet_v2 import IMG_SHAPE_224
 from nets.mobilenet_v2 import create_mobilenet_v2
-from utils.const import TRAIN_STEP1, TRAIN_STEP2
+from utils.const import TRAIN_STEP1, TRAIN_STEP2, TRAIN_STEP4
 from utils.const import TRAIN_TEMPLATE
 from utils.lib_utils import get_checkpoint_file
 
@@ -188,12 +188,16 @@ class Orchids52Mobilenet140(object):
     def restore_model_from_latest_checkpoint_if_exist(self, **kwargs):
         result = False
         show_model_weights = kwargs.get("show_model_weights", False)
+        training_step = kwargs.get("training_step", False)
+
+        check_missing_weights = False if training_step == TRAIN_STEP4 else True
 
         if self.checkpoint:
             checkpoint, checkpoint_manager = self.checkpoint
             if checkpoint_manager.latest_checkpoint:
                 status = checkpoint.restore(checkpoint_manager.latest_checkpoint)
-                status.assert_existing_objects_matched()
+                if check_missing_weights:
+                    status.assert_existing_objects_matched()
                 result = True
 
         if not result:
@@ -367,6 +371,7 @@ class PredictionLayer(keras.layers.Layer):
             inputs = self.dropout(inputs, training=training)
         inputs = self.dense(inputs, training=training)
         inputs = self.prediction_fn(inputs)
+        tf.summary.histogram("prediction", inputs, step=tf.compat.v1.train.get_global_step())
         return inputs
 
 

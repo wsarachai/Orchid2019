@@ -15,8 +15,8 @@ from utils.lib_utils import FLAGS
 from utils.lib_utils import config_learning_rate
 from utils.lib_utils import config_optimizer
 from utils.lib_utils import config_loss
-from utils.lib_utils import TrainClassifier
 from utils.lib_utils import start
+from utils.training_utils import TrainClassifier
 from utils.const import TRAIN_TEMPLATE
 
 
