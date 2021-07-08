@@ -61,7 +61,8 @@
       "program": "graph.py",
       "console": "integratedTerminal",
       "args": [
-        "--file=/Volumes/Data/tmp/orchids-models/orchids2019/mobilenet_v2_140_orchids52/11-15-2020-15-20-31-history-pretrain1"
+        "--total_epochs=100",
+        "--file=/home/keng/Documents/_trained_models/orchids2019/mobilenet_v2_140_stn_v15/07-07-2021-history-pretrain2"
       ]
     },
     {

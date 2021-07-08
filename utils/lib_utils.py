@@ -50,6 +50,9 @@ flags.DEFINE_integer("start_state", 1, "Start state")
 
 flags.DEFINE_integer("end_state", 2, "End state")
 
+flags.DEFINE_string("file", "trainHistory", "Train history")
+
+
 flags.DEFINE_string(
     "optimizer",
     "rmsprop",

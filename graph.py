@@ -8,18 +8,9 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 from pickle import load
 
+from absl import logging
+from utils.lib_utils import FLAGS
 from utils.lib_utils import start
-from nets import utils
-
-flags = tf.compat.v1.flags
-logging = tf.compat.v1.logging
-FLAGS = flags.FLAGS
-
-flags.DEFINE_string("file", "trainHistory", "Train history")
-
-flags.DEFINE_integer("total_epochs", 100, "Total epochs")
-
-flags.DEFINE_string("model", utils.MOBILENET_V2_140_ORCHIDS52, "Model")
 
 
 def main(unused_argv):
@@ -45,7 +36,7 @@ def main(unused_argv):
     fig, axs = plt.subplots(3, 1, figsize=(10, 10), dpi=300)
 
     axs[0].plot(epochs_range, accuracy, label="Training Accuracy")
-    axs[0].plot(epochs_range, validation_accuracy, label="Validation Accuracy")
+    # axs[0].plot(epochs_range, validation_accuracy, label="Validation Accuracy")
     axs[0].set_xlim(0, num_of_data)
     axs[0].set_xlabel("Epochs")
     axs[0].set_ylabel("Accuracy")
@@ -53,7 +44,7 @@ def main(unused_argv):
     axs[0].grid(True)
 
     axs[1].plot(epochs_range, train_loss, label="Training Loss")
-    axs[1].plot(epochs_range, validation_loss, label="Validation Loss")
+    # axs[1].plot(epochs_range, validation_loss, label="Validation Loss")
     axs[1].set_xlim(0, num_of_data)
     axs[1].set_xlabel("Epochs")
     axs[1].set_ylabel("Loss")
