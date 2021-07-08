@@ -27,10 +27,10 @@ def main(unused_argv):
     data_dir = os.path.join(data_path, "orchids52_data")
     load_dataset = dataset_mapping[FLAGS.dataset]
     create_model = nets_mapping[FLAGS.model]
-    checkpoint_path = os.path.join(workspace_path, "orchids-models", "orchids2019", FLAGS.model)
+    checkpoint_dir = os.path.join(workspace_path, "orchids-models", "orchids2019", FLAGS.model)
 
-    if not tf.io.gfile.exists(checkpoint_path):
-        os.makedirs(checkpoint_path)
+    if not tf.io.gfile.exists(checkpoint_dir):
+        os.makedirs(checkpoint_dir)
 
     model = None
     total_epochs = [int(e) for e in FLAGS.total_epochs.split(",")]
@@ -67,8 +67,8 @@ def main(unused_argv):
 
         train_model = TrainClassifier(model=model, batch_size=batch_size)
 
-        model.config_checkpoint(checkpoint_path)
-        epoch = model.restore_model_variables(checkpoint_path=FLAGS.trained_path)
+        model.config_checkpoint(checkpoint_dir)
+        epoch = model.restore_model_variables(checkpoint_dir=FLAGS.trained_dir)
         model.summary()
 
         history_fine = train_model.fit(
@@ -81,7 +81,7 @@ def main(unused_argv):
         )
 
         timestamp = datetime.now().strftime("%m-%d-%Y-%H-%M-%S")
-        history_path = os.path.join(checkpoint_path, "{}-history-{}.pack".format(timestamp, training_step))
+        history_path = os.path.join(checkpoint_dir, "{}-history-{}.pack".format(timestamp, training_step))
         with open(history_path, "wb") as handle:
             dump(history_fine["history"], handle)
 
@@ -89,7 +89,7 @@ def main(unused_argv):
         train_model.evaluate(datasets=test_ds)
 
     if FLAGS.save_model and model:
-        model.save(checkpoint_path)
+        model.save(checkpoint_dir)
 
 
 if __name__ == "__main__":

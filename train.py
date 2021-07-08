@@ -35,9 +35,10 @@ def main(unused_argv):
 
     create_model = nets_mapping[FLAGS.model]
 
-    checkpoint_path = os.path.join(workspace_path, "_trained_models", "orchids2019", FLAGS.model)
-    if not tf.io.gfile.exists(checkpoint_path):
-        os.makedirs(checkpoint_path)
+    trained_dir = os.path.join(workspace_path, FLAGS.trained_dir)
+    checkpoint_dir = os.path.join(workspace_path, "_trained_models", "orchids2019", FLAGS.model)
+    if not tf.io.gfile.exists(checkpoint_dir):
+        os.makedirs(checkpoint_dir)
 
     model = None
 
@@ -49,8 +50,8 @@ def main(unused_argv):
     training_step = const.TRAIN_TEMPLATE.format(FLAGS.train_step)
 
     if FLAGS.train_step > 1:
-        src_dir = os.path.join(checkpoint_path, const.TRAIN_TEMPLATE.format(FLAGS.train_step - 1))
-        des_dir = os.path.join(checkpoint_path, const.TRAIN_TEMPLATE.format(FLAGS.train_step))
+        src_dir = os.path.join(checkpoint_dir, const.TRAIN_TEMPLATE.format(FLAGS.train_step - 1))
+        des_dir = os.path.join(checkpoint_dir, const.TRAIN_TEMPLATE.format(FLAGS.train_step))
         if tf.io.gfile.exists(src_dir):
             if tf.io.gfile.exists(des_dir):
                 tf.compat.v1.gfile.DeleteRecursively(des_dir)
@@ -73,12 +74,12 @@ def main(unused_argv):
     )
 
     train_model = TrainClassifier(
-        model=model, batch_size=batch_size, summary_path=os.path.join(checkpoint_path, "logs", training_step)
+        model=model, batch_size=batch_size, summary_path=os.path.join(checkpoint_dir, "logs", training_step)
     )
 
-    model.config_checkpoint(checkpoint_path)
+    model.config_checkpoint(checkpoint_dir)
     epoch = model.restore_model_variables(
-        checkpoint_path=FLAGS.trained_path, training_for_tf25=True, pop_key=False, training_step=training_step
+        checkpoint_dir=trained_dir, training_for_tf25=True, pop_key=False, training_step=training_step
     )
     model.summary()
 
@@ -92,7 +93,7 @@ def main(unused_argv):
 
     # timestamp = datetime.now().strftime("%m-%d-%Y-%H-%M-%S")
     timestamp = datetime.now().strftime("%m-%d-%Y")
-    history_path = os.path.join(checkpoint_path, "{}-history-{}.pack".format(timestamp, training_step))
+    history_path = os.path.join(checkpoint_dir, "{}-history-{}.pack".format(timestamp, training_step))
     with open(history_path, "wb") as handle:
         dump(history_fine["history"], handle)
 
@@ -100,7 +101,7 @@ def main(unused_argv):
     train_model.evaluate(datasets=test_ds)
 
     # if FLAGS.save_model and model:
-    #     model.save(checkpoint_path)
+    #     model.save(checkpoint_dir)
 
 
 def getParam(arg):

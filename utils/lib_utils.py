@@ -37,7 +37,7 @@ flags.DEFINE_string("dataset_version", DATASET_VERSION_V1, "Dataset version")
 
 flags.DEFINE_string("model", MOBILENET_V2_140_ORCHIDS52, "Model")
 
-flags.DEFINE_string("checkpoint_path", "mobilenet_v2_140_orchids52_0001", "Checkpoint path")
+flags.DEFINE_string("checkpoint_dir", "mobilenet_v2_140_orchids52_0001", "Checkpoint directory")
 
 flags.DEFINE_boolean("save_best_only", False, "Save the checkpoint only best result.")
 
@@ -59,7 +59,7 @@ flags.DEFINE_string(
 )
 
 flags.DEFINE_string(
-    "trained_path",
+    "trained_dir",
     "/home/keng/Documents/_trained_models/model-v1/mobilenet_v2_140_orchids52_0001/pretrain2/model.ckpt-12000",
     "Checkpoint Path",
 )

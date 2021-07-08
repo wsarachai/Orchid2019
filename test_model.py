@@ -19,7 +19,7 @@ def main(unused_argv):
     logging.debug(unused_argv)
     dataset_images = create_image_lists(image_dir=FLAGS.image_dir)
     load_dataset = data_utils.dataset_mapping[FLAGS.dataset]
-    model = tf.keras.models.load_model(FLAGS.checkpoint_path)
+    model = tf.keras.models.load_model(FLAGS.checkpoint_dir)
     model.summary()
 
     info = DisplayInfo(load_dataset.test_size)

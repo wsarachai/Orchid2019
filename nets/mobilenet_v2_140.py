@@ -40,7 +40,7 @@ class Orchids52Mobilenet140(object):
         self.step = step
         self.max_to_keep = 5
 
-        self.checkpoint_path = None
+        self.checkpoint_dir = None
         self.checkpoint = None
         self.prediction_layer_checkpoints = []
 
@@ -64,18 +64,18 @@ class Orchids52Mobilenet140(object):
     def summary(self):
         self.model.summary()
 
-    def config_checkpoint(self, checkpoint_path):
+    def config_checkpoint(self, checkpoint_dir):
         assert self.optimizer is not None and self.predict_layers is not None
 
-        self.checkpoint_path = checkpoint_path
+        self.checkpoint_dir = checkpoint_dir
         checkpoint = tf.train.Checkpoint(step=tf.Variable(1), optimizer=self.optimizer, model=self.model)
-        checkpoint_prefix = os.path.join(checkpoint_path, self.step)
+        checkpoint_prefix = os.path.join(checkpoint_dir, self.step)
         checkpoint_manager = tf.train.CheckpointManager(
             checkpoint, directory=checkpoint_prefix, max_to_keep=self.max_to_keep
         )
         self.checkpoint = (checkpoint, checkpoint_manager)
 
-        predict_layers_path = os.path.join(checkpoint_path, "predict_layers")
+        predict_layers_path = os.path.join(checkpoint_dir, "predict_layers")
         for idx, predict_layer in enumerate(self.predict_layers):
             checkpoint = tf.train.Checkpoint(step=tf.Variable(1), optimizer=self.optimizer, model=predict_layer)
             prediction_layer_prefix = get_checkpoint_file(predict_layers_path, idx)
@@ -202,7 +202,7 @@ class Orchids52Mobilenet140(object):
 
         if not result:
             var_loaded = None
-            latest_checkpoint = kwargs.pop("checkpoint_path")
+            latest_checkpoint = kwargs.pop("checkpoint_dir")
             if latest_checkpoint:
                 if self.training:
                     if self.step == TRAIN_STEP1:
@@ -264,15 +264,15 @@ class Orchids52Mobilenet140(object):
         else:
             return step
 
-    def load_weights(self, checkpoint_path):
-        self.model.load_weights(checkpoint_path)
+    def load_weights(self, checkpoint_dir):
+        self.model.load_weights(checkpoint_dir)
 
-    def restore_model_variables(self, load_from_checkpoint_first=True, checkpoint_path=None, **kwargs):
+    def restore_model_variables(self, load_from_checkpoint_first=True, checkpoint_dir=None, **kwargs):
         step = 1
         loaded_successfully = False
         if load_from_checkpoint_first:
             loaded_successfully = self.restore_model_from_latest_checkpoint_if_exist(
-                checkpoint_path=checkpoint_path, **kwargs
+                checkpoint_dir=checkpoint_dir, **kwargs
             )
         if not loaded_successfully:
             self.load_model_variables()
@@ -357,8 +357,9 @@ class PreprocessLayer(keras.layers.Layer):
 
 
 class PredictionLayer(keras.layers.Layer):
-    def __init__(self, num_classes, activation=None, dropout_ratio=0.2):
+    def __init__(self, num_classes, name, activation=None, dropout_ratio=0.2):
         super(PredictionLayer, self).__init__()
+        self.layer_name = name
         self.global_average_pooling = tf.keras.layers.GlobalAveragePooling2D()
         self.dropout = keras.layers.Dropout(dropout_ratio)
         self.dense = keras.layers.Dense(num_classes, name="prediction_layer")
@@ -371,7 +372,19 @@ class PredictionLayer(keras.layers.Layer):
             inputs = self.dropout(inputs, training=training)
         inputs = self.dense(inputs, training=training)
         inputs = self.prediction_fn(inputs)
-        tf.summary.histogram("prediction", inputs, step=tf.compat.v1.train.get_global_step())
+        tf.summary.histogram(
+            "prediction/weights/{}-kernel".format(self.layer_name),
+            self.dense.weights[0],
+            step=tf.compat.v1.train.get_global_step(),
+        )
+        tf.summary.histogram(
+            "prediction/weights/{}-bias".format(self.layer_name),
+            self.dense.weights[1],
+            step=tf.compat.v1.train.get_global_step(),
+        )
+        tf.summary.histogram(
+            "prediction/activation/{}".format(self.layer_name), inputs, step=tf.compat.v1.train.get_global_step()
+        )
         return inputs
 
 
@@ -390,7 +403,7 @@ def create_mobilenet_v2_14(num_classes, optimizer=None, loss_fn=None, training=F
     processed_inputs = preprocess_layer(inputs, training=training)
     mobilenet_logits = mobilenet(processed_inputs, training=training)
 
-    prediction_layer = PredictionLayer(num_classes=num_classes)
+    prediction_layer = PredictionLayer(num_classes=num_classes, name="final-prediction")
 
     outputs = prediction_layer(mobilenet_logits, training=training)
 

@@ -18,10 +18,10 @@
         "--dataset_version=v1",
         "--model=mobilenet_v2_140_stn_v15",
         "--learning_rate=0.0001",
-        "--total_epochs=5",
+        "--total_epochs=10",
         "--save_model=True",
         "--bash=False",
-        "--trained_path=/home/keng/Documents/_trained_models/model-v1/mobilenet_v2_140_orchids52_0001/pretrain2/model.ckpt-12000"
+        "--trained_dir=_trained_models/model-v1/mobilenet_v2_140_orchids52_0001/pretrain2/model.ckpt-12000"
       ]
     },
     {
@@ -36,7 +36,7 @@
         "--dataset=orchids52_data",
         "--dataset_version=v1",
         "--model=mobilenet_v2_140",
-        "--checkpoint_path=mobilenet_v2_140_orchids52_0001",
+        "--checkpoint_dir=mobilenet_v2_140_orchids52_0001",
       ]
     },
     {
@@ -51,7 +51,7 @@
         "--dataset=orchids52_data",
         "--dataset_version=v1",
         "--model=mobilenet_v2_140_stn_v15",
-        "--checkpoint_path=mobilenet_v2_140_stn_v15_orchids52_0002",
+        "--checkpoint_dir=mobilenet_v2_140_stn_v15_orchids52_0002",
       ]
     },
     {

@@ -47,14 +47,14 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
         self.boundary_loss = boundary_loss
         self.stn_dense_checkpoints = []
 
-    def config_checkpoint(self, checkpoint_path):
-        super(Orchids52Mobilenet140STN, self).config_checkpoint(checkpoint_path)
+    def config_checkpoint(self, checkpoint_dir):
+        super(Orchids52Mobilenet140STN, self).config_checkpoint(checkpoint_dir)
         if self.stn_denses and len(self.stn_denses) > 0:
             for i, stn_dense in enumerate(self.stn_denses):
                 stn_dense_checkpoint = tf.train.Checkpoint(
                     step=tf.Variable(1), optimizer=self.optimizer, model=stn_dense
                 )
-                checkpoint_prefix = os.path.join(checkpoint_path, "stn_dense_layer_{}".format(i))
+                checkpoint_prefix = os.path.join(checkpoint_dir, "stn_dense_layer_{}".format(i))
                 stn_dense_checkpoint_manager = tf.train.CheckpointManager(
                     stn_dense_checkpoint, directory=checkpoint_prefix, max_to_keep=self.max_to_keep
                 )
@@ -217,10 +217,10 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
         self.load_model_step2()
 
     def load_model_step4(self):
-        assert self.checkpoint_path is not None
+        assert self.checkpoint_dir is not None
 
         checkpoint, _ = self.checkpoint
-        checkpoint_prefix = os.path.join(self.checkpoint_path, nets.utils.TRAIN_TEMPLATE.format(step=3))
+        checkpoint_prefix = os.path.join(self.checkpoint_dir, nets.utils.TRAIN_TEMPLATE.format(step=3))
         checkpoint_manager = tf.train.CheckpointManager(
             checkpoint, directory=checkpoint_prefix, max_to_keep=self.max_to_keep
         )
@@ -257,9 +257,9 @@ class BranchBlock(keras.layers.Layer):
             input_shape=IMG_SHAPE_224, alpha=1.4, include_top=False, weights="imagenet", sub_name="shared_branch"
         )
         self.branches_prediction_models = [
-            PredictionLayer(num_classes=num_classes),
-            PredictionLayer(num_classes=num_classes),
-            PredictionLayer(num_classes=num_classes),
+            PredictionLayer(num_classes=num_classes, name="BranchBlock-global"),
+            PredictionLayer(num_classes=num_classes, name="BranchBlock-1"),
+            PredictionLayer(num_classes=num_classes, name="BranchBlock-2"),
         ]
 
     def call(self, inputs, **kwargs):
@@ -477,7 +477,7 @@ def create_orchid_mobilenet_v2_15(
             outputs = estimate_block(logits)
 
     else:
-        prediction_layer = PredictionLayer(num_classes=num_classes, activation="softmax")
+        prediction_layer = PredictionLayer(num_classes=num_classes, activation="softmax", name=step)
         branches_prediction_models.append(prediction_layer)
         mobilenet_logits = stn_base_model(processed_inputs, training=training)
         outputs = prediction_layer(mobilenet_logits, training=training)
