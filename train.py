@@ -17,8 +17,8 @@ from utils.lib_utils import FLAGS
 from utils.lib_utils import config_learning_rate
 from utils.lib_utils import config_optimizer
 from utils.lib_utils import config_loss
-from utils.lib_utils import TrainClassifier
 from utils.lib_utils import start
+from utils.training_utils import TrainClassifier
 from utils import const
 
 
@@ -72,7 +72,9 @@ def main(unused_argv):
         batch_size=FLAGS.batch_size,
     )
 
-    train_model = TrainClassifier(model=model, batch_size=batch_size)
+    train_model = TrainClassifier(
+        model=model, batch_size=batch_size, summary_path=os.path.join(checkpoint_path, "logs", training_step)
+    )
 
     model.config_checkpoint(checkpoint_path)
     epoch = model.restore_model_variables(

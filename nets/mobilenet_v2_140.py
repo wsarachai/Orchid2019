@@ -371,6 +371,7 @@ class PredictionLayer(keras.layers.Layer):
             inputs = self.dropout(inputs, training=training)
         inputs = self.dense(inputs, training=training)
         inputs = self.prediction_fn(inputs)
+        tf.summary.histogram("prediction", inputs, step=tf.compat.v1.train.get_global_step())
         return inputs
 
 

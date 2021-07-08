@@ -4,7 +4,6 @@ from __future__ import print_function
 
 import os
 
-import tensorflow as tf
 import matplotlib.pyplot as plt
 from pickle import load
 
@@ -28,8 +27,6 @@ def main(unused_argv):
     boundary_loss = history["b_loss"]
     total_loss = history["total_loss"]
     accuracy = history["accuracy"]
-    validation_loss = history["val_loss"]
-    validation_accuracy = history["val_accuracy"]
     num_of_data = len(accuracy)
     epochs_range = range(num_of_data)
 

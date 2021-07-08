@@ -11,7 +11,7 @@
       "program": "train.py",
       "console": "integratedTerminal",
       "args": [
-        "--train_step=5",
+        "--train_step=1",
         "--batch_size=4",
         "--dataset_format=files",
         "--dataset=orchids52_data",
