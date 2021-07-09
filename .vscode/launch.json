@@ -21,6 +21,7 @@
         "--total_epochs=10",
         "--save_model=True",
         "--bash=False",
+        "--exp_decay=True",
         "--trained_dir=_trained_models/model-v1/mobilenet_v2_140_orchids52_0001/pretrain2/model.ckpt-12000"
       ]
     },

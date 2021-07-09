@@ -383,7 +383,9 @@ class PredictionLayer(keras.layers.Layer):
             step=tf.compat.v1.train.get_global_step(),
         )
         tf.summary.histogram(
-            "prediction/activation/{}".format(self.layer_name), inputs, step=tf.compat.v1.train.get_global_step()
+            "prediction/activation/{}".format(self.layer_name),
+            inputs,
+            step=tf.compat.v1.train.get_global_step(),
         )
         return inputs
 

@@ -21,8 +21,6 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_boolean("bash", False, "Execute from bash")
 
-flags.DEFINE_boolean("exp_decay", False, "Exponential decay learning rate")
-
 flags.DEFINE_integer("batch_size", 32, "Batch size")
 
 flags.DEFINE_integer("train_step", 1, "Training step")
@@ -39,6 +37,8 @@ flags.DEFINE_string("model", MOBILENET_V2_140_ORCHIDS52, "Model")
 
 flags.DEFINE_string("checkpoint_dir", "mobilenet_v2_140_orchids52_0001", "Checkpoint directory")
 
+flags.DEFINE_string("learning_rate_decay", "", "Exponential decay learning rate, exponential, cosine, piecewise_onstant")
+
 flags.DEFINE_boolean("save_best_only", False, "Save the checkpoint only best result.")
 
 flags.DEFINE_boolean("save_model", False, "Save the model on each state.")
@@ -50,7 +50,6 @@ flags.DEFINE_integer("start_state", 1, "Start state")
 flags.DEFINE_integer("end_state", 2, "End state")
 
 flags.DEFINE_string("file", "trainHistory", "Train history")
-
 
 flags.DEFINE_string(
     "optimizer",
@@ -134,15 +133,20 @@ def start(start_fn, **kwargs):
     app.run(start_fn, **kwargs)
 
 
-def config_learning_rate(learning_rate=0.001, exp_decay=False, **kwargs):
-    training_step = kwargs.pop("training_step") if "training_step" in kwargs else ""
-    if exp_decay:
+def config_learning_rate(learning_rate=0.001, decay=""):
+    if decay == 'exponential':
         learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(
             initial_learning_rate=learning_rate, decay_steps=10, decay_rate=0.96
         )
-    else:
-        if training_step in [TRAIN_STEP4, TRAIN_V2_STEP2]:
-            learning_rate = 0.000001
+    elif decay == 'cosine':
+        learning_rate = tf.keras.optimizers.schedules.CosineDecay(
+            initial_learning_rate=learning_rate, decay_steps=10
+        )
+    elif decay == 'piecewise_constant':
+        boundaries = [700, 1400]
+        values = [learning_rate, learning_rate/5, learning_rate/10]
+        learning_rate = tf.keras.optimizers.schedules.PiecewiseConstantDecay(boundaries, values)
+
     return learning_rate
 
 
@@ -158,6 +162,15 @@ def config_optimizer(optimizer, learning_rate, **kwargs):
 def config_loss(**kwargs):
     loss_fn = tf.keras.losses.CategoricalCrossentropy(from_logits=False)
     return loss_fn
+
+
+class MyLRSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
+
+    def __init__(self, initial_learning_rate):
+        self.initial_learning_rate = initial_learning_rate
+
+    def __call__(self, step):
+        return self.initial_learning_rate / (step + 1)
 
 
 class DisplayInfo(object):

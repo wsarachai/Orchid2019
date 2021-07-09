@@ -7,9 +7,12 @@ import tensorflow as tf
 
 
 class TrainClassifier:
-    def __init__(self, model, batch_size, summary_path):
+    def __init__(self, model, batch_size, summary_path, epoches, data_handler_steps, callbacks):
         self.model = model
         self.summary_path = summary_path
+        self.epoches = epoches
+        self.data_handler_steps = data_handler_steps
+        self.callbacks = callbacks
         self.train_loss_metric = tf.keras.metrics.Mean(name="train_loss")
         self.regularization_loss_metric = tf.keras.metrics.Mean(name="regularization_loss")
         self.boundary_loss_metric = tf.keras.metrics.Mean(name="boundary_loss")
@@ -25,6 +28,11 @@ class TrainClassifier:
         self.batch_size = batch_size
 
         self.model.compile(self.metrics)
+
+        for callback in self.callbacks:
+            callback.set_model(self.model.model)
+
+        tf.compat.v1.train.get_or_create_global_step()
 
     def train_step(self, inputs, labels):
         boundary_loss = 0.0
@@ -67,7 +75,11 @@ class TrainClassifier:
         self.total_loss_metric.reset_states()
         self.accuracy_metric.reset_states()
 
-    def fit(self, initial_epoch, epoches, train_ds, **kwargs):
+    def on_epoch_begin(self, epoch, logs=None):
+        for callback in self.callbacks:
+            callback.on_epoch_begin(epoch, logs)
+
+    def fit(self, initial_epoch, **kwargs):
         history = {
             "train_loss": [],
             "reg_loss": [],
@@ -77,9 +89,7 @@ class TrainClassifier:
             "val_loss": [],
             "val_accuracy": [],
         }
-        global_step = tf.compat.v1.train.get_or_create_global_step()
-        global_step.assign(1)
-        target = train_ds.size // self.batch_size
+        target = self.data_handler_steps.size // self.batch_size
         is_run_from_bash = kwargs.pop("bash") if "bash" in kwargs else False
         # save_best_only = kwargs.pop("save_best_only") if "save_best_only" in kwargs else False
         finalize = False if not is_run_from_bash else True
@@ -94,13 +104,14 @@ class TrainClassifier:
 
         w = tf.summary.create_file_writer(self.summary_path)
         with w.as_default():
-            for epoch in range(initial_epoch, epoches + 1):
-                print("\nEpoch: {}/{}".format(epoch, epoches))
+            for epoch in range(initial_epoch, self.epoches + 1):
+                print("\nEpoch: {}/{}".format(epoch, self.epoches))
 
+                self.on_epoch_begin(epoch=epoch)
                 self.reset_metric()
                 seen = 0
 
-                for inputs, labels in train_ds:
+                for inputs, labels in self.data_handler_steps:
                     if inputs.shape.as_list()[0] == self.batch_size:
                         logs = self.train_step(inputs, labels)
                         logs = copy.copy(logs) if logs else {}
@@ -108,17 +119,20 @@ class TrainClassifier:
                         seen += num_steps
                         progbar.update(seen, list(logs.items()), finalize=finalize)
 
+                    global_step = tf.compat.v1.train.get_global_step()
+                    global_step.assign(self.model.optimizer.iterations)
+
                     train_loss = self.train_loss_metric.result().numpy()
                     regularization_loss = self.regularization_loss_metric.result().numpy()
                     boundary_loss = self.boundary_loss_metric.result().numpy()
                     total_loss = self.total_loss_metric.result().numpy()
                     accuracy = self.accuracy_metric.result().numpy()
 
-                    global_step = tf.compat.v1.train.get_global_step()
                     tf.summary.scalar("scalar/train_loss", train_loss, step=global_step)
                     tf.summary.scalar("scalar/regularization_loss", regularization_loss, step=global_step)
                     tf.summary.scalar("scalar/boundary_loss", boundary_loss, step=global_step)
                     tf.summary.scalar("scalar/total_loss", total_loss, step=global_step)
+                    tf.summary.scalar("scalar/learning_rate", self.model.optimizer.lr, step=global_step)
                     tf.summary.scalar("scalar/accuracy", accuracy, step=global_step)
 
                     history["train_loss"].append(train_loss)
@@ -126,9 +140,6 @@ class TrainClassifier:
                     history["b_loss"].append(boundary_loss)
                     history["total_loss"].append(total_loss)
                     history["accuracy"].append(accuracy)
-
-                    global_step = tf.compat.v1.train.get_global_step()
-                    global_step.assign(global_step + 1)
 
                 self.model.save_model_variables()
 

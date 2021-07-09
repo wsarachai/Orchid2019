@@ -56,11 +56,8 @@ def main(unused_argv):
             if tf.io.gfile.exists(des_dir):
                 tf.compat.v1.gfile.DeleteRecursively(des_dir)
             shutil.copytree(src_dir, des_dir)
-
-    learning_rate = config_learning_rate(
-        learning_rate=FLAGS.learning_rate, exp_decay=FLAGS.exp_decay, training_step=training_step
-    )
-    optimizer = config_optimizer(FLAGS.optimizer, learning_rate=learning_rate, training_step=training_step)
+    learning_rate_schedule = config_learning_rate(learning_rate=FLAGS.learning_rate, decay=FLAGS.learning_rate_decay)
+    optimizer = config_optimizer(FLAGS.optimizer, learning_rate=FLAGS.learning_rate, training_step=training_step)
     loss_fn = config_loss()
 
     model = create_model(
@@ -73,8 +70,18 @@ def main(unused_argv):
         batch_size=FLAGS.batch_size,
     )
 
+    def scheduler(epoch, lr):
+        return learning_rate_schedule(epoch)
+
+    callback = tf.keras.callbacks.LearningRateScheduler(scheduler)
+
     train_model = TrainClassifier(
-        model=model, batch_size=batch_size, summary_path=os.path.join(checkpoint_dir, "logs", training_step)
+        model=model,
+        batch_size=batch_size,
+        summary_path=os.path.join(checkpoint_dir, "logs", training_step),
+        epoches=FLAGS.total_epochs,
+        data_handler_steps=train_ds,
+        callbacks=[callback],
     )
 
     model.config_checkpoint(checkpoint_dir)
@@ -85,8 +92,6 @@ def main(unused_argv):
 
     history_fine = train_model.fit(
         initial_epoch=epoch,
-        epoches=FLAGS.total_epochs,
-        train_ds=train_ds,
         bash=FLAGS.bash,
         save_best_only=FLAGS.save_best_only,
     )
@@ -100,8 +105,8 @@ def main(unused_argv):
     print("Test accuracy: ")
     train_model.evaluate(datasets=test_ds)
 
-    # if FLAGS.save_model and model:
-    #     model.save(checkpoint_dir)
+    if FLAGS.save_model and model:
+        model.save(checkpoint_dir)
 
 
 def getParam(arg):

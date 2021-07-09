@@ -17,11 +17,27 @@ if __name__ == '__main__':
         tf.keras.layers.Dense(10)
     ])
 
-    model.compile(optimizer='adam',
+    # learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(
+    #     initial_learning_rate=0.01, decay_steps=10, decay_rate=0.96
+    # )
+    learning_rate = 0.01
+
+    optimizers = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+
+    model.compile(optimizer=optimizers,
                   loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
                   metrics=['accuracy'])
 
-    model.fit(train_images, train_labels, epochs=10)
+
+    def scheduler(epoch, lr):
+        if epoch < 10:
+            return lr
+        else:
+            return lr * tf.math.exp(-0.1)
+
+
+    callback = tf.keras.callbacks.LearningRateScheduler(scheduler)
+    model.fit(train_images, train_labels, epochs=10, callbacks=[callback])
 
     test_loss, test_acc = model.evaluate(test_images, test_labels, verbose=2)
 
