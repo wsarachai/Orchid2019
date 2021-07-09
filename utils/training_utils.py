@@ -32,7 +32,8 @@ class TrainClassifier:
         for callback in self.callbacks:
             callback.set_model(self.model.model)
 
-        tf.compat.v1.train.get_or_create_global_step()
+        global_step = tf.compat.v1.train.get_or_create_global_step()
+        global_step.assign(1)
 
     def train_step(self, inputs, labels):
         boundary_loss = 0.0
@@ -89,7 +90,9 @@ class TrainClassifier:
             "val_loss": [],
             "val_accuracy": [],
         }
+        global_step = tf.compat.v1.train.get_global_step()
         target = self.data_handler_steps.size // self.batch_size
+        global_step.assign((initial_epoch-1)*target)
         is_run_from_bash = kwargs.pop("bash") if "bash" in kwargs else False
         # save_best_only = kwargs.pop("save_best_only") if "save_best_only" in kwargs else False
         finalize = False if not is_run_from_bash else True
@@ -108,6 +111,7 @@ class TrainClassifier:
                 print("\nEpoch: {}/{}".format(epoch, self.epoches))
 
                 self.on_epoch_begin(epoch=epoch)
+
                 self.reset_metric()
                 seen = 0
 
@@ -119,8 +123,8 @@ class TrainClassifier:
                         seen += num_steps
                         progbar.update(seen, list(logs.items()), finalize=finalize)
 
-                    global_step = tf.compat.v1.train.get_global_step()
-                    global_step.assign(self.model.optimizer.iterations)
+                    #global_step.assign(self.model.optimizer.iterations)
+                    global_step.assign_add(1)
 
                     train_loss = self.train_loss_metric.result().numpy()
                     regularization_loss = self.regularization_loss_metric.result().numpy()

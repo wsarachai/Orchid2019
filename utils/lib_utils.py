@@ -140,7 +140,7 @@ def config_learning_rate(learning_rate=0.001, decay=""):
         )
     elif decay == 'cosine':
         learning_rate = tf.keras.optimizers.schedules.CosineDecay(
-            initial_learning_rate=learning_rate, decay_steps=10
+            initial_learning_rate=learning_rate, decay_steps=710
         )
     elif decay == 'piecewise_constant':
         boundaries = [700, 1400]

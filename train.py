@@ -102,7 +102,7 @@ def main(unused_argv):
     with open(history_path, "wb") as handle:
         dump(history_fine["history"], handle)
 
-    print("Test accuracy: ")
+    print("\nTest accuracy: ")
     train_model.evaluate(datasets=test_ds)
 
     if FLAGS.save_model and model:
