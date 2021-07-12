@@ -25,19 +25,19 @@ from utils.const import TRAIN_TEMPLATE
 
 class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
     def __init__(
-            self,
-            inputs,
-            outputs,
-            optimizer,
-            loss_fn,
-            base_model,
-            stn_denses,
-            estimate_block,
-            predict_models,
-            branch_model,
-            boundary_loss,
-            training,
-            step,
+        self,
+        inputs,
+        outputs,
+        optimizer,
+        loss_fn,
+        base_model,
+        stn_denses,
+        estimate_block,
+        predict_models,
+        branch_model,
+        boundary_loss,
+        training,
+        step,
     ):
         super(Orchids52Mobilenet140STN, self).__init__(
             inputs, outputs, optimizer, loss_fn, base_model, predict_models, training, step
@@ -62,7 +62,7 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
                 self.stn_dense_checkpoints.append((stn_dense_checkpoint, stn_dense_checkpoint_manager))
 
     def load_from_v1(
-            self, latest_checkpoint, target_model="mobilenetv2", model_name="mobilenet_v2_140_stn_v15", **kwargs
+        self, latest_checkpoint, target_model="mobilenetv2", model_name="mobilenet_v2_140_stn_v15", **kwargs
     ):
         training_for_tf25 = kwargs.get("training_for_tf25", False)
         pop_key = kwargs.get("pop_key", True)
@@ -186,40 +186,46 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
             self.branch_model.set_trainable_for_share_branch(trainable)
 
     def config_layers(self):
-        if self.step == TRAIN_STEP1:
+        training_step = TRAIN_TEMPLATE.format(self.step)
+        if training_step == TRAIN_STEP1:
             self.set_mobilenet_training_status(False)
-        elif self.step == TRAIN_STEP2:
+        elif training_step == TRAIN_STEP2:
             self.set_mobilenet_training_status(False)
             self.set_prediction_training_status(False)
             self.stn_denses[0].trainable = False
-        elif self.step == TRAIN_STEP3:
+        elif training_step == TRAIN_STEP3:
             self.set_mobilenet_training_status(False)
             self.set_prediction_training_status(False)
             self.stn_denses[1].trainable = False
-        elif self.step == TRAIN_STEP4:
+        elif training_step == TRAIN_STEP4:
             self.set_mobilenet_training_status(False)
             self.set_prediction_training_status(False)
             for stn_dense in self.stn_denses:
                 stn_dense.trainable = False
-        elif self.step == TRAIN_V2_STEP1:
+        elif training_step == TRAIN_V2_STEP1:
             self.set_mobilenet_training_status(False)
-        elif self.step == TRAIN_V2_STEP2:
+        elif training_step == TRAIN_V2_STEP2:
             self.set_mobilenet_training_status(True)
 
-    def load_model_step1(self):
+    def load_model_step1(self, checkpoint_dir):
         if self.checkpoint:
             checkpoint, checkpoint_manager = self.checkpoint
-            if checkpoint_manager.latest_checkpoint:
+            if checkpoint_dir:
+                latest_checkpoint = tf.train.latest_checkpoint(checkpoint_dir=checkpoint_dir)
                 checkpoint = tf.train.Checkpoint(step=tf.Variable(1), optimizer=self.optimizer, model=self.mobilenet)
-                status = checkpoint.restore(checkpoint_manager.latest_checkpoint)
+                status = checkpoint.restore(latest_checkpoint)
                 status.expect_partial()
 
-                checkpoint = tf.train.Checkpoint(step=tf.Variable(1), optimizer=self.optimizer, model=self.branch_model.global_branch_model)
-                status = checkpoint.restore(checkpoint_manager.latest_checkpoint)
+                checkpoint = tf.train.Checkpoint(
+                    step=tf.Variable(1), optimizer=self.optimizer, model=self.branch_model.global_branch_model
+                )
+                status = checkpoint.restore(latest_checkpoint)
                 status.expect_partial()
 
-                checkpoint = tf.train.Checkpoint(step=tf.Variable(1), optimizer=self.optimizer, model=self.branch_model.shared_branch_model)
-                status = checkpoint.restore(checkpoint_manager.latest_checkpoint)
+                checkpoint = tf.train.Checkpoint(
+                    step=tf.Variable(1), optimizer=self.optimizer, model=self.branch_model.shared_branch_model
+                )
+                status = checkpoint.restore(latest_checkpoint)
                 status.expect_partial()
 
             latest_checkpoint = None
@@ -230,8 +236,8 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
                     status = checkpoint.restore(latest_checkpoint)
                     status.assert_existing_objects_matched()
 
-    def load_model_step2(self):
-        self.load_model_step1()
+    def load_model_step2(self, checkpoint_dir):
+        self.load_model_step1(os.path.join(checkpoint_dir, TRAIN_TEMPLATE.format(self.step - 1)))
         for checkpoint in self.stn_dense_checkpoints:
             stn_dense_checkpoint, stn_dense_checkpoint_manager = checkpoint
             if stn_dense_checkpoint_manager.latest_checkpoint:
@@ -245,7 +251,7 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
         assert self.checkpoint_dir is not None
 
         checkpoint, _ = self.checkpoint
-        checkpoint_prefix = os.path.join(self.checkpoint_dir, TRAIN_TEMPLATE.format(step=3))
+        checkpoint_prefix = os.path.join(self.checkpoint_dir, TRAIN_TEMPLATE.format(3))
         checkpoint_manager = tf.train.CheckpointManager(
             checkpoint, directory=checkpoint_prefix, max_to_keep=self.max_to_keep
         )
@@ -256,23 +262,25 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
     def load_model_v2_step2(self):
         pass
 
-    def load_model_variables(self):
-        if self.step == TRAIN_STEP1:
-            self.load_model_step1()
-        elif self.step == TRAIN_STEP2:
-            self.load_model_step2()
-        elif self.step == TRAIN_STEP3:
+    def load_model_variables(self, checkpoint_dir):
+        training_step = TRAIN_TEMPLATE.format(self.step)
+        if training_step == TRAIN_STEP1:
+            self.load_model_step1(TRAIN_TEMPLATE.format(self.step))
+        elif training_step == TRAIN_STEP2:
+            self.load_model_step2(checkpoint_dir)
+        elif training_step == TRAIN_STEP3:
             self.load_model_step3()
-        elif self.step == TRAIN_STEP4:
+        elif training_step == TRAIN_STEP4:
             self.load_model_step4()
-        elif self.step == TRAIN_V2_STEP2:
+        elif training_step == TRAIN_V2_STEP2:
             self.load_model_v2_step2()
 
     def restore_model_from_latest_checkpoint_if_exist(self, **kwargs):
         result = False
         load_from_old_format = False
         show_model_weights = kwargs.get("show_model_weights", False)
-        training_step = kwargs.get("training_step", False)
+        step = kwargs.get("training_step", 0)
+        training_step = TRAIN_TEMPLATE.format(step)
 
         check_missing_weights = False if training_step == TRAIN_STEP4 else True
 
@@ -291,19 +299,18 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
             else:
                 load_from_old_format = True
 
-        if load_from_old_format:
+        if training_step == TRAIN_STEP1 and load_from_old_format:
             var_loaded = None
             latest_checkpoint = kwargs.pop("checkpoint_dir")
             if latest_checkpoint:
                 if self.training:
-                    if self.step == TRAIN_STEP1:
-                        var_loaded = Orchids52Mobilenet140.load_from_v1(
-                            self,
-                            latest_checkpoint=latest_checkpoint,
-                            target_model="mobilenetv2_stn_base_1.40_224_",
-                            model_name="MobilenetV2",
-                            include_prediction_layer=True,
-                        )
+                    var_loaded = Orchids52Mobilenet140.load_from_v1(
+                        self,
+                        latest_checkpoint=latest_checkpoint,
+                        target_model="mobilenetv2_stn_base_1.40_224_",
+                        model_name="MobilenetV2",
+                        include_prediction_layer=True,
+                    )
                 else:
                     var_loaded = self.load_from_v1(latest_checkpoint, **kwargs)
 
@@ -473,7 +480,7 @@ class PrintingNode(tf.keras.layers.Layer):
 
 
 def create_orchid_mobilenet_v2_15(
-        num_classes, optimizer=None, loss_fn=None, training=False, drop_out_prop=0.8, **kwargs
+    num_classes, optimizer=None, loss_fn=None, training=False, drop_out_prop=0.8, **kwargs
 ):
     stn_denses = None
     boundary_loss = None
@@ -492,14 +499,15 @@ def create_orchid_mobilenet_v2_15(
 
     processed_inputs = preprocess_layer(inputs, training=training)
 
-    if step != TRAIN_STEP1:
+    train_step = TRAIN_TEMPLATE.format(step)
+    if train_step != TRAIN_STEP1:
         scales = [0.5, 0.3]
         fc_num = 2
 
-        if step == TRAIN_STEP2:
+        if train_step == TRAIN_STEP2:
             scales = [1.0, 0.3]
 
-        if step == TRAIN_STEP3:
+        if train_step == TRAIN_STEP3:
             scales = [0.5, 1.0]
 
         stn_dense1 = keras.Sequential(
@@ -569,20 +577,20 @@ def create_orchid_mobilenet_v2_15(
         logits = branches_block(stn_output)
 
         # # with tf.name_scope('estimate_block'):
-        if step == TRAIN_STEP2 or step == TRAIN_STEP3:
+        if train_step == TRAIN_STEP2 or train_step == TRAIN_STEP3:
             outputs = tf.reduce_mean(logits, axis=0)
         else:
             estimate_block = EstimationBlock(num_classes=num_classes, batch_size=batch_size)
             outputs = estimate_block(logits)
+
+        if activation == "softmax":
+            outputs = tf.keras.activations.softmax(outputs)
 
     else:
         prediction_layer = PredictionLayer(num_classes=num_classes, activation="softmax", name=step)
         branches_prediction_models.append(prediction_layer)
         mobilenet_logits = stn_base_model(processed_inputs, training=training)
         outputs = prediction_layer(mobilenet_logits, training=training)
-
-    if activation == "softmax":
-        outputs = tf.keras.activations.softmax(outputs)
 
     model = Orchids52Mobilenet140STN(
         inputs,

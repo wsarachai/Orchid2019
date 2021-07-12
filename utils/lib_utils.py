@@ -37,7 +37,9 @@ flags.DEFINE_string("model", MOBILENET_V2_140_ORCHIDS52, "Model")
 
 flags.DEFINE_string("checkpoint_dir", "mobilenet_v2_140_orchids52_0001", "Checkpoint directory")
 
-flags.DEFINE_string("learning_rate_decay", "", "Exponential decay learning rate, exponential, cosine, piecewise_onstant")
+flags.DEFINE_string(
+    "learning_rate_decay", "", "Exponential decay learning rate, exponential, cosine, piecewise_onstant"
+)
 
 flags.DEFINE_boolean("save_best_only", False, "Save the checkpoint only best result.")
 
@@ -134,23 +136,21 @@ def start(start_fn, **kwargs):
 
 
 def config_learning_rate(learning_rate=0.001, decay=""):
-    if decay == 'exponential':
+    if decay == "exponential":
         learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(
             initial_learning_rate=learning_rate, decay_steps=10, decay_rate=0.96
         )
-    elif decay == 'cosine':
-        learning_rate = tf.keras.optimizers.schedules.CosineDecay(
-            initial_learning_rate=learning_rate, decay_steps=710
-        )
-    elif decay == 'piecewise_constant':
+    elif decay == "cosine":
+        learning_rate = tf.keras.optimizers.schedules.CosineDecay(initial_learning_rate=learning_rate, decay_steps=710)
+    elif decay == "piecewise_constant":
         boundaries = [700, 1400]
-        values = [learning_rate, learning_rate/5, learning_rate/10]
+        values = [learning_rate, learning_rate / 5, learning_rate / 10]
         learning_rate = tf.keras.optimizers.schedules.PiecewiseConstantDecay(boundaries, values)
 
     return learning_rate
 
 
-def config_optimizer(optimizer, learning_rate, **kwargs):
+def config_optimizer(optimizer, learning_rate):
     if optimizer == "rmsprop":
         return tf.keras.optimizers.RMSprop(learning_rate=learning_rate)
     elif optimizer == "adam":
@@ -165,7 +165,6 @@ def config_loss(**kwargs):
 
 
 class MyLRSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
-
     def __init__(self, initial_learning_rate):
         self.initial_learning_rate = initial_learning_rate
 

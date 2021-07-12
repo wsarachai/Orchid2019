@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
 import copy
 import tensorflow as tf
 
@@ -92,7 +93,7 @@ class TrainClassifier:
         }
         global_step = tf.compat.v1.train.get_global_step()
         target = self.data_handler_steps.size // self.batch_size
-        global_step.assign((initial_epoch-1)*target)
+        global_step.assign((initial_epoch - 1) * target)
         is_run_from_bash = kwargs.pop("bash") if "bash" in kwargs else False
         # save_best_only = kwargs.pop("save_best_only") if "save_best_only" in kwargs else False
         finalize = False if not is_run_from_bash else True
@@ -107,6 +108,10 @@ class TrainClassifier:
 
         w = tf.summary.create_file_writer(self.summary_path)
         with w.as_default():
+            tf.keras.utils.plot_model(
+                self.model.model, to_file=os.path.join(self.summary_path, "model_1.png"), show_shapes=True
+            )
+            # tf.summary.graph(.get_concrete_function().graph)
             for epoch in range(initial_epoch, self.epoches + 1):
                 print("\nEpoch: {}/{}".format(epoch, self.epoches))
 
@@ -123,7 +128,7 @@ class TrainClassifier:
                         seen += num_steps
                         progbar.update(seen, list(logs.items()), finalize=finalize)
 
-                    #global_step.assign(self.model.optimizer.iterations)
+                    # global_step.assign(self.model.optimizer.iterations)
                     global_step.assign_add(1)
 
                     train_loss = self.train_loss_metric.result().numpy()

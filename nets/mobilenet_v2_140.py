@@ -69,7 +69,7 @@ class Orchids52Mobilenet140(object):
 
         self.checkpoint_dir = checkpoint_dir
         checkpoint = tf.train.Checkpoint(step=tf.Variable(1), optimizer=self.optimizer, model=self.model)
-        checkpoint_prefix = os.path.join(checkpoint_dir, self.step)
+        checkpoint_prefix = os.path.join(checkpoint_dir, TRAIN_TEMPLATE.format(self.step))
         checkpoint_manager = tf.train.CheckpointManager(
             checkpoint, directory=checkpoint_prefix, max_to_keep=self.max_to_keep
         )
@@ -252,11 +252,13 @@ class Orchids52Mobilenet140(object):
 
     def restore_model_variables(self, checkpoint_dir=None, **kwargs):
         step = 1
-        loaded_successfully = self.restore_model_from_latest_checkpoint_if_exist(checkpoint_dir=checkpoint_dir, **kwargs)
+        loaded_successfully = self.restore_model_from_latest_checkpoint_if_exist(
+            checkpoint_dir=checkpoint_dir, **kwargs
+        )
         if loaded_successfully:
             step = self.get_step_number_from_latest_checkpoint() + 1
         else:
-            self.load_model_variables()
+            self.load_model_variables(checkpoint_dir)
 
         self.config_layers()
         for var in self.model.trainable_variables:
@@ -339,19 +341,17 @@ class PredictionLayer(keras.layers.Layer):
         inputs = self.dense(inputs, training=training)
         inputs = self.prediction_fn(inputs)
         tf.summary.histogram(
-            "prediction/weights/{}-kernel".format(self.layer_name),
+            "prediction/{}/kernel".format(self.layer_name),
             self.dense.weights[0],
             step=tf.compat.v1.train.get_global_step(),
         )
         tf.summary.histogram(
-            "prediction/weights/{}-bias".format(self.layer_name),
+            "prediction/{}/bias".format(self.layer_name),
             self.dense.weights[1],
             step=tf.compat.v1.train.get_global_step(),
         )
         tf.summary.histogram(
-            "prediction/activation/{}".format(self.layer_name),
-            inputs,
-            step=tf.compat.v1.train.get_global_step(),
+            "prediction/activation/{}".format(self.layer_name), inputs, step=tf.compat.v1.train.get_global_step(),
         )
         return inputs
 
