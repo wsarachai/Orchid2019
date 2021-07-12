@@ -3,7 +3,6 @@ from __future__ import division
 from __future__ import print_function
 
 import os
-import sys
 import shutil
 import tensorflow as tf
 from pickle import dump
@@ -11,8 +10,6 @@ from datetime import datetime
 from absl import logging
 from nets.mapping import nets_mapping
 from data.data_utils import load_dataset
-from utils.lib_utils import FLAGS
-from utils.lib_utils import start
 from utils.lib_utils import FLAGS
 from utils.lib_utils import config_learning_rate
 from utils.lib_utils import config_optimizer
@@ -27,12 +24,7 @@ def main(unused_argv):
 
     # tf.config.run_functions_eagerly(True)
 
-    split = "train"
     workspace_path = os.environ["WORKSPACE"] if "WORKSPACE" in os.environ else "/Users/watcharinsarachai/Documents/"
-    image_dir = os.path.join(
-        workspace_path, "_datasets", FLAGS.dataset, FLAGS.dataset_format, FLAGS.dataset_version, split
-    )
-
     create_model = nets_mapping[FLAGS.model]
 
     trained_dir = os.path.join(workspace_path, FLAGS.trained_dir)
@@ -40,9 +32,7 @@ def main(unused_argv):
     if not tf.io.gfile.exists(checkpoint_dir):
         os.makedirs(checkpoint_dir)
 
-    model = None
-
-    train_ds = load_dataset(flags=FLAGS, workspace_path=workspace_path, split=split, preprocessing=True, one_hot=True)
+    train_ds = load_dataset(flags=FLAGS, workspace_path=workspace_path, split="train", preprocessing=True, one_hot=True)
     test_ds = load_dataset(flags=FLAGS, workspace_path=workspace_path, split="test", preprocessing=True, one_hot=True)
 
     batch_size = FLAGS.batch_size
@@ -53,9 +43,9 @@ def main(unused_argv):
         src_dir = os.path.join(checkpoint_dir, const.TRAIN_TEMPLATE.format(FLAGS.train_step - 1))
         des_dir = os.path.join(checkpoint_dir, const.TRAIN_TEMPLATE.format(FLAGS.train_step))
         if tf.io.gfile.exists(src_dir):
-            if tf.io.gfile.exists(des_dir):
-                tf.compat.v1.gfile.DeleteRecursively(des_dir)
-            shutil.copytree(src_dir, des_dir)
+            if not tf.io.gfile.exists(des_dir):
+                shutil.copytree(src_dir, des_dir)
+
     learning_rate_schedule = config_learning_rate(learning_rate=FLAGS.learning_rate, decay=FLAGS.learning_rate_decay)
     optimizer = config_optimizer(FLAGS.optimizer, learning_rate=FLAGS.learning_rate, training_step=training_step)
     loss_fn = config_loss()

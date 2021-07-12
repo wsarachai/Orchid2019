@@ -20,23 +20,24 @@ from nets.mobilenet_v2_140 import PredictionLayer
 from nets.mobilenet_v2_140 import Orchids52Mobilenet140
 from utils.const import TRAIN_STEP1, TRAIN_STEP2, TRAIN_STEP3, TRAIN_STEP4
 from utils.const import TRAIN_V2_STEP1, TRAIN_V2_STEP2
+from utils.const import TRAIN_TEMPLATE
 
 
 class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
     def __init__(
-        self,
-        inputs,
-        outputs,
-        optimizer,
-        loss_fn,
-        base_model,
-        stn_denses,
-        estimate_block,
-        predict_models,
-        branch_model,
-        boundary_loss,
-        training,
-        step,
+            self,
+            inputs,
+            outputs,
+            optimizer,
+            loss_fn,
+            base_model,
+            stn_denses,
+            estimate_block,
+            predict_models,
+            branch_model,
+            boundary_loss,
+            training,
+            step,
     ):
         super(Orchids52Mobilenet140STN, self).__init__(
             inputs, outputs, optimizer, loss_fn, base_model, predict_models, training, step
@@ -61,7 +62,7 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
                 self.stn_dense_checkpoints.append((stn_dense_checkpoint, stn_dense_checkpoint_manager))
 
     def load_from_v1(
-        self, latest_checkpoint, target_model="mobilenetv2", model_name="mobilenet_v2_140_stn_v15", **kwargs
+            self, latest_checkpoint, target_model="mobilenetv2", model_name="mobilenet_v2_140_stn_v15", **kwargs
     ):
         training_for_tf25 = kwargs.get("training_for_tf25", False)
         pop_key = kwargs.get("pop_key", True)
@@ -205,6 +206,30 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
         elif self.step == TRAIN_V2_STEP2:
             self.set_mobilenet_training_status(True)
 
+    def load_model_step1(self):
+        if self.checkpoint:
+            checkpoint, checkpoint_manager = self.checkpoint
+            if checkpoint_manager.latest_checkpoint:
+                checkpoint = tf.train.Checkpoint(step=tf.Variable(1), optimizer=self.optimizer, model=self.mobilenet)
+                status = checkpoint.restore(checkpoint_manager.latest_checkpoint)
+                status.expect_partial()
+
+                checkpoint = tf.train.Checkpoint(step=tf.Variable(1), optimizer=self.optimizer, model=self.branch_model.global_branch_model)
+                status = checkpoint.restore(checkpoint_manager.latest_checkpoint)
+                status.expect_partial()
+
+                checkpoint = tf.train.Checkpoint(step=tf.Variable(1), optimizer=self.optimizer, model=self.branch_model.shared_branch_model)
+                status = checkpoint.restore(checkpoint_manager.latest_checkpoint)
+                status.expect_partial()
+
+            latest_checkpoint = None
+            for checkpoint, checkpoint_manager in self.prediction_layer_checkpoints:
+                if checkpoint_manager.latest_checkpoint:
+                    latest_checkpoint = checkpoint_manager.latest_checkpoint
+                if latest_checkpoint:
+                    status = checkpoint.restore(latest_checkpoint)
+                    status.assert_existing_objects_matched()
+
     def load_model_step2(self):
         self.load_model_step1()
         for checkpoint in self.stn_dense_checkpoints:
@@ -220,7 +245,7 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
         assert self.checkpoint_dir is not None
 
         checkpoint, _ = self.checkpoint
-        checkpoint_prefix = os.path.join(self.checkpoint_dir, nets.utils.TRAIN_TEMPLATE.format(step=3))
+        checkpoint_prefix = os.path.join(self.checkpoint_dir, TRAIN_TEMPLATE.format(step=3))
         checkpoint_manager = tf.train.CheckpointManager(
             checkpoint, directory=checkpoint_prefix, max_to_keep=self.max_to_keep
         )
@@ -242,6 +267,80 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
             self.load_model_step4()
         elif self.step == TRAIN_V2_STEP2:
             self.load_model_v2_step2()
+
+    def restore_model_from_latest_checkpoint_if_exist(self, **kwargs):
+        result = False
+        load_from_old_format = False
+        show_model_weights = kwargs.get("show_model_weights", False)
+        training_step = kwargs.get("training_step", False)
+
+        check_missing_weights = False if training_step == TRAIN_STEP4 else True
+
+        if self.checkpoint:
+            checkpoint, checkpoint_manager = self.checkpoint
+            if checkpoint_manager.latest_checkpoint:
+                try:
+                    status = checkpoint.restore(checkpoint_manager.latest_checkpoint)
+                    if check_missing_weights:
+                        status.assert_existing_objects_matched()
+                    else:
+                        status.expect_partial()
+                    result = True
+                except:
+                    pass
+            else:
+                load_from_old_format = True
+
+        if load_from_old_format:
+            var_loaded = None
+            latest_checkpoint = kwargs.pop("checkpoint_dir")
+            if latest_checkpoint:
+                if self.training:
+                    if self.step == TRAIN_STEP1:
+                        var_loaded = Orchids52Mobilenet140.load_from_v1(
+                            self,
+                            latest_checkpoint=latest_checkpoint,
+                            target_model="mobilenetv2_stn_base_1.40_224_",
+                            model_name="MobilenetV2",
+                            include_prediction_layer=True,
+                        )
+                else:
+                    var_loaded = self.load_from_v1(latest_checkpoint, **kwargs)
+
+                if var_loaded:
+                    var_loaded_fixed_name = {}
+                    for key in var_loaded:
+                        var_loaded_fixed_name.update({key + ":0": var_loaded[key]})
+
+                    all_vars = self.model.weights
+
+                    all_maps = {}
+                    for _, var in enumerate(all_vars):
+                        all_maps.update({var.name: var})
+
+                    for _, var in enumerate(all_vars):
+                        if var.name in var_loaded_fixed_name:
+                            saved_var = var_loaded_fixed_name[var.name]
+                            if var.shape != saved_var.shape:
+                                saved_var = np.squeeze(saved_var)
+                                if var.shape != saved_var.shape:
+                                    raise Exception("Incompatible shapes")
+                            var.assign(saved_var)
+                            all_maps.pop(var.name)
+                            if show_model_weights:
+                                flat_var = np.reshape(saved_var, (-1))
+                                print("Loading: {} -> {}".format(var.name, flat_var[:4]))
+                        else:
+                            print("Can't find: {}".format(var.name))
+
+                    for key in all_maps:
+                        var = all_maps[key]
+                        print("Variable {} {} was not init..".format(var.name, var.shape))
+
+                    result = True
+            else:
+                result = False
+        return result
 
 
 class BranchBlock(keras.layers.Layer):
@@ -374,7 +473,7 @@ class PrintingNode(tf.keras.layers.Layer):
 
 
 def create_orchid_mobilenet_v2_15(
-    num_classes, optimizer=None, loss_fn=None, training=False, drop_out_prop=0.8, **kwargs
+        num_classes, optimizer=None, loss_fn=None, training=False, drop_out_prop=0.8, **kwargs
 ):
     stn_denses = None
     boundary_loss = None

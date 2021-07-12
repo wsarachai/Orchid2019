@@ -185,72 +185,52 @@ class Orchids52Mobilenet140(object):
                     print("Can't find the key: {}".format(_key_v))
         return value_to_load
 
+    def load_from_pretrain1(
+        self, latest_checkpoint, target_model="mobilenetv2", model_name="mobilenet_v2_140_stn_v15", **kwargs
+    ):
+        pop_key = kwargs.get("pop_key", True)
+        value_to_load = {}
+        reader = tf.compat.v1.train.NewCheckpointReader(latest_checkpoint)
+        var_to_shape_map = reader.get_variable_to_shape_map()
+        key_to_numpy = {}
+        for key in sorted(var_to_shape_map.items()):
+            print(key)
+            key_to_numpy.update({key[0]: reader.get_tensor(key[0])})
+
+        var_maps = {
+            "branch_block/prediction_layer/prediction_layer/kernel": "Logits/Conv2d_1c_1x1/weights",
+            "branch_block/prediction_layer/prediction_layer/bias": "Logits/Conv2d_1c_1x1/biases",
+            "branch_block/prediction_layer_1/prediction_layer/kernel": "Logits/Conv2d_1c_1x1/weights",
+            "branch_block/prediction_layer_1/prediction_layer/bias": "Logits/Conv2d_1c_1x1/biases",
+            "branch_block/prediction_layer_2/prediction_layer/kernel": "Logits/Conv2d_1c_1x1/weights",
+            "branch_block/prediction_layer_2/prediction_layer/bias": "Logits/Conv2d_1c_1x1/biases",
+        }
+
+        for var_name in var_maps:
+            _key = "MobilenetV2/" + var_maps[var_name]
+            if _key in key_to_numpy:
+                value = key_to_numpy[_key]
+                value_to_load[var_name] = value
+                if pop_key:
+                    key_to_numpy.pop(_key)
+            else:
+                print("Can't find the key: {}".format(_key))
+
+        if pop_key:
+            for key in key_to_numpy:
+                print("{} was not loaded".format(key))
+
+        return value_to_load
+
     def restore_model_from_latest_checkpoint_if_exist(self, **kwargs):
         result = False
-        show_model_weights = kwargs.get("show_model_weights", False)
-        training_step = kwargs.get("training_step", False)
-
-        check_missing_weights = False if training_step == TRAIN_STEP4 else True
-
         if self.checkpoint:
             checkpoint, checkpoint_manager = self.checkpoint
             if checkpoint_manager.latest_checkpoint:
                 status = checkpoint.restore(checkpoint_manager.latest_checkpoint)
-                if check_missing_weights:
-                    status.assert_existing_objects_matched()
+                status.assert_existing_objects_matched()
                 result = True
 
-        if not result:
-            var_loaded = None
-            latest_checkpoint = kwargs.pop("checkpoint_dir")
-            if latest_checkpoint:
-                if self.training:
-                    if self.step == TRAIN_STEP1:
-                        var_loaded = Orchids52Mobilenet140.load_from_v1(
-                            self,
-                            latest_checkpoint=latest_checkpoint,
-                            target_model="mobilenetv2_stn_base_1.40_224_",
-                            model_name="MobilenetV2",
-                            include_prediction_layer=True,
-                        )
-                    elif self.step == TRAIN_STEP2:
-                        var_loaded = self.load_from_v1(latest_checkpoint=latest_checkpoint, **kwargs)
-                else:
-                    var_loaded = self.load_from_v1(latest_checkpoint, **kwargs)
-
-                if var_loaded:
-                    var_loaded_fixed_name = {}
-                    for key in var_loaded:
-                        var_loaded_fixed_name.update({key + ":0": var_loaded[key]})
-
-                    all_vars = self.model.weights
-
-                    all_maps = {}
-                    for _, var in enumerate(all_vars):
-                        all_maps.update({var.name: var})
-
-                    for _, var in enumerate(all_vars):
-                        if var.name in var_loaded_fixed_name:
-                            saved_var = var_loaded_fixed_name[var.name]
-                            if var.shape != saved_var.shape:
-                                saved_var = np.squeeze(saved_var)
-                                if var.shape != saved_var.shape:
-                                    raise Exception("Incompatible shapes")
-                            var.assign(saved_var)
-                            all_maps.pop(var.name)
-                            if show_model_weights:
-                                flat_var = np.reshape(saved_var, (-1))
-                                print("Loading: {} -> {}".format(var.name, flat_var[:4]))
-                        else:
-                            print("Can't find: {}".format(var.name))
-
-                    for key in all_maps:
-                        var = all_maps[key]
-                        print("Variable {} {} was not init..".format(var.name, var.shape))
-
-                    result = True
-            else:
-                result = False
         return result
 
     def get_step_number_from_latest_checkpoint(self):
@@ -267,17 +247,17 @@ class Orchids52Mobilenet140(object):
     def load_weights(self, checkpoint_dir):
         self.model.load_weights(checkpoint_dir)
 
-    def restore_model_variables(self, load_from_checkpoint_first=True, checkpoint_dir=None, **kwargs):
+    def load_model_variables(self):
+        pass
+
+    def restore_model_variables(self, checkpoint_dir=None, **kwargs):
         step = 1
-        loaded_successfully = False
-        if load_from_checkpoint_first:
-            loaded_successfully = self.restore_model_from_latest_checkpoint_if_exist(
-                checkpoint_dir=checkpoint_dir, **kwargs
-            )
-        if not loaded_successfully:
-            self.load_model_variables()
-        else:
+        loaded_successfully = self.restore_model_from_latest_checkpoint_if_exist(checkpoint_dir=checkpoint_dir, **kwargs)
+        if loaded_successfully:
             step = self.get_step_number_from_latest_checkpoint() + 1
+        else:
+            self.load_model_variables()
+
         self.config_layers()
         for var in self.model.trainable_variables:
             print("trainable variable: ", var.name)
@@ -286,20 +266,6 @@ class Orchids52Mobilenet140(object):
     def config_layers(self):
         if self.step == TRAIN_STEP1:
             self.set_mobilenet_training_status(False)
-
-    def load_model_variables(self):
-        if self.step == TRAIN_STEP1:
-            self.load_model_step1()
-
-    def load_model_step1(self):
-        latest_checkpoint = None
-        for checkpoint, checkpoint_manager in self.prediction_layer_checkpoints:
-            if checkpoint_manager.latest_checkpoint:
-                # save latest checkpoint, it will reused later on init of pretrain 2 and 3
-                latest_checkpoint = checkpoint_manager.latest_checkpoint
-            if latest_checkpoint:
-                status = checkpoint.restore(latest_checkpoint)
-                status.assert_existing_objects_matched()
 
     def set_mobilenet_training_status(self, trainable):
         if self.mobilenet:
