@@ -183,7 +183,7 @@ class DisplayInfo(object):
         confident = result[0][predict]
         predict_string = "n{:04d}".format(predict)
         if label.dtype != tf.string:
-            label = "n{:04d}".format(label[0])
+            label = "n{:04d}".format(label)
         if predict_string == label:
             self.corrected += 1
         sys.stdout.write(

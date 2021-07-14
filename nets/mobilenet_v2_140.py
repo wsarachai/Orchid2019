@@ -325,12 +325,17 @@ class PreprocessLayer(keras.layers.Layer):
 
 
 class PredictionLayer(keras.layers.Layer):
-    def __init__(self, num_classes, name, activation=None, dropout_ratio=0.2):
+    def __init__(self, num_classes, name, activation=None, stddev=0.09, dropout_ratio=0.2, weight_decay=0.00004):
         super(PredictionLayer, self).__init__()
         self.layer_name = name
         self.global_average_pooling = tf.keras.layers.GlobalAveragePooling2D()
         self.dropout = keras.layers.Dropout(dropout_ratio)
-        self.dense = keras.layers.Dense(num_classes, name="prediction_layer")
+        self.dense = keras.layers.Dense(
+            num_classes,
+            kernel_initializer=tf.keras.initializers.TruncatedNormal(mean=0.0, stddev=stddev),
+            kernel_regularizer=tf.keras.regularizers.L2(weight_decay),
+            name="prediction_layer",
+        )
         self.prediction_fn = activations.get(activation)
 
     def call(self, inputs, **kwargs):

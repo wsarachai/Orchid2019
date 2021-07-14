@@ -5,15 +5,15 @@ trained_dir="/home/keng/Documents/_trained_models/model-v1/mobilenet_v2_140_orch
 script="${TRAIN_DIR}/train.py"
 
 readonly connections=(       
-    '1|50|0.0008'
+    '1|32|50|0.001'
 )
 
 function training_model(){
     local range proto port
     for fields in ${connections[@]}
     do
-        IFS=$'|' read -r train_step total_epochs learning_rate <<< "$fields"
-        python train.py "--train_step=${train_step}" "--batch_size=4" "--dataset_format=files" "--dataset=orchids52_data" "--dataset_version=v1" "--model=mobilenet_v2_140_stn_v15" "--learning_rate=${learning_rate}" "--total_epochs=${total_epochs}" "--save_model=True" "--bash=False" "--learning_rate_decay=exponential" "--trained_dir=${trained_dir}"
+        IFS=$'|' read -r train_step batch_size total_epochs learning_rate <<< "$fields"
+        python train.py "--train_step=${train_step}" "--batch_size=${batch_size}" "--dataset_format=files" "--dataset=orchids52_data" "--dataset_version=v1" "--model=mobilenet_v2_140_stn_v15" "--learning_rate=${learning_rate}" "--total_epochs=${total_epochs}" "--save_model=True" "--bash=False" "--learning_rate_decay=exponential" "--trained_dir=${trained_dir}"
     done
 }
 

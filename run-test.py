@@ -3,15 +3,12 @@ from __future__ import division
 from __future__ import print_function
 
 import os
-import h5py
-import numpy as np
 import tensorflow as tf
 
 from utils.lib_utils import start
 from utils.lib_utils import FLAGS
 from utils.lib_utils import DisplayInfo
 from nets.mapping import nets_mapping
-from nets.mapping import preprocessing_mapping
 from data import data_utils
 from absl import logging
 
