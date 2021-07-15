@@ -17,9 +17,7 @@ def main(unused_argv):
     logging.debug(unused_argv)
 
     workspace_path = os.environ["WORKSPACE"] if "WORKSPACE" in os.environ else "/Users/watcharinsarachai/Documents/"
-    checkpoint_dir = os.path.join(
-        workspace_path, "_trained_models", "orchids2019", FLAGS.checkpoint_dir, "variables", "variables"
-    )
+    checkpoint_dir = os.path.join(workspace_path, "_trained_models", "model-v1", FLAGS.checkpoint_dir)
 
     datasets = data_utils.load_dataset(flags=FLAGS, workspace_path=workspace_path, split="test", preprocessing=True)
 
@@ -28,7 +26,7 @@ def main(unused_argv):
     model = create_model(num_classes=datasets.num_of_classes, activation="softmax")
     accuracy_metric = tf.keras.metrics.CategoricalAccuracy(name="train_accuracy")
     model.compile(metrics=[accuracy_metric])
-    model.load_weights(checkpoint_dir=checkpoint_dir)
+    model.restore_model_variables(checkpoint_path=checkpoint_dir)
     model.summary()
 
     info = DisplayInfo(datasets.size)
@@ -40,6 +38,9 @@ def main(unused_argv):
         info.display_info(result, label, count)
 
     info.display_summary()
+
+    checkpoint_dir = os.path.join(workspace_path, "_trained_models", "orchids2019", FLAGS.model)
+    model.save(checkpoint_dir)
 
 
 if __name__ == "__main__":

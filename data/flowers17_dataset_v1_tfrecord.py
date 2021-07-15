@@ -44,10 +44,10 @@ def parse_function(example_proto):
 
 
 def _load_dataset(
-    split, root_path, data_dir, batch_size, train_size, test_size, repeat=False, num_readers=1, num_map_threads=1
+    split, root_path, batch_size, train_size, test_size, repeat=False, num_readers=1, num_map_threads=1, **kwargs
 ):
     pattern = "flowers17_{split}*.tfrecord".format(split=split)
-    pattern = os.path.join(root_path, data_dir, pattern)
+    pattern = os.path.join(root_path, pattern)
     dataset = tf.data.Dataset.list_files(file_pattern=pattern)
     dataset = dataset.interleave(
         lambda x: tf.data.TFRecordDataset(x),
@@ -70,7 +70,7 @@ def _load_dataset(
     elif split == "test":
         setattr(decode_dataset, "size", test_size)
 
-    meta_data_path = os.path.join(root_path, data_dir, "flowers17_metadata.txt")
+    meta_data_path = os.path.join(root_path, "flowers17_metadata.txt")
     with open(meta_data_path, "r") as f:
         lines = [line.rstrip().split("\t") for line in f]
 
@@ -83,10 +83,7 @@ def _load_dataset(
 get_label = wrapped_partial(_get_label, depth=flowers17_dataset.NUM_OF_CLASSES)
 
 load_dataset_v1 = wrapped_partial(
-    _load_dataset,
-    train_size=flowers17_dataset.TRAIN_SIZE_V1,
-    test_size=flowers17_dataset.TEST_SIZE_V1,
-    data_dir="tf-records/v1",
+    _load_dataset, train_size=flowers17_dataset.TRAIN_SIZE_V1, test_size=flowers17_dataset.TEST_SIZE_V1
 )
 
 load_dataset_v1.num_of_classes = flowers17_dataset.NUM_OF_CLASSES

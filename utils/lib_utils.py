@@ -181,11 +181,21 @@ class DisplayInfo(object):
     def display_info(self, result, label, count):
         predict = np.argmax(result, axis=1)[0]
         confident = result[0][predict]
-        predict_string = "n{:04d}".format(predict)
-        if label.dtype != tf.string:
-            label = "n{:04d}".format(label)
-        if predict_string == label:
-            self.corrected += 1
+        try:
+            predict_string = "n{:04d}".format(predict)
+            if label.dtype != tf.string:
+                label = "n{:04d}".format(label)
+            if predict_string == label:
+                self.corrected += 1
+        except:
+            try:
+                label = np.argmax(label, axis=1)[0]
+                if predict == label:
+                    self.corrected += 1
+            except:
+                if predict == label:
+                    self.corrected += 1
+
         sys.stdout.write(
             "\r>> {}/{}: Predict: {}, expected: {}, confident: {:.4f}, acc: {:.4f}".format(
                 count, self.total_images, predict_string, label, confident, self.corrected / count

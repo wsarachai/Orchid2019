@@ -131,4 +131,5 @@ def load_dataset_v2(split, batch_size, root_path, **kwargs):
         train_size=orchids52_dataset.TRAIN_SIZE_V2,
         test_size=orchids52_dataset.TEST_SIZE_V2,
         validate_size=orchids52_dataset.VALIDATE_SIZE_V2,
+        **kwargs
     )
