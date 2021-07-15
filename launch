@@ -1,0 +1,178 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python: Train",
+      "type": "python",
+      "request": "launch",
+      "program": "train.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--train_step=1",
+        "--batch_size=32",
+        "--dataset_format=files",
+        "--dataset=orchids52_data",
+        "--dataset_version=v1",
+        "--model=mobilenet_v2_140_stn_v15",
+        "--learning_rate=0.0001",
+        "--total_epochs=50",
+        "--save_model=True",
+        "--bash=False",
+        "--learning_rate_decay=exponential",
+        "--trained_dir=_trained_models/model-v1/mobilenet_v2_140_orchids52_0001/pretrain2/model.ckpt-12000"
+      ]
+    },
+    {
+      "name": "Python: Train-v2",
+      "type": "python",
+      "request": "launch",
+      "program": "train.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--train_step=2",
+        "--batch_size=4",
+        "--dataset_format=files",
+        "--dataset=orchids52_data",
+        "--dataset_version=v1",
+        "--model=mobilenet_v2_140_stn_v15",
+        "--learning_rate=0.0008",
+        "--total_epochs=50",
+        "--save_model=True",
+        "--bash=False",
+        "--learning_rate_decay=exponential"
+      ]
+    },
+    {
+      "name": "Python: mobilenet_v2_140 flowers17 Test",
+      "type": "python",
+      "request": "launch",
+      "program": "run-test.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--dataset_format=tf-records",
+        "--dataset=flowers17_data",
+        "--dataset_version=v1",
+        "--batch_size=1",
+        "--model=mobilenet_v2_140_v1",
+        "--checkpoint_dir=mobilenet_v2_140_flowers17_0001/pretrain2/model.ckpt-6000",
+      ]
+    },
+    {
+      "name": "Python: mobilenet_v2_140 orchids52 Test",
+      "type": "python",
+      "request": "launch",
+      "program": "run-test.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--dataset_format=tf-records",
+        "--dataset=orchids52_data",
+        "--dataset_version=v1",
+        "--batch_size=1",
+        "--model=mobilenet_v2_140_v1",
+        "--checkpoint_dir=mobilenet_v2_140_orchids52_0001/pretrain2/model.ckpt-12000",
+      ]
+    },
+    {
+      "name": "Python: mobilenet_v2_140 flowers102 Test",
+      "type": "python",
+      "request": "launch",
+      "program": "run-test.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--dataset_format=tf-records",
+        "--dataset=flowers102_data",
+        "--dataset_version=v1",
+        "--batch_size=1",
+        "--model=mobilenet_v2_140_v1",
+        "--checkpoint_dir=mobilenet_v2_140_flowers102_0001/pretrain2/model.ckpt-10000",
+      ]
+    },
+    {
+      "name": "Python: mobilenet_v2_140_flowers17 stn v1 Test",
+      "type": "python",
+      "request": "launch",
+      "program": "run-test.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--dataset_format=tf-records",
+        "--dataset=flowers17_data",
+        "--dataset_version=v1",
+        "--batch_size=1",
+        "--model=mobilenet_v2_140_flowers17_v1",
+        "--checkpoint_dir=mobilenet_v2_140_stn_v15_flowers17_0001/pretrain3/model.ckpt-50000",
+      ]
+    },
+    {
+      "name": "Python: mobilenet_v2_140_flowers102 stn v1 Test",
+      "type": "python",
+      "request": "launch",
+      "program": "run-test.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--dataset_format=tf-records",
+        "--dataset=flowers102_data",
+        "--dataset_version=v1",
+        "--batch_size=1",
+        "--model=mobilenet_v2_140_flowers102_v1",
+        "--checkpoint_dir=mobilenet_v2_140_stn_v15_flowers102_0001/pretrain3/model.ckpt-50000",
+      ]
+    },
+    {
+      "name": "Python: mobilenet_v2_140_orchids52 stn v1 Test",
+      "type": "python",
+      "request": "launch",
+      "program": "run-test.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--dataset_format=tf-records",
+        "--dataset=orchids52_data",
+        "--dataset_version=v1",
+        "--batch_size=1",
+        "--model=mobilenet_v2_140_stn_v15_v1",
+        "--checkpoint_dir=mobilenet_v2_140_stn_v15_orchids52_0002/pretrain3/model.ckpt-50000",
+      ]
+    },
+    {
+      "name": "Python: mobilenet_v2_140_stn Test",
+      "type": "python",
+      "request": "launch",
+      "program": "test_model.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--train_step=1",
+        "--dataset_format=files",
+        "--dataset=orchids52_data",
+        "--dataset_version=v1",
+        "--batch_size=1",
+        "--model=mobilenet_v2_140_stn_v15",
+        "--checkpoint_dir=_trained_models/orchids2019/mobilenet_v2_140_stn_v15",
+      ]
+    }
+    {
+      "name": "Python: Gen Graph",
+      "type": "python",
+      "request": "launch",
+      "program": "graph.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--total_epochs=100",
+        "--file=/home/keng/Documents/_trained_models/orchids2019/mobilenet_v2_140_stn_v15/07-07-2021-history-pretrain2"
+      ]
+    },
+    {
+      "name": "Python: Gen dataset",
+      "type": "python",
+      "request": "launch",
+      "program": "create-h5-data.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--dataset_format=files",
+        "--dataset=orchids52_data",
+        "--dataset_version=v1",
+      ]
+    }
+  ]
+}
