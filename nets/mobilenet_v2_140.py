@@ -61,11 +61,13 @@ class Orchids52Mobilenet140(object):
     def get_trainable_variables(self):
         return self.model.trainable_variables
 
-    def fit(self, train_ds, initial_epoch, epochs, validation_data, callbacks):
-        return self.model.fit(train_ds, initial_epoch=initial_epoch, epochs=epochs, validation_data=validation_data, callbacks=callbacks)
+    def fit(self, train_ds, initial_epoch, epochs, validation_data=None, callbacks=None):
+        return self.model.fit(
+            train_ds, initial_epoch=initial_epoch, epochs=epochs, validation_data=validation_data, callbacks=callbacks
+        )
 
     def evaluate(self, validation_data):
-        return self.model.evaluate(validation_data=validation_data)
+        return self.model.evaluate(validation_data)
 
     def summary(self):
         self.model.summary()

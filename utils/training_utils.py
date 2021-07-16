@@ -18,7 +18,7 @@ class TrainClassifier:
         self.regularization_loss_metric = tf.keras.metrics.Mean(name="regularization_loss")
         self.boundary_loss_metric = tf.keras.metrics.Mean(name="boundary_loss")
         self.total_loss_metric = tf.keras.metrics.Mean(name="total_loss")
-        self.accuracy_metric = tf.keras.metrics.CategoricalAccuracy(name="train_accuracy")
+        self.accuracy_metric = tf.keras.metrics.CategoricalAccuracy(name="accuracy")
         self.metrics = [
             self.train_loss_metric,
             self.regularization_loss_metric,
@@ -108,9 +108,9 @@ class TrainClassifier:
 
         w = tf.summary.create_file_writer(self.summary_path)
         with w.as_default():
-            tf.keras.utils.plot_model(
-                self.model.model, to_file=os.path.join(self.summary_path, "model_1.png"), show_shapes=True
-            )
+            # tf.keras.utils.plot_model(
+            #     self.model.model, to_file=os.path.join(self.summary_path, "model_1.png"), show_shapes=True
+            # )
             # tf.summary.graph(.get_concrete_function().graph)
             for epoch in range(initial_epoch, self.epoches + 1):
                 print("\nEpoch: {}/{}".format(epoch, self.epoches))

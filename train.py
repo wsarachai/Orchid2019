@@ -3,7 +3,6 @@ from __future__ import division
 from __future__ import print_function
 
 import os
-import shutil
 import tensorflow as tf
 from pickle import dump
 from datetime import datetime
@@ -15,6 +14,7 @@ from utils.lib_utils import config_learning_rate
 from utils.lib_utils import config_optimizer
 from utils.lib_utils import config_loss
 from utils.lib_utils import start
+from utils.training_utils import TrainClassifier
 from utils import const
 
 
@@ -22,6 +22,8 @@ def main(unused_argv):
     logging.debug(unused_argv)
 
     # tf.config.run_functions_eagerly(True)
+
+    create_model_graph = False
 
     workspace_path = os.environ["WORKSPACE"] if "WORKSPACE" in os.environ else "/Users/watcharinsarachai/Documents/"
     create_model = nets_mapping[FLAGS.model]
@@ -50,34 +52,66 @@ def main(unused_argv):
         batch_size=FLAGS.batch_size,
     )
 
-    checkpoint_dir = os.path.join(training_dir, const.TRAIN_TEMPLATE.format(FLAGS.train_step), "model")
-    log_dir = os.path.join(training_dir, "logs", const.TRAIN_TEMPLATE.format(FLAGS.train_step))
-
-    def scheduler(epochs, lr):
-        return learning_rate_schedule(epochs)
+    def scheduler(epoch, lr):
+        return learning_rate_schedule(epoch)
 
     callback = tf.keras.callbacks.LearningRateScheduler(scheduler)
-    cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_dir,
-                                                     save_weights_only=True,
-                                                     verbose=1)
-    tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
 
-    model.config_checkpoint(checkpoint_dir)
-    _checkpoint_dir = checkpoint_dir if FLAGS.train_step > 1 else trained_weights_dir
+    train_model = TrainClassifier(
+        model=model,
+        batch_size=FLAGS.batch_size,
+        summary_path=os.path.join(training_dir, "logs", const.TRAIN_TEMPLATE.format(FLAGS.train_step)),
+        epoches=FLAGS.total_epochs,
+        data_handler_steps=train_ds,
+        callbacks=[callback],
+    )
+
+    model.config_checkpoint(training_dir)
+    _checkpoint_dir = training_dir if FLAGS.train_step > 1 else trained_weights_dir
     epoch = model.restore_model_variables(
         checkpoint_dir=_checkpoint_dir, training_for_tf25=True, pop_key=False, training_step=FLAGS.train_step
     )
     model.summary()
 
-    model.compile(metrics=['accuracy'])
+    def scheduler(epochs, _):
+        return learning_rate_schedule(epochs)
 
-    model.fit(train_ds, initial_epoch=epoch, epochs=FLAGS.total_epochs, validation_data=test_ds, callbacks=[callback, cp_callback, tensorboard_callback])
+    callback = tf.keras.callbacks.LearningRateScheduler(scheduler)
+
+    if create_model_graph:
+        log_dir = os.path.join(training_dir, "graph", const.TRAIN_TEMPLATE.format(FLAGS.train_step))
+        tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
+        model.compile(metrics=["accuracy"])
+
+        model.fit(
+            train_ds, initial_epoch=0, epochs=1, callbacks=[callback, tensorboard_callback],
+        )
+
+    log_dir = os.path.join(training_dir, "logs", const.TRAIN_TEMPLATE.format(FLAGS.train_step))
+
+    train_model = TrainClassifier(
+        model=model,
+        batch_size=FLAGS.batch_size,
+        summary_path=log_dir,
+        epoches=FLAGS.total_epochs,
+        data_handler_steps=train_ds,
+        callbacks=[callback],
+    )
+
+    history_fine = train_model.fit(initial_epoch=epoch, bash=FLAGS.bash, save_best_only=FLAGS.save_best_only,)
+
+    timestamp = datetime.now().strftime("%m-%d-%Y")
+    history_path = os.path.join(
+        training_dir, "{}-history-{}.pack".format(timestamp, const.TRAIN_TEMPLATE.format(FLAGS.train_step))
+    )
+    with open(history_path, "wb") as handle:
+        dump(history_fine["history"], handle)
 
     print("\nTest accuracy: ")
-    model.evaluate(datasets=test_ds)
+    train_model.evaluate(datasets=test_ds)
 
     if FLAGS.save_model and model:
-        model.save(checkpoint_dir)
+        model.save(training_dir)
 
 
 def getParam(arg):

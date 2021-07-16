@@ -282,33 +282,33 @@ def spatial_transformer_network(input_map, theta, batch_size, width, height, sca
 
     thetas = []
     bound_err = []
-    range_values = range(0, _w, 2)
-    for idx, i in enumerate(range_values):
-        x_zero = tf.constant(np.full((B, 1), 0.00, dtype=np.float32))
-        y_zero = tf.constant(np.full((B, 1), 0.00, dtype=np.float32))
-        scale = tf.constant(np.full((B, 1), scales[idx], dtype=np.float32))
 
-        if scales is None:
-            x_t_flat = tf.constant(np.full((B, 1), 0.00, dtype=np.float32))
-            y_t_flat = tf.constant(np.full((B, 1), 0.00, dtype=np.float32))
-        else:
-            x_t_flat = tf.slice(theta, [0, i], [B, 1])
-            y_t_flat = tf.slice(theta, [0, i + 1], [B, 1])
+    with tf.name_scope("STN"):
+        range_values = range(0, _w, 2)
+        for idx, i in enumerate(range_values):
+            x_zero = tf.constant(np.full((B, 1), 0.00, dtype=np.float32))
+            y_zero = tf.constant(np.full((B, 1), 0.00, dtype=np.float32))
+            scale = tf.constant(np.full((B, 1), scales[idx], dtype=np.float32))
 
-            tf.compat.v1.add_to_collection("boundary", x_t_flat)
-            tf.compat.v1.add_to_collection("boundary", y_t_flat)
+            if scales is None:
+                x_t_flat = tf.constant(np.full((B, 1), 0.00, dtype=np.float32))
+                y_t_flat = tf.constant(np.full((B, 1), 0.00, dtype=np.float32))
+            else:
+                x_t_flat = tf.slice(theta, [0, i], [B, 1])
+                y_t_flat = tf.slice(theta, [0, i + 1], [B, 1])
 
-        bound_err_x = tf.maximum(0.0, (tf.abs(x_t_flat) + scale) - 1.0)
-        bound_err_y = tf.maximum(0.0, (tf.abs(y_t_flat) + scale) - 1.0)
-        bound_err_scale = tf.maximum(0.0, scale - 1.0)
-        bound_err.append(bound_err_x)
-        bound_err.append(bound_err_y)
-        bound_err.append(bound_err_scale)
+                tf.compat.v1.add_to_collection("boundary", x_t_flat)
+                tf.compat.v1.add_to_collection("boundary", y_t_flat)
 
-        parameters = tf.concat((scale, x_zero, x_t_flat, y_zero, scale, y_t_flat), axis=1)
+            bound_err_x = tf.maximum(0.0, (tf.abs(x_t_flat) + scale) - 1.0)
+            bound_err_y = tf.maximum(0.0, (tf.abs(y_t_flat) + scale) - 1.0)
+            bound_err.append(bound_err_x)
+            bound_err.append(bound_err_y)
 
-        parameters = tf.reshape(parameters, [B, 1, 2, 3])
-        thetas.append(parameters)
+            parameters = tf.concat((scale, x_zero, x_t_flat, y_zero, scale, y_t_flat), axis=1)
+
+            parameters = tf.reshape(parameters, [B, 1, 2, 3])
+            thetas.append(parameters)
 
     bound_err = tf.squeeze(tf.concat(bound_err, axis=0), [1])
 
@@ -319,3 +319,67 @@ def spatial_transformer_network(input_map, theta, batch_size, width, height, sca
             h_trans.append(stn(input_map, _theta, out_size))
 
     return tf.stack(h_trans, axis=0), bound_err
+
+
+def get_parameter(batch_size, input, x_zero, y_zero, scale):
+    x_t_flat = tf.slice(input, [0, 0], [batch_size, 1])
+    y_t_flat = tf.slice(input, [0, 1], [batch_size, 1])
+
+    bound_err_x = tf.maximum(0.0, (tf.abs(x_t_flat) + scale) - 1.0)
+    bound_err_y = tf.maximum(0.0, (tf.abs(y_t_flat) + scale) - 1.0)
+    b_err = tf.concat([bound_err_x, bound_err_y], axis=1)
+
+    parameters = tf.concat((scale, x_zero, x_t_flat, y_zero, scale, y_t_flat), axis=1)
+
+    return tf.reshape(parameters, [batch_size, 1, 2, 3]), b_err
+
+
+class SpatialTransformerNetwork(tf.keras.layers.Layer):
+    def __init__(self, batch_size, width, height, scales):
+        super(SpatialTransformerNetwork, self).__init__()
+        self.batch_size = batch_size
+        self.scales = scales
+        self.x_zero = tf.constant(0.0, shape=(batch_size, 1), dtype=tf.float32)
+        self.y_zero = tf.constant(0.0, shape=(batch_size, 1), dtype=tf.float32)
+        self.scale1 = tf.constant(scales[0], shape=(batch_size, 1), dtype=tf.float32)
+        self.scale2 = tf.constant(scales[1], shape=(batch_size, 1), dtype=tf.float32)
+
+        stn_inputs = tf.keras.Input(shape=(2, 3))
+        grid = affine_grid_generator(width, height, stn_inputs)
+
+        self.batch_grids_m = tf.keras.Model(stn_inputs, grid, name="affine_grid_generator")
+
+    def call(self, inputs, thetas):
+        bound_err = []
+
+        parameter1, b_err1 = get_parameter(self.batch_size, thetas[0], self.x_zero, self.y_zero, self.scale1)
+        parameter2, b_err2 = get_parameter(self.batch_size, thetas[1], self.x_zero, self.y_zero, self.scale2)
+        thetas = [parameter1, parameter2]
+        bound_err = [b_err1, b_err2]
+
+        bound_err = tf.concat(bound_err, axis=1)
+        tf.summary.histogram("boundary_error", bound_err, step=tf.compat.v1.train.get_global_step())
+
+        h_trans = [inputs]
+
+        tf.summary.image("stn/image/1.0", inputs, step=tf.compat.v1.train.get_global_step(), max_outputs=3)
+
+        for i in range(2):
+            _theta = tf.squeeze(thetas[i])
+
+            batch_grids = self.batch_grids_m(_theta)
+
+            x_s = batch_grids[:, 0, :, :]
+            y_s = batch_grids[:, 1, :, :]
+
+            out_fmap = bilinear_sampler(inputs, x_s, y_s)
+            tf.summary.image(
+                "stn/image/{}".format(self.scales[i]),
+                out_fmap,
+                step=tf.compat.v1.train.get_global_step(),
+                max_outputs=3,
+            )
+
+            h_trans.append(out_fmap)
+
+        return tf.stack(h_trans, axis=0), bound_err
