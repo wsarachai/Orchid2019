@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import os
 import nets
+import h5py
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
@@ -39,6 +40,7 @@ class Orchids52Mobilenet140(object):
         self.training = training
         self.step = step
         self.max_to_keep = 5
+        self.files_may_delete = []
 
         self.checkpoint_dir = None
         self.checkpoint = None
@@ -83,21 +85,39 @@ class Orchids52Mobilenet140(object):
         )
         self.checkpoint = (checkpoint, checkpoint_manager)
 
-        predict_layers_path = os.path.join(checkpoint_dir, "predict_layers")
-        for idx, predict_layer in enumerate(self.predict_layers):
-            checkpoint = tf.train.Checkpoint(step=tf.Variable(1), optimizer=self.optimizer, model=predict_layer)
-            prediction_layer_prefix = get_checkpoint_file(predict_layers_path, idx)
-            predict_layers_checkpoint_managers = tf.train.CheckpointManager(
-                checkpoint, directory=prediction_layer_prefix, max_to_keep=self.max_to_keep
-            )
-            self.prediction_layer_checkpoints.append((checkpoint, predict_layers_checkpoint_managers))
+    def save_h5_weights(self, filename, weights):
+        f = h5py.File(filename + ".h5", "w")
+        try:
+            g = f.create_group("model_weights")
+            for w in weights:
+                val = w.numpy()
+                param_dset = g.create_dataset(w.name, val.shape, dtype=val.dtype)
+                if not val.shape:
+                    # scalar
+                    param_dset[()] = val
+                else:
+                    param_dset[:] = val
+        finally:
+            f.close()
 
     def save_model_variables(self):
         _, checkpoint_manager = self.checkpoint
         checkpoint_manager.save()
-        for checkpoint in self.prediction_layer_checkpoints:
-            _, checkpoint_manager = checkpoint
-            checkpoint_manager.save()
+
+        predict_layers_path = os.path.join(self.checkpoint_dir, "predict_layers")
+        for idx, predict_layer in enumerate(self.predict_layers):
+            if not tf.io.gfile.exists(predict_layers_path):
+                tf.io.gfile.makedirs(predict_layers_path)
+            prediction_layer_prefix = get_checkpoint_file(predict_layers_path, idx)
+            self.save_h5_weights(prediction_layer_prefix, predict_layer.weights)
+
+        file_to_save = checkpoint_manager.latest_checkpoint + ".h5"
+        self.files_may_delete.append(file_to_save)
+        self.save_h5_weights(checkpoint_manager.latest_checkpoint, self.model.weights)
+
+        if len(self.files_may_delete) > self.max_to_keep:
+            file_to_delete = self.files_may_delete.pop(0)
+            tf.io.gfile.remove(file_to_delete)
 
     def load_from_v1(
         self, latest_checkpoint, target_model="mobilenetv2_01_1.40_224_", model_name="MobilenetV2", **kwargs
@@ -266,7 +286,7 @@ class Orchids52Mobilenet140(object):
         if loaded_successfully:
             step = self.get_step_number_from_latest_checkpoint() + 1
         else:
-            self.load_model_variables(checkpoint_dir)
+            self.load_model_variables()
 
         self.config_layers()
         for var in self.model.trainable_variables:
