@@ -12,7 +12,6 @@ from tensorboard.plugins.hparams import summary_v2
 
 
 class TrainClassifier:
-
     def __init__(self, model, batch_size, summary_path, epoches, data_handler_steps, hparams, callbacks):
         self.model = model
         self.summary_path = summary_path
@@ -121,6 +120,8 @@ class TrainClassifier:
 
                 for inputs, labels in self.data_handler_steps:
                     if inputs.shape.as_list()[0] == self.batch_size:
+                        if first_graph_writing:
+                            tf.summary.trace_on(graph=True)
                         logs = self.train_step(inputs, labels)
                         logs = copy.copy(logs) if logs else {}
                         num_steps = logs.pop("num_steps", 1)
@@ -137,8 +138,13 @@ class TrainClassifier:
                     accuracy = self.accuracy_metric.result().numpy()
 
                     if first_graph_writing:
-                        tf.summary.graph(self.train_step.get_concrete_function(inputs, labels).graph)
-                        first_graph_writing = False
+                        try:
+                            # tf.summary.graph support only tf 2.5
+                            tf.summary.graph(self.train_step.get_concrete_function(inputs, labels).graph)
+                        except:
+                            tf.summary.trace_export(name="train_step", step=0)
+                        finally:
+                            first_graph_writing = False
 
                     tf.summary.scalar("scalar/train_loss", train_loss, step=global_step)
                     tf.summary.scalar("scalar/regularization_loss", regularization_loss, step=global_step)
