@@ -52,20 +52,6 @@ def main(unused_argv):
         batch_size=FLAGS.batch_size,
     )
 
-    def scheduler(epoch, lr):
-        return learning_rate_schedule(epoch)
-
-    callback = tf.keras.callbacks.LearningRateScheduler(scheduler)
-
-    train_model = TrainClassifier(
-        model=model,
-        batch_size=FLAGS.batch_size,
-        summary_path=os.path.join(training_dir, "logs", const.TRAIN_TEMPLATE.format(FLAGS.train_step)),
-        epoches=FLAGS.total_epochs,
-        data_handler_steps=train_ds,
-        callbacks=[callback],
-    )
-
     model.config_checkpoint(training_dir)
     _checkpoint_dir = training_dir if FLAGS.train_step > 1 else trained_weights_dir
     epoch = model.restore_model_variables(
