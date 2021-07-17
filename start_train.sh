@@ -8,11 +8,13 @@ readonly connections=(
     '1|32|50|0.0001'
     '2|4|20|0.0001'
     '3|4|20|0.0001'
+    '4|4|50|0.0001'
 )
 
 function training_model(){
+    # shellcheck disable=SC2034
     local range proto port
-    for fields in ${connections[@]}
+    for fields in "${connections[@]}"
     do
         IFS=$'|' read -r train_step batch_size total_epochs learning_rate <<< "$fields"
         python train.py "--train_step=${train_step}" "--batch_size=${batch_size}" "--dataset_format=files" "--dataset=orchids52_data" "--dataset_version=v1" "--model=mobilenet_v2_140_stn_v15" "--learning_rate=${learning_rate}" "--total_epochs=${total_epochs}" "--save_model=True" "--bash=False" "--learning_rate_decay=exponential" "--trained_dir=${trained_dir}"
