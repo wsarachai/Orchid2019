@@ -281,8 +281,12 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
         self.load_model_from_hdf5(latest_checkpoint, self.model)
 
     def load_model_step4(self):
-        training_step = TRAIN_TEMPLATE.format(3)
+        training_step = TRAIN_TEMPLATE.format(self.step)
         checkpoint_dir = os.path.join(self.checkpoint_dir, training_step)
+        if not tf.io.gfile.exists(checkpoint_dir):
+            training_step = TRAIN_TEMPLATE.format(3)
+            checkpoint_dir = os.path.join(self.checkpoint_dir, training_step)
+
         latest_checkpoint = tf.train.latest_checkpoint(checkpoint_dir=checkpoint_dir)
 
         self.load_model_from_hdf5(latest_checkpoint, self.model)

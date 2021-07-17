@@ -365,7 +365,7 @@ class SpatialTransformerNetwork(tf.keras.layers.Layer):
         tf.summary.image("stn/image/1.0", inputs, step=tf.compat.v1.train.get_global_step(), max_outputs=3)
 
         for i in range(2):
-            _theta = tf.squeeze(thetas[i])
+            _theta = tf.squeeze(thetas[i], axis=1)
 
             batch_grids = self.batch_grids_m(_theta)
 
