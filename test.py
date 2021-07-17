@@ -1,61 +1,42 @@
-import os
-import numpy as np
 import tensorflow as tf
+import datetime
+from tensorboard.plugins.hparams import api as hp
 
 if __name__ == '__main__':
-    fashion_mnist = tf.keras.datasets.fashion_mnist
-    (train_images, train_labels), (test_images, test_labels) = fashion_mnist.load_data()
+    mnist = tf.keras.datasets.mnist
 
-    class_names = ['T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat',
-                   'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot']
-
-    train_images = train_images / 255.0
-    test_images = test_images / 255.0
-
-    model = tf.keras.Sequential([
-        tf.keras.layers.Flatten(input_shape=(28, 28)),
-        tf.keras.layers.Dense(128, activation='relu'),
-        tf.keras.layers.Dense(10)
-    ])
-
-    # learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(
-    #     initial_learning_rate=0.01, decay_steps=10, decay_rate=0.96
-    # )
-    learning_rate = 0.01
-
-    optimizers = tf.keras.optimizers.Adam(learning_rate=learning_rate)
-
-    model.compile(optimizer=optimizers,
-                  loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-                  metrics=['accuracy'])
-
-    checkpoint_path = "/Users/watcharinsarachai/tmp/logs/training_1/cp.ckpt"
-    checkpoint_dir = os.path.dirname(checkpoint_path)
-
-    cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
-                                                     #save_weights_only=True,
-                                                     verbose=1)
-
-    def scheduler(epoch, lr):
-        tf.summary.scalar("lr", lr, epoch)
-        if epoch < 10:
-            return lr
-        else:
-            return lr * tf.math.exp(-0.1)
+    (x_train, y_train), (x_test, y_test) = mnist.load_data()
+    x_train, x_test = x_train / 255.0, x_test / 255.0
 
 
-    callback = tf.keras.callbacks.LearningRateScheduler(scheduler)
-    w = tf.summary.create_file_writer('/Users/watcharinsarachai/tmp/logs/training_1')
-    with w.as_default():
-        model.fit(train_images, train_labels, epochs=10, callbacks=[callback, cp_callback])
+    def create_model():
+        return tf.keras.models.Sequential([
+            tf.keras.layers.Flatten(input_shape=(28, 28)),
+            tf.keras.layers.Dense(512, activation='relu'),
+            tf.keras.layers.Dropout(0.2),
+            tf.keras.layers.Dense(10, activation='softmax')
+        ])
 
-    test_loss, test_acc = model.evaluate(test_images, test_labels, verbose=2)
 
-    print('\nTest accuracy:', test_acc)
+    model = create_model()
+    model.compile(
+        optimizer='adam',
+        loss='sparse_categorical_crossentropy',
+        metrics=['accuracy'])
 
-    probability_model = tf.keras.Sequential([model,
-                                             tf.keras.layers.Softmax()])
+    log_dir = "/Users/watcharinsarachai/Documents/_trained_models/test/logs/fit/" + datetime.datetime.now().strftime(
+        "%Y%m%d-%H%M%S")
+    tensorboard_callback = tf.keras.callbacks.TensorBoard(
+        log_dir=log_dir, histogram_freq=1)
 
-    predictions = probability_model.predict(test_images)
+    hparams_callback = hp.KerasCallback(log_dir, {
+        'num_relu_units': 512,
+        'dropout': 0.2
+    })
 
-    np.argmax(predictions[0])
+    model.fit(
+        x=x_train,
+        y=y_train,
+        epochs=5,
+        validation_data=(x_test, y_test),
+        callbacks=[tensorboard_callback, hparams_callback])

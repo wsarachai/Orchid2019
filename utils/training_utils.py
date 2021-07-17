@@ -6,13 +6,19 @@ import os
 import copy
 import tensorflow as tf
 
+from tensorboard.plugins.hparams import api_pb2
+from tensorboard.plugins.hparams import summary
+from tensorboard.plugins.hparams import summary_v2
+
 
 class TrainClassifier:
-    def __init__(self, model, batch_size, summary_path, epoches, data_handler_steps, callbacks):
+
+    def __init__(self, model, batch_size, summary_path, epoches, data_handler_steps, hparams, callbacks):
         self.model = model
         self.summary_path = summary_path
         self.epoches = epoches
         self.data_handler_steps = data_handler_steps
+        self._hparams = dict(hparams)
         self.callbacks = callbacks
         self.train_loss_metric = tf.keras.metrics.Mean(name="train_loss")
         self.regularization_loss_metric = tf.keras.metrics.Mean(name="regularization_loss")
@@ -83,15 +89,6 @@ class TrainClassifier:
             callback.on_epoch_begin(epoch, logs)
 
     def fit(self, initial_epoch, **kwargs):
-        history = {
-            "train_loss": [],
-            "reg_loss": [],
-            "b_loss": [],
-            "total_loss": [],
-            "accuracy": [],
-            "val_loss": [],
-            "val_accuracy": [],
-        }
         global_step = tf.compat.v1.train.get_global_step()
         target = self.data_handler_steps.size // self.batch_size
         global_step.assign((initial_epoch - 1) * target)
@@ -111,10 +108,13 @@ class TrainClassifier:
 
         w = tf.summary.create_file_writer(self.summary_path)
         with w.as_default():
+            summary_v2.hparams_pb(self._hparams)
+
             for epoch in range(initial_epoch, self.epoches + 1):
                 print("\nEpoch: {}/{}".format(epoch, self.epoches))
 
                 self.on_epoch_begin(epoch=epoch)
+                summary_v2.hparams(self._hparams)
 
                 self.reset_metric()
                 seen = 0
@@ -147,15 +147,11 @@ class TrainClassifier:
                     tf.summary.scalar("scalar/learning_rate", self.model.optimizer.lr, step=global_step)
                     tf.summary.scalar("scalar/accuracy", accuracy, step=global_step)
 
-                    history["train_loss"].append(train_loss)
-                    history["reg_loss"].append(regularization_loss)
-                    history["b_loss"].append(boundary_loss)
-                    history["total_loss"].append(total_loss)
-                    history["accuracy"].append(accuracy)
-
                 self.model.save_model_variables()
 
-        return {"history": history}
+            pb = summary.session_end_pb(api_pb2.STATUS_SUCCESS)
+            raw_pb = pb.SerializeToString()
+            tf.compat.v2.summary.experimental.write_raw_pb(raw_pb, step=0)
 
     def evaluate(self, datasets, **kwargs):
         logs = None

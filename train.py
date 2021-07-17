@@ -4,8 +4,6 @@ from __future__ import print_function
 
 import os
 import tensorflow as tf
-from pickle import dump
-from datetime import datetime
 from absl import logging
 from nets.mapping import nets_mapping
 from data.data_utils import load_dataset
@@ -82,16 +80,20 @@ def main(unused_argv):
         epoches=FLAGS.total_epochs,
         data_handler_steps=train_ds,
         callbacks=[callback],
+        hparams={
+            'model': FLAGS.model,
+            'dataset': FLAGS.dataset,
+            'training_state': const.TRAIN_TEMPLATE.format(FLAGS.train_step),
+            'learning_rate': FLAGS.learning_rate,
+            'optimizer': FLAGS.optimizer,
+            'weight_decay': FLAGS.learning_rate_decay,
+            'batch_size': FLAGS.batch_size,
+            'dropout': 0.2,
+            'epoches': FLAGS.total_epochs,
+        }
     )
 
-    history_fine = train_model.fit(initial_epoch=epoch, bash=FLAGS.bash, save_best_only=FLAGS.save_best_only,)
-
-    timestamp = datetime.now().strftime("%m-%d-%Y")
-    history_path = os.path.join(
-        training_dir, "{}-history-{}.pack".format(timestamp, const.TRAIN_TEMPLATE.format(FLAGS.train_step))
-    )
-    with open(history_path, "wb") as handle:
-        dump(history_fine["history"], handle)
+    train_model.fit(initial_epoch=epoch, bash=FLAGS.bash, save_best_only=FLAGS.save_best_only,)
 
     print("\nTest accuracy: ")
     train_model.evaluate(datasets=test_ds)
