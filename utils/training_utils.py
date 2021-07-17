@@ -36,6 +36,7 @@ class TrainClassifier:
         global_step = tf.compat.v1.train.get_or_create_global_step()
         global_step.assign(1)
 
+    @tf.function
     def train_step(self, inputs, labels):
         boundary_loss = 0.0
         with tf.GradientTape() as tape:
