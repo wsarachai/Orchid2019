@@ -107,12 +107,10 @@ class TrainClassifier:
             unit_name="step",
         )
 
+        first_graph_writing = True
+
         w = tf.summary.create_file_writer(self.summary_path)
         with w.as_default():
-            # tf.keras.utils.plot_model(
-            #     self.model.model, to_file=os.path.join(self.summary_path, "model_1.png"), show_shapes=True
-            # )
-            # tf.summary.graph(.get_concrete_function().graph)
             for epoch in range(initial_epoch, self.epoches + 1):
                 print("\nEpoch: {}/{}".format(epoch, self.epoches))
 
@@ -137,6 +135,10 @@ class TrainClassifier:
                     boundary_loss = self.boundary_loss_metric.result().numpy()
                     total_loss = self.total_loss_metric.result().numpy()
                     accuracy = self.accuracy_metric.result().numpy()
+
+                    if first_graph_writing:
+                        tf.summary.graph(self.train_step.get_concrete_function(inputs, labels).graph)
+                        first_graph_writing = False
 
                     tf.summary.scalar("scalar/train_loss", train_loss, step=global_step)
                     tf.summary.scalar("scalar/regularization_loss", regularization_loss, step=global_step)
