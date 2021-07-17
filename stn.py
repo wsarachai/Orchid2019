@@ -382,4 +382,4 @@ class SpatialTransformerNetwork(tf.keras.layers.Layer):
 
             h_trans.append(out_fmap)
 
-        return tf.stack(h_trans, axis=0), bound_err
+        return h_trans, bound_err

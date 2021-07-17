@@ -209,10 +209,13 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
                 var_name = var.name
                 if to_name is not None and from_name is not None:
                     var_name = var_name.replace(from_name, to_name)
-                weight = np.asarray(g[var_name])
-                if var.shape != weight.shape:
-                    raise Exception("Incompatible shapes")
-                var.assign(weight)
+                if var_name in g:
+                    weight = np.asarray(g[var_name])
+                    if var.shape != weight.shape:
+                        raise Exception("Incompatible shapes")
+                    var.assign(weight)
+                else:
+                    logging.warning("Variabel [%s] is not loaded..", var_name)
         finally:
             f.close()
 
@@ -271,19 +274,18 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
                     self.load_model_from_hdf5(checkpoint_prefix + "/stn_dense_{}".format(i), stn_dense)
 
     def load_model_step3(self):
-        self.load_model_step2()
+        training_step = TRAIN_TEMPLATE.format(2)
+        checkpoint_dir = os.path.join(self.checkpoint_dir, training_step)
+        latest_checkpoint = tf.train.latest_checkpoint(checkpoint_dir=checkpoint_dir)
+
+        self.load_model_from_hdf5(latest_checkpoint, self.model)
 
     def load_model_step4(self):
-        assert self.checkpoint_dir is not None
+        training_step = TRAIN_TEMPLATE.format(3)
+        checkpoint_dir = os.path.join(self.checkpoint_dir, training_step)
+        latest_checkpoint = tf.train.latest_checkpoint(checkpoint_dir=checkpoint_dir)
 
-        checkpoint, _ = self.checkpoint
-        checkpoint_prefix = os.path.join(self.checkpoint_dir, TRAIN_TEMPLATE.format(3))
-        checkpoint_manager = tf.train.CheckpointManager(
-            checkpoint, directory=checkpoint_prefix, max_to_keep=self.max_to_keep
-        )
-        if checkpoint_manager.latest_checkpoint:
-            status = checkpoint.restore(checkpoint_manager.latest_checkpoint)
-            status.assert_existing_objects_matched()
+        self.load_model_from_hdf5(latest_checkpoint, self.model)
 
     def load_model_v2_step2(self):
         pass
@@ -388,30 +390,12 @@ class BranchBlock(keras.layers.Layer):
             PredictionLayer(num_classes=num_classes, name="BranchBlock-2"),
         ]
 
-    def call(self, inputs, **kwargs):
-        inp1 = tf.reshape(
-            tf.slice(inputs, [0, 0, 0, 0, 0], [1, self.batch_size, self.width, self.height, 3]),
-            [self.batch_size, self.width, self.height, 3],
-        )
-        inp2 = tf.reshape(
-            tf.slice(inputs, [1, 0, 0, 0, 0], [1, self.batch_size, self.width, self.height, 3]),
-            [self.batch_size, self.width, self.height, 3],
-        )
-        inp3 = tf.reshape(
-            tf.slice(inputs, [2, 0, 0, 0, 0], [1, self.batch_size, self.width, self.height, 3]),
-            [self.batch_size, self.width, self.height, 3],
-        )
-
-        logits = tf.stack(
-            [
-                self.sub_process(1, inp1, self.branches_prediction_models[0]),
-                self.sub_process(2, inp2, self.branches_prediction_models[1]),
-                self.sub_process(2, inp3, self.branches_prediction_models[2]),
-            ],
-            axis=0,
-        )
-
-        return logits
+    def call(self, inputs):
+        return [
+            self.sub_process(1, inputs[0], self.branches_prediction_models[0]),
+            self.sub_process(2, inputs[1], self.branches_prediction_models[1]),
+            self.sub_process(2, inputs[2], self.branches_prediction_models[2]),
+        ]
 
     def sub_process(self, branch, inp, prediction):
         if branch == 1:
@@ -444,25 +428,15 @@ class EstimationBlock(keras.layers.Layer):
             moving_variance_initializer="ones",
         )
 
-    def call(self, inputs, **kwargs):
-        inp1 = tf.reshape(
-            tf.slice(inputs, [0, 0, 0], [1, self.batch_size, self.num_classes]), [self.batch_size, self.num_classes]
-        )
-        inp2 = tf.reshape(
-            tf.slice(inputs, [1, 0, 0], [1, self.batch_size, self.num_classes]), [self.batch_size, self.num_classes]
-        )
-        inp3 = tf.reshape(
-            tf.slice(inputs, [2, 0, 0], [1, self.batch_size, self.num_classes]), [self.batch_size, self.num_classes]
-        )
+    def call(self, inputs):
+        main_net = c_t = inputs[0]
 
-        main_net = c_t = inp1
-
-        input_and_hstate_concatenated = tf.concat(values=[c_t, inp2], axis=1)
+        input_and_hstate_concatenated = tf.concat(values=[c_t, inputs[1]], axis=1)
         c_t = self.dense(input_and_hstate_concatenated)
         c_t = self.batch_norm(c_t)
         main_net = main_net + c_t
 
-        input_and_hstate_concatenated = tf.concat(values=[c_t, inp3], axis=1)
+        input_and_hstate_concatenated = tf.concat(values=[c_t, inputs[2]], axis=1)
         c_t = self.dense(input_and_hstate_concatenated)
         c_t = self.batch_norm(c_t)
         main_net = main_net + c_t
@@ -574,7 +548,7 @@ def create_orchid_mobilenet_v2_15(
             batch_size=batch_size, width=default_image_size, height=default_image_size, scales=scales
         )
 
-        stn_output, bound_err = stn_layer(processed_inputs, thetas=[stn_logits1, stn_logits2])
+        stn_outputs, bound_err = stn_layer(processed_inputs, thetas=[stn_logits1, stn_logits2])
 
         if training:
             bound_std = tf.constant(np.full(bound_err.shape, 0.00, dtype=np.float32), name="bound_std_zero")
@@ -583,7 +557,7 @@ def create_orchid_mobilenet_v2_15(
         branches_block = BranchBlock(num_classes=num_classes, batch_size=batch_size)
         branches_prediction_models = branches_block.branches_prediction_models
 
-        logits = branches_block(stn_output)
+        logits = branches_block(stn_outputs)
 
         if train_step == TRAIN_STEP2 or train_step == TRAIN_STEP3:
             outputs = tf.reduce_mean(logits, axis=0)

@@ -5,10 +5,10 @@ from __future__ import print_function
 import os
 import nets
 import h5py
-import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
 
+from absl import logging
 from tensorflow.python.keras import activations
 from nets.mobilenet_v2 import IMG_SHAPE_224
 from nets.mobilenet_v2 import create_mobilenet_v2
@@ -290,7 +290,7 @@ class Orchids52Mobilenet140(object):
 
         self.config_layers()
         for var in self.model.trainable_variables:
-            print("trainable variable: ", var.name)
+            logging.info("trainable variable: %s", var.name)
         return step
 
     def config_layers(self):
@@ -327,7 +327,7 @@ class PreprocessLayer(keras.layers.Layer):
     def call(self, inputs, **kwargs):
         training = kwargs.pop("training")
         if training:
-            sel = tf.random.uniform([], maxval=4, dtype=tf.int32)
+            sel = tf.random.uniform([], maxval=10, dtype=tf.int32)
             inputs = tf.switch_case(
                 sel,
                 branch_fns={
@@ -342,7 +342,7 @@ class PreprocessLayer(keras.layers.Layer):
             inputs = tf.switch_case(
                 sel,
                 branch_fns={
-                    0: lambda: tf.image.random_brightness(inputs, max_delta=0.5),
+                    0: lambda: tf.image.random_brightness(inputs, max_delta=0.2),
                     1: lambda: tf.image.random_saturation(inputs, lower=1, upper=5),
                     2: lambda: tf.image.random_contrast(inputs, lower=0.2, upper=0.5),
                     3: lambda: tf.image.random_hue(inputs, max_delta=0.2),

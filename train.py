@@ -23,7 +23,7 @@ def main(unused_argv):
 
     # tf.config.run_functions_eagerly(True)
 
-    create_model_graph = False
+    create_model_graph = True
 
     workspace_path = os.environ["WORKSPACE"] if "WORKSPACE" in os.environ else "/Users/watcharinsarachai/Documents/"
     create_model = nets_mapping[FLAGS.model]

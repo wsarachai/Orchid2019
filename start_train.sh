@@ -5,8 +5,9 @@ trained_dir="/home/keng/Documents/_trained_models/model-v1/mobilenet_v2_140_orch
 script="${TRAIN_DIR}/train.py"
 
 readonly connections=(       
-    #'1|32|50|0.0001'
-    '2|4|50|0.0001'
+    '1|32|50|0.0001'
+    '2|4|20|0.0001'
+    '3|4|20|0.0001'
 )
 
 function training_model(){
