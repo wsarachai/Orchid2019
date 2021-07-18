@@ -18,7 +18,7 @@ from utils import const
 def main(unused_argv):
     logging.debug(unused_argv)
 
-    tf.config.run_functions_eagerly(True)
+    # tf.config.run_functions_eagerly(True)
 
     create_model_graph = False
 
@@ -67,10 +67,7 @@ def main(unused_argv):
         model.compile(metrics=["accuracy"])
 
         model.fit(
-            train_ds,
-            initial_epoch=0,
-            epochs=1,
-            callbacks=[callback, tensorboard_callback],
+            train_ds, initial_epoch=0, epochs=1, callbacks=[callback, tensorboard_callback],
         )
 
     log_dir = os.path.join(training_dir, "logs", const.TRAIN_TEMPLATE.format(FLAGS.train_step))
@@ -96,9 +93,7 @@ def main(unused_argv):
     )
 
     train_model.fit(
-        initial_epoch=epoch,
-        bash=FLAGS.bash,
-        save_best_only=FLAGS.save_best_only,
+        initial_epoch=epoch, bash=FLAGS.bash, save_best_only=FLAGS.save_best_only,
     )
 
     print("\nTest accuracy: ")

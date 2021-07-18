@@ -19,7 +19,7 @@ from utils.const import TRAIN_STEP1, TRAIN_STEP2, TRAIN_STEP3, TRAIN_STEP4
 from utils.const import TRAIN_V2_STEP1, TRAIN_V2_STEP2
 from utils.const import TRAIN_TEMPLATE
 from utils.lib_utils import get_checkpoint_file
-from nets.layers import Conv2DWrapper, PreprocessLayer, PredictionLayer
+from nets.layers import Conv2DWrapper, DenseWrapper, PreprocessLayer, PredictionLayer
 from nets.layers import FullyConnectedLayer
 from nets.layers import BranchBlock
 from nets.layers import EstimationBlock
@@ -181,8 +181,10 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
             self.set_mobilenet_training_status(True)
 
     def load_model_from_hdf5(self, filepath, model, to_name=None, from_name=None):
-        f = h5py.File(filepath + ".h5", mode="r")
+        file_loaed = False
         try:
+            f = h5py.File(filepath + ".h5", mode="r")
+            file_loaed = True
             g = f["model_weights"]
             for var in model.weights:
                 var_name = var.name
@@ -195,8 +197,11 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
                     var.assign(weight)
                 else:
                     logging.warning("Variabel [%s] is not loaded..", var_name)
+        except:
+            file_loaed = False
         finally:
-            f.close()
+            if file_loaed:
+                f.close()
 
     def load_model_step1(self):
         training_step = TRAIN_TEMPLATE.format(1)
@@ -361,7 +366,7 @@ def create_orchid_mobilenet_v2_15(
             [
                 Conv2DWrapper(filters=128, kernel_size=[1, 1], activation="relu", name="stn_conv2d_1"),
                 keras.layers.Flatten(),
-                keras.layers.Dense(units=128, activation="tanh", name="stn_dense_128_1"),
+                DenseWrapper(units=128, activation="tanh", name="stn_dense_128_1"),
                 keras.layers.Dropout(rate=drop_out_prop),
                 FullyConnectedLayer(
                     fc_num,
@@ -378,7 +383,7 @@ def create_orchid_mobilenet_v2_15(
             [
                 Conv2DWrapper(filters=128, kernel_size=[1, 1], activation="relu", name="stn_conv2d_2"),
                 keras.layers.Flatten(),
-                keras.layers.Dense(units=128, activation="tanh", name="stn_dense_128_2"),
+                DenseWrapper(units=128, activation="tanh", name="stn_dense_128_2"),
                 keras.layers.Dropout(rate=drop_out_prop),
                 FullyConnectedLayer(
                     fc_num,

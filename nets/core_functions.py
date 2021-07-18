@@ -168,6 +168,7 @@ def load_orchids52_weight_from_old_checkpoint(latest_checkpoint):
     return key_to_numpy, var_maps
 
 
+@tf.function
 def preprocess_input(image_data, central_fraction=0.875):
     image = tf.image.decode_jpeg(image_data, channels=3)
     image = tf.image.convert_image_dtype(image, dtype=tf.float32)

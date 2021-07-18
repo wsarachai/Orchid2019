@@ -66,17 +66,13 @@ class PredictionLayer(keras.layers.Layer):
         inputs = self.dense(inputs, training=training)
         inputs = self.prediction_fn(inputs)
         tf.summary.histogram(
-            "prediction/{}/kernel".format(self.layer_name),
-            self.dense.weights[0],
-            step=tf.compat.v1.train.get_global_step(),
+            "inputs", inputs, step=tf.compat.v1.train.get_global_step(),
         )
         tf.summary.histogram(
-            "prediction/{}/bias".format(self.layer_name),
-            self.dense.weights[1],
-            step=tf.compat.v1.train.get_global_step(),
+            "kernel", self.dense.kernel, step=tf.compat.v1.train.get_global_step(),
         )
         tf.summary.histogram(
-            "prediction/activation/{}".format(self.layer_name), inputs, step=tf.compat.v1.train.get_global_step(),
+            "bias", self.dense.bias, step=tf.compat.v1.train.get_global_step(),
         )
         return inputs
 
@@ -167,7 +163,10 @@ class FullyConnectedLayer(tf.keras.layers.Layer):
             "kernel", shape=[int(input_shape[-1]), self.num_outputs], initializer=self.kernel_initializer
         )
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs):
+        tf.summary.histogram(
+            "kernel", self.kernel, step=tf.compat.v1.train.get_global_step(),
+        )
         x = tf.matmul(inputs, self.kernel)
         if self.normalizer_fn is not None:
             x = self.normalizer_fn(x)
@@ -186,6 +185,26 @@ class Conv2DWrapper(keras.layers.Conv2D):
     def __init__(self, **kwargs):
         super(Conv2DWrapper, self).__init__(**kwargs)
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs):
+        tf.summary.histogram(
+            "kernel", self.kernel, step=tf.compat.v1.train.get_global_step(),
+        )
+        tf.summary.histogram(
+            "bias", self.bias, step=tf.compat.v1.train.get_global_step(),
+        )
         return super(Conv2DWrapper, self).call(inputs)
+
+
+class DenseWrapper(keras.layers.Dense):
+    def __init__(self, **kwargs):
+        super(DenseWrapper, self).__init__(**kwargs)
+
+    def call(self, inputs):
+        tf.summary.histogram(
+            "kernel", self.kernel, step=tf.compat.v1.train.get_global_step(),
+        )
+        tf.summary.histogram(
+            "bias", self.bias, step=tf.compat.v1.train.get_global_step(),
+        )
+        return super(DenseWrapper, self).call(inputs)
 
