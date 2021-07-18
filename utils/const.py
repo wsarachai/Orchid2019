@@ -19,3 +19,16 @@ MOBILENET_V2_140 = "mobilenet_v2_140"
 MOBILENET_V2_140_FLOWERS17 = "mobilenet_v2_140_flowers17"
 MOBILENET_V2_140_FLOWERS102 = "mobilenet_v2_140_flowers102"
 MOBILENET_V2_140_ORCHIDS52 = "mobilenet_v2_140_stn_v15"
+
+FLOWERS17 = "flowers17_data"
+FLOWERS102 = "flowers102_data"
+ORCHIDS52 = "orchids52_data"
+
+DATA_FORMAT_TF_RECORDS = "tf-records"
+DATA_FORMAT_FILES = "files"
+DATA_FORMAT_H5 = "h5"
+
+DATASET_VERSION_V1 = "v1"
+DATASET_VERSION_V2 = "v2"
+
+PATTERNS = "{}-{}-{}"

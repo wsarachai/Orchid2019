@@ -7,22 +7,22 @@ import h5py
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
-import nets
 
 from absl import logging
+
+from nets.const_vars import IMG_SHAPE_224, default_image_size
+from nets.core_functions import load_orchids52_weight_from_old_checkpoint, load_weight
 from stn import SpatialTransformerNetwork
-from tensorflow.python.keras import initializers
-from tensorflow.python.keras import activations
-from nets.mobilenet_v2 import IMG_SHAPE_224
-from nets.mobilenet_v2 import default_image_size
 from nets.mobilenet_v2 import create_mobilenet_v2
-from nets.mobilenet_v2_140 import PreprocessLayer
-from nets.mobilenet_v2_140 import PredictionLayer
-from nets.mobilenet_v2_140 import Orchids52Mobilenet140
+from nets.mobilenet_v2_140 import Orchids52Mobilenet140, save_h5_weights
 from utils.const import TRAIN_STEP1, TRAIN_STEP2, TRAIN_STEP3, TRAIN_STEP4
 from utils.const import TRAIN_V2_STEP1, TRAIN_V2_STEP2
 from utils.const import TRAIN_TEMPLATE
 from utils.lib_utils import get_checkpoint_file
+from nets.layers import Conv2DWrapper, PreprocessLayer, PredictionLayer
+from nets.layers import FullyConnectedLayer
+from nets.layers import BranchBlock
+from nets.layers import EstimationBlock
 
 
 class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
@@ -59,29 +59,8 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
         training_for_tf25 = kwargs.get("training_for_tf25", False)
         pop_key = kwargs.get("pop_key", True)
         value_to_load = {}
-        reader = tf.compat.v1.train.NewCheckpointReader(latest_checkpoint)
-        var_to_shape_map = reader.get_variable_to_shape_map()
-        key_to_numpy = {}
-        for key in sorted(var_to_shape_map.items()):
-            key_to_numpy.update({key[0]: reader.get_tensor(key[0])})
 
-        var_maps = {
-            "stn_conv2d_1/kernel": "dense-1/conv2d_resize_128/weights",
-            "stn_conv2d_1/bias": "dense-1/conv2d_resize_128/biases",
-            "stn_dense_128_1/kernel": "dense-1/fc_128/weights",
-            "stn_dense_128_1/bias": "dense-1/fc_128/biases",
-            "stn_dense_3_1/kernel": "dense-1/fc_final-1/weights",
-            "stn_conv2d_2/kernel": "dense-2/conv2d_resize_128/weights",
-            "stn_conv2d_2/bias": "dense-2/conv2d_resize_128/biases",
-            "stn_dense_128_2/kernel": "dense-2/fc_128/weights",
-            "stn_dense_128_2/bias": "dense-2/fc_128/biases",
-            "stn_dense_3_2/kernel": "dense-2/fc_final-2/weights",
-            "estimation_block/fully_connected_layer/kernel": "Estimation/fully_connected_logits/weights",
-            "estimation_block/batch_normalization/gamma": "Estimation/fully_connected_logits/BatchNorm/gamma",
-            "estimation_block/batch_normalization/beta": "Estimation/fully_connected_logits/BatchNorm/beta",
-            "estimation_block/batch_normalization/moving_mean": "Estimation/fully_connected_logits/BatchNorm/moving_mean",
-            "estimation_block/batch_normalization/moving_variance": "Estimation/fully_connected_logits/BatchNorm/moving_variance",
-        }
+        key_to_numpy, var_maps = load_orchids52_weight_from_old_checkpoint(latest_checkpoint)
 
         if training_for_tf25:
             var_maps_ext = {
@@ -113,7 +92,7 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
             features_extraction = model_name + "/features-extraction/MobilenetV2"
             features_extraction_common = model_name + "/features-extraction-common/MobilenetV2"
 
-        local_var_loaded = super().load_from_v1(
+        local_var_loaded = super(Orchids52Mobilenet140STN, self).load_from_v1(
             latest_checkpoint,
             target_model + "_stn_base_1.40_224_",
             localization_params,
@@ -121,7 +100,7 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
             include_prediction_layer=False,
             **kwargs
         )
-        extract_var_loaded = super().load_from_v1(
+        extract_var_loaded = super(Orchids52Mobilenet140STN, self).load_from_v1(
             latest_checkpoint,
             target_model + "_global_branch_1.40_224_",
             features_extraction,
@@ -129,7 +108,7 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
             include_prediction_layer=False,
             **kwargs
         )
-        extract_comm_var_loaded = super().load_from_v1(
+        extract_comm_var_loaded = super(Orchids52Mobilenet140STN, self).load_from_v1(
             latest_checkpoint,
             target_model + "_shared_branch_1.40_224_",
             features_extraction_common,
@@ -171,7 +150,7 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
                 checkpoint_prefix = os.path.join(self.checkpoint_dir, "stn_dense_layer")
                 if not tf.io.gfile.exists(checkpoint_prefix):
                     tf.io.gfile.makedirs(checkpoint_prefix)
-                self.save_h5_weights(checkpoint_prefix + "/stn_dense_{}".format(i), stn_dense.weights)
+                save_h5_weights(checkpoint_prefix + "/stn_dense_{}".format(i), stn_dense.weights)
 
     def set_mobilenet_training_status(self, trainable):
         super(Orchids52Mobilenet140STN, self).set_mobilenet_training_status(trainable)
@@ -340,141 +319,11 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
                 else:
                     var_loaded = self.load_from_v1(latest_checkpoint, **kwargs)
 
-                if var_loaded:
-                    var_loaded_fixed_name = {}
-                    for key in var_loaded:
-                        var_loaded_fixed_name.update({key + ":0": var_loaded[key]})
+                result = load_weight(var_loaded, self.model.weights)
 
-                    all_vars = self.model.weights
-
-                    all_maps = {}
-                    for _, var in enumerate(all_vars):
-                        all_maps.update({var.name: var})
-
-                    for _, var in enumerate(all_vars):
-                        if var.name in var_loaded_fixed_name:
-                            saved_var = var_loaded_fixed_name[var.name]
-                            if var.shape != saved_var.shape:
-                                saved_var = np.squeeze(saved_var)
-                                if var.shape != saved_var.shape:
-                                    raise Exception("Incompatible shapes")
-                            var.assign(saved_var)
-                            all_maps.pop(var.name)
-                            if show_model_weights:
-                                flat_var = np.reshape(saved_var, (-1))
-                                print("Loading: {} -> {}".format(var.name, flat_var[:4]))
-                        else:
-                            print("Can't find: {}".format(var.name))
-
-                    for key in all_maps:
-                        var = all_maps[key]
-                        print("Variable {} {} was not init..".format(var.name, var.shape))
-
-                    result = True
             else:
                 result = False
         return result
-
-
-class BranchBlock(keras.layers.Layer):
-    def __init__(self, num_classes, batch_size, width=default_image_size, height=default_image_size):
-        super(BranchBlock, self).__init__()
-        self.batch_size = batch_size
-        self.width = width
-        self.height = height
-        self.global_branch_model = create_mobilenet_v2(
-            input_shape=IMG_SHAPE_224, alpha=1.4, include_top=False, weights="imagenet", sub_name="global_branch"
-        )
-        self.shared_branch_model = create_mobilenet_v2(
-            input_shape=IMG_SHAPE_224, alpha=1.4, include_top=False, weights="imagenet", sub_name="shared_branch"
-        )
-        self.branches_prediction_models = [
-            PredictionLayer(num_classes=num_classes, name="BranchBlock-global"),
-            PredictionLayer(num_classes=num_classes, name="BranchBlock-1"),
-            PredictionLayer(num_classes=num_classes, name="BranchBlock-2"),
-        ]
-
-    def call(self, inputs):
-        return [
-            self.sub_process(1, inputs[0], self.branches_prediction_models[0]),
-            self.sub_process(2, inputs[1], self.branches_prediction_models[1]),
-            self.sub_process(2, inputs[2], self.branches_prediction_models[2]),
-        ]
-
-    def sub_process(self, branch, inp, prediction):
-        if branch == 1:
-            x = self.global_branch_model(inp, training=False)
-            x = prediction(x, training=False)
-        else:
-            x = self.shared_branch_model(inp, training=False)
-            x = prediction(x, training=False)
-        return x
-
-    def set_trainable_for_global_branch(self, trainable):
-        self.global_branch_model.trainable = trainable
-
-    def set_trainable_for_share_branch(self, trainable):
-        self.shared_branch_model.trainable = trainable
-
-
-class EstimationBlock(keras.layers.Layer):
-    def __init__(self, num_classes, batch_size):
-        super(EstimationBlock, self).__init__()
-        self.num_classes = num_classes
-        self.batch_size = batch_size
-        self.dense = FullyConnectedLayer(
-            self.num_classes, kernel_initializer=tf.keras.initializers.TruncatedNormal(mean=0.5), activation=None
-        )
-        self.batch_norm = tf.keras.layers.BatchNormalization(
-            beta_initializer="zeros",
-            gamma_initializer="ones",
-            moving_mean_initializer="zeros",
-            moving_variance_initializer="ones",
-        )
-
-    def call(self, inputs):
-        main_net = c_t = inputs[0]
-
-        input_and_hstate_concatenated = tf.concat(values=[c_t, inputs[1]], axis=1)
-        c_t = self.dense(input_and_hstate_concatenated)
-        c_t = self.batch_norm(c_t)
-        main_net = main_net + c_t
-
-        input_and_hstate_concatenated = tf.concat(values=[c_t, inputs[2]], axis=1)
-        c_t = self.dense(input_and_hstate_concatenated)
-        c_t = self.batch_norm(c_t)
-        main_net = main_net + c_t
-
-        return main_net
-
-
-class FullyConnectedLayer(tf.keras.layers.Layer):
-    def __init__(self, num_outputs, kernel_initializer, activation, normalizer_fn=None, **kwargs):
-        super(FullyConnectedLayer, self).__init__(**kwargs)
-        self.kernel = None
-        self.num_outputs = num_outputs
-        self.kernel_initializer = initializers.get(kernel_initializer)
-        self.normalizer_fn = normalizer_fn
-        self.activation = activations.get(activation)
-
-    def build(self, input_shape):
-        self.kernel = self.add_weight(
-            "kernel", shape=[int(input_shape[-1]), self.num_outputs], initializer=self.kernel_initializer
-        )
-
-    def call(self, inputs, **kwargs):
-        x = tf.matmul(inputs, self.kernel)
-        if self.normalizer_fn is not None:
-            x = self.normalizer_fn(x)
-        return self.activation(x)
-
-
-class PrintingNode(tf.keras.layers.Layer):
-    def __init__(self, **kwargs):
-        super(PrintingNode, self).__init__(**kwargs)
-
-    def call(self, inputs, **kwargs):
-        return tf.compat.v1.Print(inputs, [inputs])
 
 
 def create_orchid_mobilenet_v2_15(
@@ -510,9 +359,9 @@ def create_orchid_mobilenet_v2_15(
 
         stn_dense1 = keras.Sequential(
             [
-                keras.layers.Conv2D(128, [1, 1], activation="relu", name="stn_conv2d_1"),
+                Conv2DWrapper(filters=128, kernel_size=[1, 1], activation="relu", name="stn_conv2d_1"),
                 keras.layers.Flatten(),
-                keras.layers.Dense(128, activation="tanh", name="stn_dense_128_1"),
+                keras.layers.Dense(units=128, activation="tanh", name="stn_dense_128_1"),
                 keras.layers.Dropout(rate=drop_out_prop),
                 FullyConnectedLayer(
                     fc_num,
@@ -527,9 +376,9 @@ def create_orchid_mobilenet_v2_15(
 
         stn_dense2 = keras.Sequential(
             [
-                keras.layers.Conv2D(128, [1, 1], activation="relu", name="stn_conv2d_2"),
+                Conv2DWrapper(filters=128, kernel_size=[1, 1], activation="relu", name="stn_conv2d_2"),
                 keras.layers.Flatten(),
-                keras.layers.Dense(128, activation="tanh", name="stn_dense_128_2"),
+                keras.layers.Dense(units=128, activation="tanh", name="stn_dense_128_2"),
                 keras.layers.Dropout(rate=drop_out_prop),
                 FullyConnectedLayer(
                     fc_num,

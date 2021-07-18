@@ -11,14 +11,14 @@ from tensorflow.python.keras.utils import data_utils
 from tensorflow.python.keras.utils import layer_utils
 from tensorflow.python.keras.applications import imagenet_utils
 
+from nets.const_vars import regularizers_l2, BASE_WEIGHT_PATH, IMG_SHAPE_224
+from nets.v1.mobilenet_v2_140 import Orchids52Mobilenet140 as Orchids52Mobilenet140_V1
+from nets.mobilenet_v2_140 import Orchids52Mobilenet140 as Orchids52Mobilenet140_V2
+
 from absl import logging
 
-BASE_WEIGHT_PATH = ('https://storage.googleapis.com/tensorflow/'
-                    'keras-applications/mobilenet_v2/')
-default_image_size = 224
-IMG_SIZE_224 = (default_image_size, default_image_size)
-IMG_SHAPE_224 = IMG_SIZE_224 + (3,)
-regularizers_l2 = 0.00004
+from nets.layers import PreprocessLayer, PredictionLayer
+from utils.const import TRAIN_TEMPLATE
 
 
 def _inverted_res_block(name, inputs, expansion, stride, alpha, filters, block_id):
@@ -347,5 +347,43 @@ def create_mobilenet_v2(input_shape=None,
         model.load_weights(weights_path)
     elif weights is not None:
         model.load_weights(weights)
+
+    return model
+
+
+def create_mobilenet_v2_14(ver, num_classes, optimizer=None, loss_fn=None, training=False, **kwargs):
+    step = kwargs.pop("step") if "step" in kwargs else TRAIN_TEMPLATE.format(1)
+
+    inputs = keras.Input(shape=IMG_SHAPE_224)
+    preprocess_layer = PreprocessLayer()
+    mobilenet = create_mobilenet_v2(input_shape=IMG_SHAPE_224, alpha=1.4, include_top=False, weights=None)
+    processed_inputs = preprocess_layer(inputs, training=training)
+    mobilenet_logits = mobilenet(processed_inputs, training=training)
+
+    prediction_layer = PredictionLayer(num_classes=num_classes, name="final-prediction")
+    outputs = prediction_layer(mobilenet_logits, training=training)
+
+    if ver == 1:
+        model = Orchids52Mobilenet140_V1(
+            inputs,
+            outputs,
+            optimizer=optimizer,
+            loss_fn=loss_fn,
+            mobilenet=mobilenet,
+            predict_layers=[prediction_layer],
+            training=training,
+            step=step,
+        )
+    else:
+        model = Orchids52Mobilenet140_V2(
+            inputs,
+            outputs,
+            optimizer=optimizer,
+            loss_fn=loss_fn,
+            mobilenet=mobilenet,
+            predict_layers=[prediction_layer],
+            training=training,
+            step=step,
+        )
 
     return model

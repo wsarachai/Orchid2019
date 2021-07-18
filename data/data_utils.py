@@ -10,20 +10,9 @@ from data import flowers102_dataset_v1_tfrecord
 from data import orchids52_dataset_v1_tfrecord
 from data import orchids52_dataset_tfrecord
 from data import orchids52_dataset_h5
+from utils.const import PATTERNS, ORCHIDS52, DATA_FORMAT_FILES, DATASET_VERSION_V1, DATASET_VERSION_V2, \
+    DATA_FORMAT_TF_RECORDS, DATA_FORMAT_H5, FLOWERS17, FLOWERS102
 
-
-FLOWERS17 = "flowers17_data"
-FLOWERS102 = "flowers102_data"
-ORCHIDS52 = "orchids52_data"
-
-DATA_FORMAT_TF_RECORDS = "tf-records"
-DATA_FORMAT_FILES = "files"
-DATA_FORMAT_H5 = "h5"
-
-DATASET_VERSION_V1 = "v1"
-DATASET_VERSION_V2 = "v2"
-
-PATTERNS = "{}-{}-{}"
 ORCHIDS52_V1_FILE = PATTERNS.format(ORCHIDS52, DATA_FORMAT_FILES, DATASET_VERSION_V1)
 ORCHIDS52_V2_FILE = PATTERNS.format(ORCHIDS52, DATA_FORMAT_FILES, DATASET_VERSION_V2)
 ORCHIDS52_V1_TFRECORD = PATTERNS.format(ORCHIDS52, DATA_FORMAT_TF_RECORDS, DATASET_VERSION_V1)

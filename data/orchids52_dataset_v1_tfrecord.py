@@ -7,6 +7,7 @@ import tensorflow as tf
 
 from nets import mobilenet_v2
 from data import orchids52_dataset
+from nets.const_vars import IMG_SIZE_224
 from utils.wrapped_tools import wrapped_partial
 
 feature_description = {
@@ -60,7 +61,7 @@ def _load_dataset(
     parsed_dataset = dataset.map(parse_function, num_parallel_calls=num_map_threads)
     decode_dataset = parsed_dataset.map(decode_example)
 
-    preprocess_image = wrapped_partial(orchids52_dataset.preprocess_image, image_size=mobilenet_v2.IMG_SIZE_224)
+    preprocess_image = wrapped_partial(orchids52_dataset.preprocess_image, image_size=IMG_SIZE_224)
     decode_dataset = decode_dataset.map(preprocess_image)
     decode_dataset = decode_dataset.batch(batch_size=batch_size).cache()
 

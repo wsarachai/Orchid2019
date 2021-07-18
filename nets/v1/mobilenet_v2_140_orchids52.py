@@ -8,15 +8,13 @@ import tensorflow as tf
 import tensorflow.keras as keras
 import nets
 
-from absl import logging
+from nets.const_vars import default_image_size, IMG_SHAPE_224
+from nets.core_functions import load_orchids52_weight_from_old_checkpoint
+from nets.layers import PredictionLayer, PreprocessLayer
 from stn import pre_spatial_transformer_network
 from tensorflow.python.keras import initializers
 from tensorflow.python.keras import activations
-from nets.mobilenet_v2 import IMG_SHAPE_224
-from nets.mobilenet_v2 import default_image_size
 from nets.mobilenet_v2 import create_mobilenet_v2
-from nets.v1.mobilenet_v2_140 import PreprocessLayer
-from nets.v1.mobilenet_v2_140 import PredictionLayer
 from nets.v1.mobilenet_v2_140 import Orchids52Mobilenet140
 from utils.const import TRAIN_STEP1, TRAIN_STEP2, TRAIN_STEP3, TRAIN_STEP4
 from utils.const import TRAIN_V2_STEP1, TRAIN_V2_STEP2
@@ -66,29 +64,8 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
         training_for_tf25 = kwargs.get("training_for_tf25", False)
         pop_key = kwargs.get("pop_key", True)
         value_to_load = {}
-        reader = tf.compat.v1.train.NewCheckpointReader(latest_checkpoint)
-        var_to_shape_map = reader.get_variable_to_shape_map()
-        key_to_numpy = {}
-        for key in sorted(var_to_shape_map.items()):
-            key_to_numpy.update({key[0]: reader.get_tensor(key[0])})
 
-        var_maps = {
-            "stn_conv2d_1/kernel": "dense-1/conv2d_resize_128/weights",
-            "stn_conv2d_1/bias": "dense-1/conv2d_resize_128/biases",
-            "stn_dense_128_1/kernel": "dense-1/fc_128/weights",
-            "stn_dense_128_1/bias": "dense-1/fc_128/biases",
-            "stn_dense_3_1/kernel": "dense-1/fc_final-1/weights",
-            "stn_conv2d_2/kernel": "dense-2/conv2d_resize_128/weights",
-            "stn_conv2d_2/bias": "dense-2/conv2d_resize_128/biases",
-            "stn_dense_128_2/kernel": "dense-2/fc_128/weights",
-            "stn_dense_128_2/bias": "dense-2/fc_128/biases",
-            "stn_dense_3_2/kernel": "dense-2/fc_final-2/weights",
-            "estimation_block/fully_connected_layer/kernel": "Estimation/fully_connected_logits/weights",
-            "estimation_block/batch_normalization/gamma": "Estimation/fully_connected_logits/BatchNorm/gamma",
-            "estimation_block/batch_normalization/beta": "Estimation/fully_connected_logits/BatchNorm/beta",
-            "estimation_block/batch_normalization/moving_mean": "Estimation/fully_connected_logits/BatchNorm/moving_mean",
-            "estimation_block/batch_normalization/moving_variance": "Estimation/fully_connected_logits/BatchNorm/moving_variance",
-        }
+        key_to_numpy, var_maps = load_orchids52_weight_from_old_checkpoint(latest_checkpoint)
 
         if training_for_tf25:
             var_maps_ext = {
@@ -120,7 +97,7 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
             features_extraction = model_name + "/features-extraction/MobilenetV2"
             features_extraction_common = model_name + "/features-extraction-common/MobilenetV2"
 
-        local_var_loaded = super().load_from_v1(
+        local_var_loaded = super(Orchids52Mobilenet140STN, self).load_from_v1(
             latest_checkpoint,
             target_model + "_stn_base_1.40_224_",
             localization_params,
@@ -128,7 +105,7 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
             include_prediction_layer=False,
             **kwargs
         )
-        extract_var_loaded = super().load_from_v1(
+        extract_var_loaded = super(Orchids52Mobilenet140STN, self).load_from_v1(
             latest_checkpoint,
             target_model + "_global_branch_1.40_224_",
             features_extraction,
@@ -136,7 +113,7 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
             include_prediction_layer=False,
             **kwargs
         )
-        extract_comm_var_loaded = super().load_from_v1(
+        extract_comm_var_loaded = super(Orchids52Mobilenet140STN, self).load_from_v1(
             latest_checkpoint,
             target_model + "_shared_branch_1.40_224_",
             features_extraction_common,
@@ -252,9 +229,9 @@ class BranchBlock(keras.layers.Layer):
             input_shape=IMG_SHAPE_224, alpha=1.4, include_top=False, weights="imagenet", sub_name="shared_branch"
         )
         self.branches_prediction_models = [
-            PredictionLayer(num_classes=num_classes),
-            PredictionLayer(num_classes=num_classes),
-            PredictionLayer(num_classes=num_classes),
+            PredictionLayer(num_classes=num_classes, name=""),
+            PredictionLayer(num_classes=num_classes, name=""),
+            PredictionLayer(num_classes=num_classes, name=""),
         ]
 
     def call(self, inputs, **kwargs):

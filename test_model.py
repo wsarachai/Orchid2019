@@ -6,13 +6,11 @@ import os
 import tensorflow as tf
 
 from absl import logging
+
 from data.data_utils import load_dataset
-from utils.lib_utils import FLAGS
-from utils.lib_utils import DisplayInfo
-from utils.lib_utils import start
 from nets.mapping import nets_mapping
-from utils.lib_utils import config_optimizer
-from utils import const
+from utils.lib_utils import DisplayInfo
+from utils.start_app import FLAGS, start
 
 
 @tf.function

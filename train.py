@@ -7,11 +7,10 @@ import tensorflow as tf
 from absl import logging
 from nets.mapping import nets_mapping
 from data.data_utils import load_dataset
-from utils.lib_utils import FLAGS
 from utils.lib_utils import config_learning_rate
 from utils.lib_utils import config_optimizer
 from utils.lib_utils import config_loss
-from utils.lib_utils import start
+from utils.start_app import FLAGS, start
 from utils.training_utils import TrainClassifier
 from utils import const
 
@@ -19,7 +18,7 @@ from utils import const
 def main(unused_argv):
     logging.debug(unused_argv)
 
-    # tf.config.run_functions_eagerly(True)
+    tf.config.run_functions_eagerly(True)
 
     create_model_graph = False
 
@@ -68,7 +67,10 @@ def main(unused_argv):
         model.compile(metrics=["accuracy"])
 
         model.fit(
-            train_ds, initial_epoch=0, epochs=1, callbacks=[callback, tensorboard_callback],
+            train_ds,
+            initial_epoch=0,
+            epochs=1,
+            callbacks=[callback, tensorboard_callback],
         )
 
     log_dir = os.path.join(training_dir, "logs", const.TRAIN_TEMPLATE.format(FLAGS.train_step))
@@ -81,19 +83,23 @@ def main(unused_argv):
         data_handler_steps=train_ds,
         callbacks=[callback],
         hparams={
-            'model': FLAGS.model,
-            'dataset': FLAGS.dataset,
-            'training_state': const.TRAIN_TEMPLATE.format(FLAGS.train_step),
-            'learning_rate': FLAGS.learning_rate,
-            'optimizer': FLAGS.optimizer,
-            'weight_decay': FLAGS.learning_rate_decay,
-            'batch_size': FLAGS.batch_size,
-            'dropout': 0.2,
-            'epoches': FLAGS.total_epochs,
-        }
+            "model": FLAGS.model,
+            "dataset": FLAGS.dataset,
+            "training_state": const.TRAIN_TEMPLATE.format(FLAGS.train_step),
+            "learning_rate": FLAGS.learning_rate,
+            "optimizer": FLAGS.optimizer,
+            "weight_decay": FLAGS.learning_rate_decay,
+            "batch_size": FLAGS.batch_size,
+            "dropout": 0.2,
+            "epoches": FLAGS.total_epochs,
+        },
     )
 
-    train_model.fit(initial_epoch=epoch, bash=FLAGS.bash, save_best_only=FLAGS.save_best_only,)
+    train_model.fit(
+        initial_epoch=epoch,
+        bash=FLAGS.bash,
+        save_best_only=FLAGS.save_best_only,
+    )
 
     print("\nTest accuracy: ")
     train_model.evaluate(datasets=test_ds)

@@ -3,26 +3,12 @@ from __future__ import division
 from __future__ import print_function
 
 import os
-import pathlib
 import numpy as np
 import tensorflow as tf
+from pathlib import Path
 from data import orchids52_dataset
+from nets.core_functions import preprocess_input
 from utils.wrapped_tools import wrapped_partial
-from nets.mobilenet_v2 import IMG_SIZE_224
-
-
-@tf.function
-def preprocess_input(image_data, central_fraction=0.875):
-    image = tf.image.decode_jpeg(image_data, channels=3)
-
-    image = tf.image.convert_image_dtype(image, dtype=tf.float32)
-    image = tf.image.central_crop(image, central_fraction=central_fraction)
-    image = tf.image.resize(images=image, size=IMG_SIZE_224, method=tf.image.ResizeMethod.BILINEAR)
-
-    image = tf.subtract(image, 0.5)
-    image = tf.multiply(image, 2.0)
-
-    return image
 
 
 def decode_img(image, size):
@@ -84,9 +70,8 @@ class OrchidsDataset(object):
         repeat=False,
         **kwargs
     ):
-        dataset = None
         image_path = os.path.join(root_path, split)
-        images_dir = pathlib.Path(image_path)
+        images_dir = Path(image_path)
         dataset = tf.data.Dataset.list_files(str(images_dir / "*/*"), shuffle=False)
 
         self.extracting_label_warping(data_dir=images_dir, **kwargs)
