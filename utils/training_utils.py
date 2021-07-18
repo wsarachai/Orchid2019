@@ -62,10 +62,10 @@ class TrainClassifier:
         self.accuracy_metric.update_state(labels, predictions)
 
         return {
-            "train_loss": train_loss,
-            "reg_loss": regularization_loss,
-            "b_loss": boundary_loss,
-            "total_loss": total_loss,
+            "train_loss": self.train_loss_metric.result(),
+            "reg_loss": self.regularization_loss_metric.result(),
+            "b_loss": self.boundary_loss_metric.result(),
+            "total_loss": self.total_loss_metric.result(),
             "accuracy": self.accuracy_metric.result(),
         }
 
@@ -128,15 +128,6 @@ class TrainClassifier:
                         seen += num_steps
                         progbar.update(seen, list(logs.items()), finalize=finalize)
 
-                    # global_step.assign(self.model.optimizer.iterations)
-                    global_step.assign_add(1)
-
-                    train_loss = self.train_loss_metric.result().numpy()
-                    regularization_loss = self.regularization_loss_metric.result().numpy()
-                    boundary_loss = self.boundary_loss_metric.result().numpy()
-                    total_loss = self.total_loss_metric.result().numpy()
-                    accuracy = self.accuracy_metric.result().numpy()
-
                     if first_graph_writing:
                         try:
                             # tf.summary.graph support only tf 2.5
@@ -146,12 +137,21 @@ class TrainClassifier:
                         finally:
                             first_graph_writing = False
 
-                    tf.summary.scalar("scalar/train_loss", train_loss, step=global_step)
-                    tf.summary.scalar("scalar/regularization_loss", regularization_loss, step=global_step)
-                    tf.summary.scalar("scalar/boundary_loss", boundary_loss, step=global_step)
-                    tf.summary.scalar("scalar/total_loss", total_loss, step=global_step)
-                    tf.summary.scalar("scalar/learning_rate", self.model.optimizer.lr, step=global_step)
-                    tf.summary.scalar("scalar/accuracy", accuracy, step=global_step)
+                # global_step.assign(self.model.optimizer.iterations)
+                global_step.assign_add(1)
+
+                train_loss = self.train_loss_metric.result().numpy()
+                regularization_loss = self.regularization_loss_metric.result().numpy()
+                boundary_loss = self.boundary_loss_metric.result().numpy()
+                total_loss = self.total_loss_metric.result().numpy()
+                accuracy = self.accuracy_metric.result().numpy()
+
+                tf.summary.scalar("scalar/train_loss", train_loss, step=global_step)
+                tf.summary.scalar("scalar/regularization_loss", regularization_loss, step=global_step)
+                tf.summary.scalar("scalar/boundary_loss", boundary_loss, step=global_step)
+                tf.summary.scalar("scalar/total_loss", total_loss, step=global_step)
+                tf.summary.scalar("scalar/learning_rate", self.model.optimizer.lr, step=global_step)
+                tf.summary.scalar("scalar/accuracy", accuracy, step=global_step)
 
                 self.model.save_model_variables()
 
