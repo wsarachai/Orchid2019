@@ -1,7 +1,7 @@
 #!/bin/bash
 
 TRAIN_DIR=$PWD
-trained_dir="/home/keng/Documents/_trained_models/model-v1/mobilenet_v2_140_orchids52_0001/pretrain2/model.ckpt-12000"
+trained_dir="${WORKSPACE}/_trained_models/model-v1/mobilenet_v2_140_orchids52_0001/pretrain2/model.ckpt-12000"
 script="${TRAIN_DIR}/train.py"
 
 readonly connections=(       
