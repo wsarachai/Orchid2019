@@ -25,6 +25,12 @@ from nets.layers import BranchBlock
 from nets.layers import EstimationBlock
 
 
+def get_dataset_keys(f):
+    keys = []
+    f.visit(lambda key: keys.append(key) if isinstance(f[key], h5py.Dataset) else None)
+    return keys
+
+
 class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
     def __init__(
         self,
@@ -186,10 +192,15 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
             f = h5py.File(filepath + ".h5", mode="r")
             file_loaed = True
             g = f["model_weights"]
+            # keys = get_dataset_keys(g)
+            # for v in keys:
+            #     print(v)
             for var in model.weights:
                 var_name = var.name
-                if to_name is not None and from_name is not None:
-                    var_name = var_name.replace(from_name, to_name)
+
+                if var_name not in g:
+                    if to_name is not None and from_name is not None:
+                        var_name = var_name.replace(from_name, to_name)
                 if var_name in g:
                     weight = np.asarray(g[var_name])
                     if var.shape != weight.shape:
@@ -294,7 +305,7 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
     def restore_model_from_latest_checkpoint_if_exist(self, **kwargs):
         result = False
         load_from_old_format = False
-        show_model_weights = kwargs.get("show_model_weights", False)
+
         step = kwargs.get("training_step", 0)
         training_step = TRAIN_TEMPLATE.format(step)
 

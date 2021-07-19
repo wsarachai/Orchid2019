@@ -5,6 +5,8 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
+from utils.summary import k_summary
+
 
 def get_pixel_value(img, x, y):
     """
@@ -358,11 +360,11 @@ class SpatialTransformerNetwork(tf.keras.layers.Layer):
         bound_err = [b_err1, b_err2]
 
         bound_err = tf.concat(bound_err, axis=1)
-        tf.summary.histogram("boundary_error", bound_err, step=tf.compat.v1.train.get_global_step())
+        k_summary.histogram_update("boundary_error", bound_err)
 
         h_trans = [inputs]
 
-        tf.summary.image("stn/image/1.0", inputs, step=tf.compat.v1.train.get_global_step(), max_outputs=3)
+        k_summary.image_update("stn/image/1.0", inputs, max_outputs=3)
 
         for i in range(2):
             _theta = tf.squeeze(thetas[i], axis=1)
@@ -373,11 +375,8 @@ class SpatialTransformerNetwork(tf.keras.layers.Layer):
             y_s = batch_grids[:, 1, :, :]
 
             out_fmap = bilinear_sampler(inputs, x_s, y_s)
-            tf.summary.image(
-                "stn/image/{}".format(self.scales[i]),
-                out_fmap,
-                step=tf.compat.v1.train.get_global_step(),
-                max_outputs=3,
+            k_summary.image_update(
+                "stn/image/{}".format(self.scales[i]), out_fmap, max_outputs=3,
             )
 
             h_trans.append(out_fmap)

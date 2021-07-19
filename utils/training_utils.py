@@ -2,13 +2,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import os
 import copy
 import tensorflow as tf
 
-from tensorboard.plugins.hparams import api_pb2
-from tensorboard.plugins.hparams import summary
-from tensorboard.plugins.hparams import summary_v2
+from utils.summary import k_summary
 
 
 class TrainClassifier:
@@ -37,9 +34,6 @@ class TrainClassifier:
 
         for callback in self.callbacks:
             callback.set_model(self.model.model)
-
-        global_step = tf.compat.v1.train.get_or_create_global_step()
-        global_step.assign(1)
 
     @tf.function
     def train_step(self, inputs, labels):
@@ -88,9 +82,8 @@ class TrainClassifier:
             callback.on_epoch_begin(epoch, logs)
 
     def fit(self, initial_epoch, **kwargs):
-        global_step = tf.compat.v1.train.get_global_step()
         target = self.data_handler_steps.size // self.batch_size
-        global_step.assign((initial_epoch - 1) * target)
+        summary_step = (initial_epoch - 1) * target
         is_run_from_bash = kwargs.pop("bash") if "bash" in kwargs else False
         # save_best_only = kwargs.pop("save_best_only") if "save_best_only" in kwargs else False
         finalize = False if not is_run_from_bash else True
@@ -105,59 +98,54 @@ class TrainClassifier:
 
         first_graph_writing = True
 
-        w = tf.summary.create_file_writer(self.summary_path)
-        with w.as_default():
-            summary_v2.hparams_pb(self._hparams)
+        k_summary.re_init(self.summary_path)
+        k_summary.hparams_pb(self._hparams)
 
-            for epoch in range(initial_epoch, self.epoches + 1):
-                print("\nEpoch: {}/{}".format(epoch, self.epoches))
+        for epoch in range(initial_epoch, self.epoches + 1):
+            print("\nEpoch: {}/{}".format(epoch, self.epoches))
 
-                self.on_epoch_begin(epoch=epoch)
-                summary_v2.hparams(self._hparams)
+            self.on_epoch_begin(epoch=epoch)
+            k_summary.hparams(self._hparams)
 
-                self.reset_metric()
-                seen = 0
+            self.reset_metric()
+            seen = 0
 
-                for inputs, labels in self.data_handler_steps:
-                    if inputs.shape.as_list()[0] == self.batch_size:
-                        if first_graph_writing:
-                            tf.summary.trace_on(graph=True)
-                        logs = self.train_step(inputs, labels)
-                        logs = copy.copy(logs) if logs else {}
-                        num_steps = logs.pop("num_steps", 1)
-                        seen += num_steps
-                        progbar.update(seen, list(logs.items()), finalize=finalize)
-
+            for inputs, labels in self.data_handler_steps:
+                if inputs.shape.as_list()[0] == self.batch_size:
                     if first_graph_writing:
-                        try:
-                            # tf.summary.graph support only tf 2.5
-                            tf.summary.graph(self.train_step.get_concrete_function(inputs, labels).graph)
-                        except:
-                            tf.summary.trace_export(name="train_step", step=0)
-                        finally:
-                            first_graph_writing = False
+                        k_summary.trace_on(graph=True)
+                    logs = self.train_step(inputs, labels)
+                    logs = copy.copy(logs) if logs else {}
+                    num_steps = logs.pop("num_steps", 1)
+                    seen += num_steps
+                    progbar.update(seen, list(logs.items()), finalize=finalize)
 
-                # global_step.assign(self.model.optimizer.iterations)
-                global_step.assign_add(1)
+                if first_graph_writing:
+                    k_summary.graph(
+                        fn_name="train_step", graph=self.train_step.get_concrete_function(inputs, labels).graph
+                    )
+                    first_graph_writing = False
 
-                train_loss = self.train_loss_metric.result().numpy()
-                regularization_loss = self.regularization_loss_metric.result().numpy()
-                boundary_loss = self.boundary_loss_metric.result().numpy()
-                total_loss = self.total_loss_metric.result().numpy()
-                accuracy = self.accuracy_metric.result().numpy()
+            train_loss = self.train_loss_metric.result().numpy()
+            regularization_loss = self.regularization_loss_metric.result().numpy()
+            boundary_loss = self.boundary_loss_metric.result().numpy()
+            total_loss = self.total_loss_metric.result().numpy()
+            accuracy = self.accuracy_metric.result().numpy()
 
-                tf.summary.scalar("scalar/train_loss", train_loss, step=global_step)
-                tf.summary.scalar("scalar/regularization_loss", regularization_loss, step=global_step)
-                tf.summary.scalar("scalar/boundary_loss", boundary_loss, step=global_step)
-                tf.summary.scalar("scalar/total_loss", total_loss, step=global_step)
-                tf.summary.scalar("scalar/learning_rate", self.model.optimizer.lr, step=global_step)
-                tf.summary.scalar("scalar/accuracy", accuracy, step=global_step)
+            k_summary.scalar_update("scalar/train_loss", train_loss)
+            k_summary.scalar_update("scalar/regularization_loss", regularization_loss)
+            k_summary.scalar_update("scalar/boundary_loss", boundary_loss)
+            k_summary.scalar_update("scalar/total_loss", total_loss)
+            k_summary.scalar_update("scalar/learning_rate", self.model.optimizer.lr)
+            k_summary.scalar_update("scalar/accuracy", accuracy)
 
-                self.model.save_model_variables()
+            # summary_step = self.model.optimizer.iterations
+            summary_step += 1
 
-            pb = summary.session_end_pb(api_pb2.STATUS_SUCCESS)
-            raw_pb = pb.SerializeToString()
-            tf.compat.v2.summary.experimental.write_raw_pb(raw_pb, step=0)
+            k_summary.flush_all(step=summary_step)
+            self.model.save_model_variables()
+
+        k_summary.session_end_pb()
 
     def evaluate(self, datasets, **kwargs):
         logs = None
