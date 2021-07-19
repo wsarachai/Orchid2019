@@ -227,18 +227,17 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
             prediction_layer_prefix = get_checkpoint_file(predict_layers_path, idx)
             if not tf.io.gfile.exists(prediction_layer_prefix + ".h5"):
                 prediction_layer_prefix = _prediction_layer_prefix
+                if not tf.io.gfile.exists(prediction_layer_prefix):
+                    prediction_layer_prefix = latest_checkpoint
 
             from_name = (
-                "branch_block/prediction_layer/prediction_layer"
+                "branch_block/prediction_layer/dense"
                 if idx == 0
-                else "branch_block/prediction_layer_{}/prediction_layer".format(idx)
+                else "branch_block/prediction_layer_{}/dense_{}".format(idx, idx)
             )
 
             self.load_model_from_hdf5(
-                prediction_layer_prefix,
-                predict_layer,
-                from_name=from_name,
-                to_name="prediction_layer/prediction_layer",
+                prediction_layer_prefix, predict_layer, from_name=from_name, to_name="prediction_layer/dense",
             )
             _prediction_layer_prefix = prediction_layer_prefix
 
