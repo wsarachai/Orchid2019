@@ -64,12 +64,8 @@ class PredictionLayer(keras.layers.Layer):
             inputs = self.dropout(inputs, training=training)
         inputs = self.dense(inputs, training=training)
         inputs = self.prediction_fn(inputs)
-        k_summary.histogram_update(
-            "kernel", self.dense.kernel,
-        )
-        k_summary.histogram_update(
-            "bias", self.dense.bias,
-        )
+        k_summary.histogram_update("kernel", self.dense.kernel)
+        k_summary.histogram_update("bias", self.dense.bias)
         return inputs
 
 

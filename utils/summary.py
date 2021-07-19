@@ -3,22 +3,28 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
+import random
+
 from tensorboard.plugins.hparams import api_pb2
 from tensorboard.plugins.hparams import summary
 from tensorboard.plugins.hparams import summary_v2
 
 
 class KSummary(object):
-    def __init__(self, summary_path=None):
+    def __init__(self, summary_path=None, target=1, image_logging_every=10):
         self._writer = None
         self.keep_last_update = True
+        self.image_logging_every = image_logging_every
         self.summary_path = summary_path
-        self._image_maps = {}
-        self._histrogram_maps = {}
-        self._scalar_maps = {}
 
-    def re_init(self, summary_path):
+        self.epoch = tf.Variable(0, trainable=False, dtype=tf.int64)
+        self._current_step = tf.Variable(1, trainable=False, dtype=tf.int64)
+        self.target = tf.Variable(target, trainable=False, dtype=tf.int64)
+        self.log_image_at_step = tf.Variable(random.randint(0, self.target), trainable=False, dtype=tf.int64)
+
+    def re_init(self, summary_path, target):
         self._writer = None
+        self.target.assign(target)
         self.summary_path = summary_path
 
     def hparams_pb(self, hparams):
@@ -53,47 +59,30 @@ class KSummary(object):
             self._writer = tf.summary.create_file_writer(self.summary_path)
         return self._writer
 
-    def get_unit_key(self, name, unit):
-        if hasattr(unit, "name"):
-            u_name = unit.name
-            if ":" in unit.name:
-                u_name = unit.name.split(":")[0]
-            key = "{}/{}".format(name, u_name)
-        else:
-            key = "{}".format(name)
-        return key
-
-    def image_update(self, name, unit, step=0, max_outputs=3):
-        if self.keep_last_update:
-            self._image_maps.update(
-                {self.get_unit_key(name, unit): {"name": name, "unit": unit, "max_outputs": max_outputs}}
-            )
-        else:
+    def image_update(self, name, unit, max_outputs=3):
+        if self._current_step == self.log_image_at_step:
             with self.get_writer().as_default():
-                tf.summary.image(name, unit, step)
+                tf.summary.image(name, unit, self.epoch, max_outputs=max_outputs)
 
-    def histogram_update(self, name, unit, step=0):
-        if self.keep_last_update:
-            self._histrogram_maps.update({self.get_unit_key(name, unit): {"name": name, "unit": unit}})
-        else:
+    def histogram_update(self, name, unit):
+        if self._current_step == self.target:
             with self.get_writer().as_default():
-                tf.summary.histogram(name, unit, step)
+                tf.summary.histogram(name, unit, self.epoch)
 
-    def scalar_update(self, name, unit, step=0):
-        if self.keep_last_update:
-            self._scalar_maps.update({self.get_unit_key(name, unit): {"name": name, "unit": unit}})
-        else:
-            with self.get_writer().as_default():
-                tf.summary.scalar(name, unit, step)
-
-    def flush_all(self, step):
+    def scalar_update(self, name, unit, step):
         with self.get_writer().as_default():
-            for k, v in self._image_maps.items():
-                tf.summary.image(k, v["unit"], step, max_outputs=v["max_outputs"])
-            for k, v in self._histrogram_maps.items():
-                tf.summary.histogram(k, v["unit"], step)
-            for k, v in self._scalar_maps.items():
-                tf.summary.scalar(k, v["unit"], step)
+            tf.summary.scalar(name, unit, step)
+
+    def set_epoch(self, epoch):
+        self.epoch.assign(epoch)
+
+    def end_step(self):
+        self._current_step.assign_add(1)
+
+    def end_epoch(self):
+        self._current_step.assign(1)
+        sel = tf.random.uniform(shape=[], minval=0, maxval=self.target, dtype=tf.int64, seed=10)
+        self.log_image_at_step.assign(sel)
 
 
 k_summary = KSummary()

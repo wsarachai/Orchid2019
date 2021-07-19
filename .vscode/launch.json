@@ -18,7 +18,7 @@
         "--dataset_version=v1",
         "--model=mobilenet_v2_140_stn_v15",
         "--learning_rate=0.001",
-        "--total_epochs=100",
+        "--total_epochs=2",
         "--save_model=True",
         "--bash=False",
         "--learning_rate_decay=exponential",
@@ -39,7 +39,7 @@
         "--dataset_version=v1",
         "--model=mobilenet_v2_140_stn_v15",
         "--learning_rate=0.001",
-        "--total_epochs=100",
+        "--total_epochs=2",
         "--save_model=True",
         "--bash=False",
         "--learning_rate_decay=exponential"

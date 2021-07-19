@@ -99,8 +99,8 @@ def main(unused_argv):
     print("\nTest accuracy: ")
     train_model.evaluate(datasets=test_ds)
 
-    if FLAGS.save_model and model:
-        model.save(training_dir)
+    # if FLAGS.save_model and model:
+    #     model.save(training_dir)
 
 
 def getParam(arg):

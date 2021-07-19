@@ -63,6 +63,7 @@ class TrainClassifier:
             "accuracy": self.accuracy_metric.result(),
         }
 
+    @tf.function
     def evaluate_step(self, inputs, labels):
         predictions = self.model.process_step(inputs, training=False)
         total_loss = self.model.get_loss(labels, predictions)
@@ -83,7 +84,6 @@ class TrainClassifier:
 
     def fit(self, initial_epoch, **kwargs):
         target = self.data_handler_steps.size // self.batch_size
-        summary_step = (initial_epoch - 1) * target
         is_run_from_bash = kwargs.pop("bash") if "bash" in kwargs else False
         # save_best_only = kwargs.pop("save_best_only") if "save_best_only" in kwargs else False
         finalize = False if not is_run_from_bash else True
@@ -98,13 +98,14 @@ class TrainClassifier:
 
         first_graph_writing = True
 
-        k_summary.re_init(self.summary_path)
+        k_summary.re_init(self.summary_path, target)
         k_summary.hparams_pb(self._hparams)
 
         for epoch in range(initial_epoch, self.epoches + 1):
             print("\nEpoch: {}/{}".format(epoch, self.epoches))
 
             self.on_epoch_begin(epoch=epoch)
+            k_summary.set_epoch(epoch=epoch)
             k_summary.hparams(self._hparams)
 
             self.reset_metric()
@@ -126,23 +127,22 @@ class TrainClassifier:
                     )
                     first_graph_writing = False
 
+                k_summary.end_step()
+
             train_loss = self.train_loss_metric.result().numpy()
             regularization_loss = self.regularization_loss_metric.result().numpy()
             boundary_loss = self.boundary_loss_metric.result().numpy()
             total_loss = self.total_loss_metric.result().numpy()
             accuracy = self.accuracy_metric.result().numpy()
 
-            k_summary.scalar_update("scalar/train_loss", train_loss)
-            k_summary.scalar_update("scalar/regularization_loss", regularization_loss)
-            k_summary.scalar_update("scalar/boundary_loss", boundary_loss)
-            k_summary.scalar_update("scalar/total_loss", total_loss)
-            k_summary.scalar_update("scalar/learning_rate", self.model.optimizer.lr)
-            k_summary.scalar_update("scalar/accuracy", accuracy)
+            k_summary.scalar_update("scalar/train_loss", train_loss, epoch)
+            k_summary.scalar_update("scalar/regularization_loss", regularization_loss, epoch)
+            k_summary.scalar_update("scalar/boundary_loss", boundary_loss, epoch)
+            k_summary.scalar_update("scalar/total_loss", total_loss, epoch)
+            k_summary.scalar_update("scalar/learning_rate", self.model.optimizer.lr, epoch)
+            k_summary.scalar_update("scalar/accuracy", accuracy, epoch)
 
-            # summary_step = self.model.optimizer.iterations
-            summary_step += 1
-
-            k_summary.flush_all(step=summary_step)
+            k_summary.end_epoch()
             self.model.save_model_variables()
 
         k_summary.session_end_pb()

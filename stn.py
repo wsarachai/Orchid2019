@@ -360,11 +360,17 @@ class SpatialTransformerNetwork(tf.keras.layers.Layer):
         bound_err = [b_err1, b_err2]
 
         bound_err = tf.concat(bound_err, axis=1)
-        k_summary.histogram_update("boundary_error", bound_err)
+        histogram_update = tf.function(k_summary.histogram_update).get_concrete_function(
+            name="boundary_error", unit=bound_err
+        )
+        histogram_update(unit=bound_err)
 
         h_trans = [inputs]
 
-        k_summary.image_update("stn/image/1.0", inputs, max_outputs=3)
+        image_update_1_0 = tf.function(k_summary.image_update).get_concrete_function(
+            name="stn/image/1.0", unit=inputs, max_outputs=3
+        )
+        image_update_1_0(unit=inputs)
 
         for i in range(2):
             _theta = tf.squeeze(thetas[i], axis=1)
@@ -375,9 +381,10 @@ class SpatialTransformerNetwork(tf.keras.layers.Layer):
             y_s = batch_grids[:, 1, :, :]
 
             out_fmap = bilinear_sampler(inputs, x_s, y_s)
-            k_summary.image_update(
-                "stn/image/{}".format(self.scales[i]), out_fmap, max_outputs=3,
+            image_update_s = tf.function(k_summary.image_update).get_concrete_function(
+                name="stn/image/{}".format(self.scales[i]), unit=out_fmap, max_outputs=3
             )
+            image_update_s(unit=out_fmap)
 
             h_trans.append(out_fmap)
 
