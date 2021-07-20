@@ -15,7 +15,7 @@ from nets.core_functions import load_orchids52_weight_from_old_checkpoint, load_
 from stn import SpatialTransformerNetwork
 from nets.mobilenet_v2 import create_mobilenet_v2
 from nets.mobilenet_v2_140 import Orchids52Mobilenet140, save_h5_weights
-from utils.const import TRAIN_STEP1, TRAIN_STEP2, TRAIN_STEP3, TRAIN_STEP4
+from utils.const import TRAIN_STEP1, TRAIN_STEP2, TRAIN_STEP3, TRAIN_STEP4, TRAIN_STEP5
 from utils.const import TRAIN_V2_STEP1, TRAIN_V2_STEP2
 from utils.const import TRAIN_TEMPLATE
 from utils.lib_utils import get_checkpoint_file
@@ -181,8 +181,12 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
             self.set_prediction_training_status(False)
             for stn_dense in self.stn_denses:
                 stn_dense.trainable = False
-        elif training_step == TRAIN_V2_STEP1:
-            self.set_mobilenet_training_status(False)
+        elif training_step == TRAIN_STEP5:
+            self.set_mobilenet_training_status(True)
+            self.set_prediction_training_status(True)
+            self.estimate_block.trainable = True
+            for stn_dense in self.stn_denses:
+                stn_dense.trainable = True
         elif training_step == TRAIN_V2_STEP2:
             self.set_mobilenet_training_status(True)
 
@@ -285,8 +289,16 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
 
         self.load_model_from_hdf5(latest_checkpoint, self.model)
 
-    def load_model_v2_step2(self):
-        pass
+    def load_model_step5(self):
+        training_step = TRAIN_TEMPLATE.format(self.step)
+        checkpoint_dir = os.path.join(self.checkpoint_dir, training_step)
+        if not tf.io.gfile.exists(checkpoint_dir):
+            training_step = TRAIN_TEMPLATE.format(4)
+            checkpoint_dir = os.path.join(self.checkpoint_dir, training_step)
+
+        latest_checkpoint = tf.train.latest_checkpoint(checkpoint_dir=checkpoint_dir)
+
+        self.load_model_from_hdf5(latest_checkpoint, self.model)
 
     def load_model_variables(self):
         training_step = TRAIN_TEMPLATE.format(self.step)
@@ -298,8 +310,8 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
             self.load_model_step3()
         elif training_step == TRAIN_STEP4:
             self.load_model_step4()
-        elif training_step == TRAIN_V2_STEP2:
-            self.load_model_v2_step2()
+        elif training_step == TRAIN_STEP5:
+            self.load_model_step5()
 
     def restore_model_from_latest_checkpoint_if_exist(self, **kwargs):
         result = False

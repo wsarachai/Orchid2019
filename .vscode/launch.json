@@ -46,6 +46,26 @@
       ]
     },
     {
+      "name": "Python: Train-finetune",
+      "type": "python",
+      "request": "launch",
+      "program": "train.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--train_step=5",
+        "--batch_size=4",
+        "--dataset_format=files",
+        "--dataset=orchids52_data",
+        "--dataset_version=v1",
+        "--model=mobilenet_v2_140_stn_v15",
+        "--learning_rate=0.00001",
+        "--total_epochs=2",
+        "--save_model=True",
+        "--bash=False",
+        "--learning_rate_decay=exponential"
+      ]
+    },
+    {
       "name": "Python: mobilenet_v2_140 flowers17 Test",
       "type": "python",
       "request": "launch",

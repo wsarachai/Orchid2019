@@ -109,11 +109,25 @@ class BranchBlock(keras.layers.Layer):
             x = prediction(x, training=training)
         return x
 
-    def set_trainable_for_global_branch(self, trainable):
-        self.global_branch_model.trainable = trainable
+    def set_trainable_for_global_branch(self, trainable, fine_tune_at=100):
+        if trainable:
+            self.global_branch_model.trainable = True
 
-    def set_trainable_for_share_branch(self, trainable):
-        self.shared_branch_model.trainable = trainable
+            # Freeze all the layers before the `fine_tune_at` layer
+            for layer in self.global_branch_model.layers[:fine_tune_at]:
+                layer.trainable = False
+        else:
+            self.global_branch_model.trainable = False
+
+    def set_trainable_for_share_branch(self, trainable, fine_tune_at=100):
+        if trainable:
+            self.shared_branch_model.trainable = True
+
+            # Freeze all the layers before the `fine_tune_at` layer
+            for layer in self.shared_branch_model.layers[:fine_tune_at]:
+                layer.trainable = False
+        else:
+            self.shared_branch_model.trainable = False
 
 
 class EstimationBlock(keras.layers.Layer):

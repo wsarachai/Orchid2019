@@ -143,11 +143,11 @@ class Orchids52Mobilenet140(object):
             tf.io.gfile.remove(file_to_delete)
 
     def load_from_v1(
-            self, latest_checkpoint, target_model="mobilenetv2_01_1.40_224_", model_name="MobilenetV2", **kwargs
+        self, latest_checkpoint, target_model="mobilenetv2_01_1.40_224_", model_name="MobilenetV2", **kwargs
     ):
-        load_weight_from_old_checkpoint(latest_checkpoint=latest_checkpoint,
-                                        target_model=target_model,
-                                        model_name=model_name)
+        load_weight_from_old_checkpoint(
+            latest_checkpoint=latest_checkpoint, target_model=target_model, model_name=model_name
+        )
 
     def restore_model_from_latest_checkpoint_if_exist(self, **kwargs):
         result = False
@@ -196,9 +196,16 @@ class Orchids52Mobilenet140(object):
         if self.step == TRAIN_STEP1:
             self.set_mobilenet_training_status(False)
 
-    def set_mobilenet_training_status(self, trainable):
+    def set_mobilenet_training_status(self, trainable, fine_tune_at=100):
         if self.mobilenet:
-            self.mobilenet.trainable = trainable
+            if trainable:
+                self.mobilenet.trainable = True
+
+                # Freeze all the layers before the `fine_tune_at` layer
+                for layer in self.mobilenet.layers[:fine_tune_at]:
+                    layer.trainable = False
+            else:
+                self.mobilenet.trainable = False
 
     def set_prediction_training_status(self, trainable):
         if self.predict_layers:
