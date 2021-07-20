@@ -5,15 +5,17 @@ from __future__ import print_function
 import copy
 import tensorflow as tf
 
+from absl import logging
 from utils.summary import k_summary
 
 
 class TrainClassifier:
-    def __init__(self, model, batch_size, summary_path, epoches, data_handler_steps, hparams, callbacks):
+    def __init__(self, model, batch_size, summary_path, epoches, data_handler_steps, test_ds, hparams, callbacks):
         self.model = model
         self.summary_path = summary_path
         self.epoches = epoches
         self.data_handler_steps = data_handler_steps
+        self.test_ds = test_ds
         self._hparams = dict(hparams)
         self.callbacks = callbacks
         self.train_loss_metric = tf.keras.metrics.Mean(name="train_loss")
@@ -56,9 +58,9 @@ class TrainClassifier:
         self.accuracy_metric.update_state(labels, predictions)
 
         return {
-            "train_loss": self.train_loss_metric.result(),
-            "reg_loss": self.regularization_loss_metric.result(),
-            "b_loss": self.boundary_loss_metric.result(),
+            # "train_loss": self.train_loss_metric.result(),
+            # "reg_loss": self.regularization_loss_metric.result(),
+            # "b_loss": self.boundary_loss_metric.result(),
             "total_loss": self.total_loss_metric.result(),
             "accuracy": self.accuracy_metric.result(),
         }
@@ -96,6 +98,7 @@ class TrainClassifier:
             unit_name="step",
         )
 
+        best_acc = 0
         first_graph_writing = True
 
         k_summary.re_init(self.summary_path, target)
@@ -113,7 +116,7 @@ class TrainClassifier:
 
             for inputs, labels in self.data_handler_steps:
                 if inputs.shape.as_list()[0] == self.batch_size:
-                    if first_graph_writing:
+                    if first_graph_writing and epoch == 1:
                         k_summary.trace_on(graph=True)
                     logs = self.train_step(inputs, labels)
                     logs = copy.copy(logs) if logs else {}
@@ -121,13 +124,16 @@ class TrainClassifier:
                     seen += num_steps
                     progbar.update(seen, list(logs.items()), finalize=finalize)
 
-                if first_graph_writing:
+                if first_graph_writing and epoch == 1:
                     k_summary.graph(
                         fn_name="train_step", graph=self.train_step.get_concrete_function(inputs, labels).graph
                     )
                     first_graph_writing = False
 
                 k_summary.end_step()
+
+            print("\n")
+            t_acc, t_loss = self.evaluate(datasets=self.test_ds)
 
             train_loss = self.train_loss_metric.result().numpy()
             regularization_loss = self.regularization_loss_metric.result().numpy()
@@ -141,9 +147,15 @@ class TrainClassifier:
             k_summary.scalar_update("scalar/total_loss", total_loss, epoch)
             k_summary.scalar_update("scalar/learning_rate", self.model.optimizer.lr, epoch)
             k_summary.scalar_update("scalar/accuracy", accuracy, epoch)
+            k_summary.scalar_update("scalar/validation", t_acc, epoch)
+            k_summary.scalar_update("scalar/loss", t_loss, epoch)
 
             k_summary.end_epoch()
-            self.model.save_model_variables()
+
+            if best_acc < t_acc:
+                logging.info("Saving best weights...")
+                best_acc = t_acc
+                self.model.save_model_variables()
 
         k_summary.session_end_pb()
 
@@ -164,3 +176,5 @@ class TrainClassifier:
                 progbar.update(seen, list(logs.items()), finalize=finalize)
         logs = copy.copy(logs) if logs else {}
         print("loss: {:.3f}, accuracy: {:.3f}\n".format(logs["loss"], logs["accuracy"]))
+
+        return logs["accuracy"], logs["loss"]

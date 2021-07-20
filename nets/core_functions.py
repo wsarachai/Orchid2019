@@ -84,8 +84,8 @@ def load_weight_from_old_checkpoint(latest_checkpoint, target_model, model_name,
         "Conv_1_bn/moving_variance": "Conv_1/BatchNorm/moving_variance",
     }
     key_maps2 = {
-        "prediction_layer/prediction_layer/kernel": "Logits/Conv2d_1c_1x1/weights",
-        "prediction_layer/prediction_layer/bias": "Logits/Conv2d_1c_1x1/biases",
+        "prediction_layer/dense/kernel": "Logits/Conv2d_1c_1x1/weights",
+        "prediction_layer/dense/bias": "Logits/Conv2d_1c_1x1/biases",
     }
     key_maps3 = {
         "block_{}_expand/kernel": "expanded_conv_{}/expand/weights",

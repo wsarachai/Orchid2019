@@ -17,7 +17,7 @@ class PreprocessLayer(keras.layers.Layer):
         super(PreprocessLayer, self).__init__()
 
     def call(self, inputs, **kwargs):
-        training = kwargs.pop("training")
+        training = kwargs.get("training", False)
         if training:
             sel = tf.random.uniform([], maxval=10, dtype=tf.int32)
             inputs = tf.switch_case(
@@ -58,14 +58,19 @@ class PredictionLayer(keras.layers.Layer):
         self.prediction_fn = activations.get(activation)
 
     def call(self, inputs, **kwargs):
-        training = kwargs.pop("training")
+        training = kwargs.get("training", False)
         inputs = self.global_average_pooling(inputs, training=training)
         if training:
             inputs = self.dropout(inputs, training=training)
         inputs = self.dense(inputs, training=training)
         inputs = self.prediction_fn(inputs)
-        k_summary.histogram_update("kernel", self.dense.kernel)
-        k_summary.histogram_update("bias", self.dense.bias)
+        if training and self.trainable:
+            histogram_update_k = tf.function(k_summary.histogram_update).get_concrete_function(
+                "kernel", self.dense.kernel
+            )
+            histogram_update_b = tf.function(k_summary.histogram_update).get_concrete_function("bias", self.dense.bias)
+            histogram_update_k(self.dense.kernel)
+            histogram_update_b(self.dense.bias)
         return inputs
 
 
@@ -88,19 +93,20 @@ class BranchBlock(keras.layers.Layer):
         ]
 
     def call(self, inputs, **kwargs):
+        training = kwargs.get("training", False)
         return [
-            self.sub_process(1, inputs[0], self.branches_prediction_models[0]),
-            self.sub_process(2, inputs[1], self.branches_prediction_models[1]),
-            self.sub_process(2, inputs[2], self.branches_prediction_models[2]),
+            self.get_prediction_layer(1, inputs[0], self.branches_prediction_models[0], training),
+            self.get_prediction_layer(2, inputs[1], self.branches_prediction_models[1], training),
+            self.get_prediction_layer(2, inputs[2], self.branches_prediction_models[2], training),
         ]
 
-    def sub_process(self, branch, inp, prediction):
+    def get_prediction_layer(self, branch, inp, prediction, training):
         if branch == 1:
-            x = self.global_branch_model(inp, training=False)
-            x = prediction(x, training=False)
+            x = self.global_branch_model(inp, training=training)
+            x = prediction(x, training=training)
         else:
-            x = self.shared_branch_model(inp, training=False)
-            x = prediction(x, training=False)
+            x = self.shared_branch_model(inp, training=training)
+            x = prediction(x, training=training)
         return x
 
     def set_trainable_for_global_branch(self, trainable):
@@ -126,6 +132,7 @@ class EstimationBlock(keras.layers.Layer):
         )
 
     def call(self, inputs, **kwargs):
+        training = kwargs.get("training", False)
         main_net = c_t = inputs[0]
 
         input_and_hstate_concatenated = tf.concat(values=[c_t, inputs[1]], axis=1)
@@ -137,6 +144,12 @@ class EstimationBlock(keras.layers.Layer):
         c_t = self.dense(input_and_hstate_concatenated)
         c_t = self.batch_norm(c_t)
         main_net = main_net + c_t
+
+        if training and self.trainable:
+            histogram_update = tf.function(k_summary.histogram_update).get_concrete_function(
+                "kernel", self.dense.kernel
+            )
+            histogram_update(self.dense.kernel)
 
         return main_net
 
@@ -156,7 +169,9 @@ class FullyConnectedLayer(tf.keras.layers.Layer):
         )
 
     def call(self, inputs):
-        k_summary.histogram_update("kernel", self.kernel)
+        if self.trainable:
+            k_summary.histogram_update("kernel", self.kernel)
+
         x = tf.matmul(inputs, self.kernel)
         if self.normalizer_fn is not None:
             x = self.normalizer_fn(x)
@@ -176,8 +191,10 @@ class Conv2DWrapper(keras.layers.Conv2D):
         super(Conv2DWrapper, self).__init__(**kwargs)
 
     def call(self, inputs):
-        k_summary.histogram_update("kernel", self.kernel)
-        k_summary.histogram_update("bias", self.bias)
+        if self.trainable:
+            k_summary.histogram_update("kernel", self.kernel)
+            k_summary.histogram_update("bias", self.bias)
+
         return super(Conv2DWrapper, self).call(inputs)
 
 
@@ -186,7 +203,9 @@ class DenseWrapper(keras.layers.Dense):
         super(DenseWrapper, self).__init__(**kwargs)
 
     def call(self, inputs):
-        k_summary.histogram_update("kernel", self.kernel)
-        k_summary.histogram_update("bias", self.bias)
+        if self.trainable:
+            k_summary.histogram_update("kernel", self.kernel)
+            k_summary.histogram_update("bias", self.bias)
+
         return super(DenseWrapper, self).call(inputs)
 

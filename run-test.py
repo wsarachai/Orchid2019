@@ -22,7 +22,7 @@ def main(unused_argv):
 
     create_model = nets_mapping[FLAGS.model]
 
-    model = create_model(num_classes=datasets.num_of_classes, activation="softmax")
+    model = create_model(num_classes=datasets.num_of_classes, activation="softmax", training=False)
     accuracy_metric = tf.keras.metrics.CategoricalAccuracy(name="train_accuracy")
     model.compile(metrics=[accuracy_metric])
     model.restore_model_variables(checkpoint_path=checkpoint_dir)
@@ -39,7 +39,7 @@ def main(unused_argv):
     info.display_summary()
 
     checkpoint_dir = os.path.join(workspace_path, "_trained_models", "orchids2019", FLAGS.model)
-    model.save(checkpoint_dir)
+    model.save(checkpoint_dir + ".h5")
 
 
 if __name__ == "__main__":

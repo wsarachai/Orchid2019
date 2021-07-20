@@ -14,7 +14,7 @@ from utils.lib_utils import get_checkpoint_file
 class Orchids52Mobilenet140(object):
     def __init__(self, inputs, outputs, optimizer, loss_fn, mobilenet, predict_layers, training, step):
         super(Orchids52Mobilenet140, self).__init__()
-        self.model = keras.Model(inputs, outputs, trainable=training)
+        self.model = keras.Model(inputs, outputs, trainable=False)
         self.optimizer = optimizer
         self.loss_fn = loss_fn
         self.mobilenet = mobilenet
@@ -78,12 +78,11 @@ class Orchids52Mobilenet140(object):
         self, latest_checkpoint, target_model="mobilenetv2_01_1.40_224_", model_name="MobilenetV2", **kwargs
     ):
         return load_weight_from_old_checkpoint(
-            latest_checkpoint=latest_checkpoint, target_model=target_model, model_name=model_name
+            latest_checkpoint=latest_checkpoint, target_model=target_model, model_name=model_name, **kwargs
         )
 
     def restore_model_from_latest_checkpoint_if_exist(self, **kwargs):
         result = False
-        show_model_weights = kwargs.get("show_model_weights", False)
 
         if self.checkpoint:
             checkpoint, checkpoint_manager = self.checkpoint

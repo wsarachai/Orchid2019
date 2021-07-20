@@ -69,21 +69,21 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
 
         if training_for_tf25:
             var_maps_ext = {
-                "branch_block/prediction_layer/prediction_layer/kernel": "Logits/Conv2d_1c_1x1/weights",
-                "branch_block/prediction_layer/prediction_layer/bias": "Logits/Conv2d_1c_1x1/biases",
-                "branch_block/prediction_layer_1/prediction_layer/kernel": "Logits/Conv2d_1c_1x1/weights",
-                "branch_block/prediction_layer_1/prediction_layer/bias": "Logits/Conv2d_1c_1x1/biases",
-                "branch_block/prediction_layer_2/prediction_layer/kernel": "Logits/Conv2d_1c_1x1/weights",
-                "branch_block/prediction_layer_2/prediction_layer/bias": "Logits/Conv2d_1c_1x1/biases",
+                "branch_block/prediction_layer/dense/kernel": "Logits/Conv2d_1c_1x1/weights",
+                "branch_block/prediction_layer/dense/bias": "Logits/Conv2d_1c_1x1/biases",
+                "branch_block/prediction_layer_1/dense_1/kernel": "Logits/Conv2d_1c_1x1/weights",
+                "branch_block/prediction_layer_1/dense_1/bias": "Logits/Conv2d_1c_1x1/biases",
+                "branch_block/prediction_layer_2/dense_2/kernel": "Logits/Conv2d_1c_1x1/weights",
+                "branch_block/prediction_layer_2/dense_2/bias": "Logits/Conv2d_1c_1x1/biases",
             }
         else:
             var_maps_ext = {
-                "branch_block/prediction_layer/prediction_layer/kernel": "Logits/Conv2d_1c_1x1-0/weights",
-                "branch_block/prediction_layer/prediction_layer/bias": "Logits/Conv2d_1c_1x1-0/biases",
-                "branch_block/prediction_layer_1/prediction_layer/kernel": "Logits/Conv2d_1c_1x1-1/weights",
-                "branch_block/prediction_layer_1/prediction_layer/bias": "Logits/Conv2d_1c_1x1-1/biases",
-                "branch_block/prediction_layer_2/prediction_layer/kernel": "Logits/Conv2d_1c_1x1-2/weights",
-                "branch_block/prediction_layer_2/prediction_layer/bias": "Logits/Conv2d_1c_1x1-2/biases",
+                "branch_block/prediction_layer/dense/kernel": "Logits/Conv2d_1c_1x1-0/weights",
+                "branch_block/prediction_layer/dense/bias": "Logits/Conv2d_1c_1x1-0/biases",
+                "branch_block/prediction_layer_1/dense_1/kernel": "Logits/Conv2d_1c_1x1-1/weights",
+                "branch_block/prediction_layer_1/dense_1/bias": "Logits/Conv2d_1c_1x1-1/biases",
+                "branch_block/prediction_layer_2/dense_2/kernel": "Logits/Conv2d_1c_1x1-2/weights",
+                "branch_block/prediction_layer_2/dense_2/bias": "Logits/Conv2d_1c_1x1-2/biases",
             }
 
         var_maps.update(var_maps_ext)
@@ -144,7 +144,8 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
 
         if pop_key:
             for key in key_to_numpy:
-                print("{} was not loaded".format(key))
+                if "RMSProp" not in key:
+                    print("{} was not loaded".format(key))
 
         return value_to_load
 

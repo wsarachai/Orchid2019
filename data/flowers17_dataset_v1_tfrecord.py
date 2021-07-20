@@ -7,7 +7,6 @@ import tensorflow as tf
 
 from nets.const_vars import IMG_SIZE_224
 from utils.wrapped_tools import wrapped_partial
-from nets import mobilenet_v2
 from data import flowers17_dataset
 
 

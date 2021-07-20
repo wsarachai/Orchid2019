@@ -351,26 +351,29 @@ class SpatialTransformerNetwork(tf.keras.layers.Layer):
 
         self.batch_grids_m = tf.keras.Model(stn_inputs, grid, name="affine_grid_generator")
 
-    def call(self, inputs, thetas):
+    def call(self, inputs, thetas, **kwargs):
+        training = kwargs.get("training", False)
         bound_err = []
 
         parameter1, b_err1 = get_parameter(self.batch_size, thetas[0], self.x_zero, self.y_zero, self.scale1)
         parameter2, b_err2 = get_parameter(self.batch_size, thetas[1], self.x_zero, self.y_zero, self.scale2)
         thetas = [parameter1, parameter2]
-        bound_err = [b_err1, b_err2]
-
-        bound_err = tf.concat(bound_err, axis=1)
-        histogram_update = tf.function(k_summary.histogram_update).get_concrete_function(
-            name="boundary_error", unit=bound_err
-        )
-        histogram_update(unit=bound_err)
 
         h_trans = [inputs]
 
-        image_update_1_0 = tf.function(k_summary.image_update).get_concrete_function(
-            name="stn/image/1.0", unit=inputs, max_outputs=3
-        )
-        image_update_1_0(unit=inputs)
+        if training and self.trainable:
+            bound_err = [b_err1, b_err2]
+
+            bound_err = tf.concat(bound_err, axis=1)
+            histogram_update = tf.function(k_summary.histogram_update).get_concrete_function(
+                name="boundary_error", unit=bound_err
+            )
+            histogram_update(unit=bound_err)
+
+            image_update_1_0 = tf.function(k_summary.image_update).get_concrete_function(
+                name="stn/image/1.0", unit=inputs, max_outputs=3
+            )
+            image_update_1_0(unit=inputs)
 
         for i in range(2):
             _theta = tf.squeeze(thetas[i], axis=1)
@@ -381,11 +384,12 @@ class SpatialTransformerNetwork(tf.keras.layers.Layer):
             y_s = batch_grids[:, 1, :, :]
 
             out_fmap = bilinear_sampler(inputs, x_s, y_s)
-            image_update_s = tf.function(k_summary.image_update).get_concrete_function(
-                name="stn/image/{}".format(self.scales[i]), unit=out_fmap, max_outputs=3
-            )
-            image_update_s(unit=out_fmap)
-
             h_trans.append(out_fmap)
+
+            if training and self.trainable:
+                image_update_s = tf.function(k_summary.image_update).get_concrete_function(
+                    name="stn/image/{}".format(self.scales[i]), unit=out_fmap, max_outputs=3
+                )
+                image_update_s(unit=out_fmap)
 
         return h_trans, bound_err

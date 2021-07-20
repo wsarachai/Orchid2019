@@ -20,8 +20,6 @@ def main(unused_argv):
 
     # tf.config.run_functions_eagerly(True)
 
-    create_model_graph = False
-
     workspace_path = os.environ["WORKSPACE"] if "WORKSPACE" in os.environ else "/Users/watcharinsarachai/Documents/"
     create_model = nets_mapping[FLAGS.model]
 
@@ -61,15 +59,6 @@ def main(unused_argv):
 
     callback = tf.keras.callbacks.LearningRateScheduler(scheduler)
 
-    if create_model_graph:
-        log_dir = os.path.join(training_dir, "graph", const.TRAIN_TEMPLATE.format(FLAGS.train_step))
-        tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
-        model.compile(metrics=["accuracy"])
-
-        model.fit(
-            train_ds, initial_epoch=0, epochs=1, callbacks=[callback, tensorboard_callback],
-        )
-
     log_dir = os.path.join(training_dir, "logs", const.TRAIN_TEMPLATE.format(FLAGS.train_step))
 
     train_model = TrainClassifier(
@@ -78,6 +67,7 @@ def main(unused_argv):
         summary_path=log_dir,
         epoches=FLAGS.total_epochs,
         data_handler_steps=train_ds,
+        test_ds=test_ds,
         callbacks=[callback],
         hparams={
             "model": FLAGS.model,
@@ -95,9 +85,6 @@ def main(unused_argv):
     train_model.fit(
         initial_epoch=epoch, bash=FLAGS.bash, save_best_only=FLAGS.save_best_only,
     )
-
-    print("\nTest accuracy: ")
-    train_model.evaluate(datasets=test_ds)
 
     # if FLAGS.save_model and model:
     #     model.save(training_dir)

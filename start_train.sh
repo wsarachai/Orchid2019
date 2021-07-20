@@ -6,9 +6,9 @@ script="${TRAIN_DIR}/train.py"
 
 readonly connections=(       
     '1|32|100|0.001'
-    '2|4|100|0.001'
-    '3|4|100|0.001'
-    '4|4|100|0.001'
+    '2|4|15|0.001'
+    '3|4|15|0.001'
+    '4|4|12|0.001'
 )
 
 function training_model(){

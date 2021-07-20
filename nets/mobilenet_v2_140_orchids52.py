@@ -408,7 +408,7 @@ def create_orchid_mobilenet_v2_15(
 
         stn_denses = [stn_dense1, stn_dense2]
 
-        stn_logits = stn_base_model(processed_inputs)
+        stn_logits = stn_base_model(processed_inputs, training=training)
         stn_logits1 = stn_dense1(stn_logits)
         stn_logits2 = stn_dense2(stn_logits)
 
@@ -416,7 +416,7 @@ def create_orchid_mobilenet_v2_15(
             batch_size=batch_size, width=default_image_size, height=default_image_size, scales=scales
         )
 
-        stn_outputs, bound_err = stn_layer(processed_inputs, thetas=[stn_logits1, stn_logits2])
+        stn_outputs, bound_err = stn_layer(processed_inputs, thetas=[stn_logits1, stn_logits2], training=training)
 
         if training:
             bound_std = tf.constant(np.full(bound_err.shape, 0.00, dtype=np.float32), name="bound_std_zero")
@@ -425,13 +425,13 @@ def create_orchid_mobilenet_v2_15(
         branches_block = BranchBlock(num_classes=num_classes, batch_size=batch_size)
         branches_prediction_models = branches_block.branches_prediction_models
 
-        logits = branches_block(stn_outputs)
+        logits = branches_block(stn_outputs, training=training)
 
         if train_step == TRAIN_STEP2 or train_step == TRAIN_STEP3:
             outputs = tf.reduce_mean(logits, axis=0)
         else:
             estimate_block = EstimationBlock(num_classes=num_classes, batch_size=batch_size)
-            outputs = estimate_block(logits)
+            outputs = estimate_block(logits, training=training)
 
         if activation == "softmax":
             outputs = tf.keras.activations.softmax(outputs)
