@@ -32,7 +32,7 @@ def main(unused_argv):
     )
 
     model.checkpoint_dir = checkpoint_dir
-    model.load_model_step4()
+    model.load_model_variables()
 
     model.summary()
 

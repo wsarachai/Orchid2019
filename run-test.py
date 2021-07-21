@@ -30,16 +30,20 @@ def main(unused_argv):
 
     info = DisplayInfo(datasets.size)
 
+    @tf.function
+    def process_step(model, inputs):
+        return model(inputs)
+
     count = 0
     for inputs, label in datasets:
-        result = model.model(inputs).numpy()
+        result = process_step(model.model, inputs).numpy()
         count = count + 1
         info.display_info(result, label, count)
 
     info.display_summary()
 
     checkpoint_dir = os.path.join(workspace_path, "_trained_models", "orchids2019", FLAGS.model)
-    model.save(checkpoint_dir + ".h5")
+    # model.save(checkpoint_dir + ".h5")
 
 
 if __name__ == "__main__":

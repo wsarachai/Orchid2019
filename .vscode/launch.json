@@ -162,7 +162,7 @@
       "program": "test_model.py",
       "console": "integratedTerminal",
       "args": [
-        "--train_step=4",
+        "--train_step=5",
         "--dataset_format=files",
         "--dataset=orchids52_data",
         "--dataset_version=v1",
