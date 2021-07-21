@@ -87,7 +87,7 @@ class TrainClassifier:
     def fit(self, initial_epoch, **kwargs):
         target = self.data_handler_steps.size // self.batch_size
         is_run_from_bash = kwargs.pop("bash") if "bash" in kwargs else False
-        # save_best_only = kwargs.pop("save_best_only") if "save_best_only" in kwargs else False
+        save_best_only = kwargs.pop("save_best_only") if "save_best_only" in kwargs else False
         finalize = False if not is_run_from_bash else True
         progbar = tf.keras.utils.Progbar(
             target,
@@ -152,9 +152,11 @@ class TrainClassifier:
 
             k_summary.end_epoch()
 
-            if best_acc < t_acc:
+            if save_best_only and best_acc < t_acc:
                 logging.info("Saving best weights...")
                 best_acc = t_acc
+                self.model.save_model_variables()
+            else:
                 self.model.save_model_variables()
 
         k_summary.session_end_pb()
