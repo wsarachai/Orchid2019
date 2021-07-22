@@ -8,8 +8,8 @@ import matplotlib.pyplot as plt
 from pickle import load
 
 from absl import logging
-from utils.lib_utils import FLAGS
-from utils.lib_utils import start
+
+from utils.start_app import FLAGS, start
 
 
 def main(unused_argv):

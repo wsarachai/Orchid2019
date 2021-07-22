@@ -4,8 +4,9 @@ from __future__ import print_function
 
 import os
 import data
-import nets
 import tensorflow as tf
+
+from nets.const_vars import IMG_SIZE_224
 from utils.wrapped_tools import wrapped_partial
 
 feature_description = {
@@ -64,7 +65,7 @@ def _load_dataset(
     decode_dataset = parsed_dataset.map(decode_example)
 
     preprocess_image = wrapped_partial(
-        data.orchids52_dataset.preprocess_image, image_size=nets.mobilenet_v2.IMG_SIZE_224
+        data.orchids52_dataset.preprocess_image, image_size=IMG_SIZE_224
     )
     decode_dataset = decode_dataset.map(preprocess_image)
     decode_dataset = decode_dataset.batch(batch_size=batch_size).cache()

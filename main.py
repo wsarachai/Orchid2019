@@ -7,7 +7,7 @@ import tensorflow as tf
 
 from data import data_utils
 from data.data_utils import dataset_mapping
-from utils.lib_utils import start
+from utils.start_app import start
 
 flags = tf.compat.v1.flags
 logging = tf.compat.v1.logging

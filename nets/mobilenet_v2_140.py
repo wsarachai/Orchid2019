@@ -166,7 +166,7 @@ class Orchids52Mobilenet140(object):
             index = checkpoint_manager.latest_checkpoint.index("ckpt-")
             step = checkpoint_manager.latest_checkpoint[index:][5:]
             step = int(step)
-        except:
+        except Exception:
             return 0
         else:
             return step

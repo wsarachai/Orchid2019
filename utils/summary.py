@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import traceback
 import tensorflow as tf
 import random
 
@@ -20,7 +21,7 @@ class KSummary(object):
         self.epoch = tf.Variable(0, trainable=False, dtype=tf.int64)
         self._current_step = tf.Variable(1, trainable=False, dtype=tf.int64)
         self.target = tf.Variable(target, trainable=False, dtype=tf.int64)
-        self.log_image_at_step = tf.Variable(random.randint(0, self.target), trainable=False, dtype=tf.int64)
+        self.log_image_at_step = tf.Variable(random.randint(0, target), trainable=False, dtype=tf.int64)
 
     def re_init(self, summary_path, target):
         self._writer = None
@@ -50,7 +51,8 @@ class KSummary(object):
             try:
                 # tf.summary.graph support only tf 2.5
                 tf.summary.graph(graph)
-            except:
+            except Exception:
+                traceback.print_exc()
                 tf.summary.trace_export(name=fn_name, step=0)
 
     def get_writer(self):

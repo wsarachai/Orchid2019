@@ -16,7 +16,7 @@ from stn import SpatialTransformerNetwork
 from nets.mobilenet_v2 import create_mobilenet_v2
 from nets.mobilenet_v2_140 import Orchids52Mobilenet140, save_h5_weights
 from utils.const import TRAIN_STEP1, TRAIN_STEP2, TRAIN_STEP3, TRAIN_STEP4, TRAIN_STEP5
-from utils.const import TRAIN_V2_STEP1, TRAIN_V2_STEP2
+from utils.const import TRAIN_V2_STEP2
 from utils.const import TRAIN_TEMPLATE
 from utils.lib_utils import get_checkpoint_file
 from nets.layers import Conv2DWrapper, DenseWrapper, PreprocessLayer, PredictionLayer
@@ -29,6 +29,36 @@ def get_dataset_keys(f):
     keys = []
     f.visit(lambda key: keys.append(key) if isinstance(f[key], h5py.Dataset) else None)
     return keys
+
+
+def load_model_from_hdf5(filepath, model, to_name=None, from_name=None, show_all_key=False):
+    file_loaded = None
+    try:
+        filepath = filepath + ".h5"
+        file_loaded = h5py.File(filepath, mode="r")
+        g = file_loaded["model_weights"]
+        if show_all_key:
+            keys = get_dataset_keys(g)
+            for v in keys:
+                print(v)
+        for var in model.weights:
+            var_name = var.name
+
+            if var_name not in g:
+                if to_name is not None and from_name is not None:
+                    var_name = var_name.replace(from_name, to_name)
+            if var_name in g:
+                weight = np.asarray(g[var_name])
+                if var.shape != weight.shape:
+                    raise Exception("Incompatible shapes")
+                var.assign(weight)
+            else:
+                logging.warning("Variable [%s] is not loaded..", var_name)
+    except TypeError as e:
+        logging.warning("Invalid filename [%s] not found with error: %s", filepath, e)
+    finally:
+        if file_loaded:
+            file_loaded.close()
 
 
 class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
@@ -158,7 +188,7 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
                     tf.io.gfile.makedirs(checkpoint_prefix)
                 save_h5_weights(checkpoint_prefix + "/stn_dense_{}".format(i), stn_dense.weights)
 
-    def set_mobilenet_training_status(self, trainable):
+    def set_mobilenet_training_status(self, trainable, **kwargs):
         super(Orchids52Mobilenet140STN, self).set_mobilenet_training_status(trainable)
         if self.branch_model:
             self.branch_model.set_trainable_for_global_branch(trainable)
@@ -190,40 +220,12 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
         elif training_step == TRAIN_V2_STEP2:
             self.set_mobilenet_training_status(True)
 
-    def load_model_from_hdf5(self, filepath, model, to_name=None, from_name=None):
-        file_loaed = False
-        try:
-            f = h5py.File(filepath + ".h5", mode="r")
-            file_loaed = True
-            g = f["model_weights"]
-            # keys = get_dataset_keys(g)
-            # for v in keys:
-            #     print(v)
-            for var in model.weights:
-                var_name = var.name
-
-                if var_name not in g:
-                    if to_name is not None and from_name is not None:
-                        var_name = var_name.replace(from_name, to_name)
-                if var_name in g:
-                    weight = np.asarray(g[var_name])
-                    if var.shape != weight.shape:
-                        raise Exception("Incompatible shapes")
-                    var.assign(weight)
-                else:
-                    logging.warning("Variabel [%s] is not loaded..", var_name)
-        except:
-            file_loaed = False
-        finally:
-            if file_loaed:
-                f.close()
-
     def load_model_step1(self):
         training_step = TRAIN_TEMPLATE.format(1)
         checkpoint_dir = os.path.join(self.checkpoint_dir, training_step)
         latest_checkpoint = tf.train.latest_checkpoint(checkpoint_dir=checkpoint_dir)
 
-        self.load_model_from_hdf5(latest_checkpoint, self.mobilenet)
+        load_model_from_hdf5(latest_checkpoint, self.mobilenet)
 
         _prediction_layer_prefix = ""
         predict_layers_path = os.path.join(self.checkpoint_dir, "predict_layers")
@@ -240,8 +242,11 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
                 else "branch_block/prediction_layer_{}/dense_{}".format(idx, idx)
             )
 
-            self.load_model_from_hdf5(
-                prediction_layer_prefix, predict_layer, from_name=from_name, to_name="prediction_layer/dense",
+            load_model_from_hdf5(
+                prediction_layer_prefix,
+                predict_layer,
+                from_name=from_name,
+                to_name="prediction_layer/dense",
             )
             _prediction_layer_prefix = prediction_layer_prefix
 
@@ -252,13 +257,13 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
         checkpoint_dir = os.path.join(self.checkpoint_dir, training_step)
         latest_checkpoint = tf.train.latest_checkpoint(checkpoint_dir=checkpoint_dir)
 
-        self.load_model_from_hdf5(
+        load_model_from_hdf5(
             latest_checkpoint,
             self.branch_model.global_branch_model,
             to_name="mobilenetv2_stn_base_1.40_224_",
             from_name="mobilenetv2_global_branch_1.40_224_",
         )
-        self.load_model_from_hdf5(
+        load_model_from_hdf5(
             latest_checkpoint,
             self.branch_model.shared_branch_model,
             to_name="mobilenetv2_stn_base_1.40_224_",
@@ -269,14 +274,14 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
             for i, stn_dense in enumerate(self.stn_denses):
                 checkpoint_prefix = os.path.join(self.checkpoint_dir, "stn_dense_layer")
                 if tf.io.gfile.exists(checkpoint_prefix):
-                    self.load_model_from_hdf5(checkpoint_prefix + "/stn_dense_{}".format(i), stn_dense)
+                    load_model_from_hdf5(checkpoint_prefix + "/stn_dense_{}".format(i), stn_dense)
 
     def load_model_step3(self):
         training_step = TRAIN_TEMPLATE.format(2)
         checkpoint_dir = os.path.join(self.checkpoint_dir, training_step)
         latest_checkpoint = tf.train.latest_checkpoint(checkpoint_dir=checkpoint_dir)
 
-        self.load_model_from_hdf5(latest_checkpoint, self.model)
+        load_model_from_hdf5(latest_checkpoint, self.model)
 
     def load_model_step4(self):
         training_step = TRAIN_TEMPLATE.format(self.step)
@@ -287,7 +292,7 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
 
         latest_checkpoint = tf.train.latest_checkpoint(checkpoint_dir=checkpoint_dir)
 
-        self.load_model_from_hdf5(latest_checkpoint, self.model)
+        load_model_from_hdf5(latest_checkpoint, self.model)
 
     def load_model_step5(self):
         training_step = TRAIN_TEMPLATE.format(self.step)
@@ -298,7 +303,7 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
 
         latest_checkpoint = tf.train.latest_checkpoint(checkpoint_dir=checkpoint_dir)
 
-        self.load_model_from_hdf5(latest_checkpoint, self.model)
+        load_model_from_hdf5(latest_checkpoint, self.model)
 
     def load_model_variables(self):
         training_step = TRAIN_TEMPLATE.format(self.step)
@@ -327,29 +332,34 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
                     status = checkpoint.restore(checkpoint_manager.latest_checkpoint)
                     status.assert_existing_objects_matched()
                     result = True
-                except:
-                    pass
+                except Exception:
+                    logging.info("Can't load checkpoint: %s", checkpoint_manager.latest_checkpoint)
+                    logging.info("Continue load from load format file...")
             else:
                 load_from_old_format = True
 
         if training_step == TRAIN_STEP1 and load_from_old_format:
             latest_checkpoint = kwargs.pop("checkpoint_dir")
             if latest_checkpoint:
+                var_loaded = None
                 if self.training:
-                    var_loaded = Orchids52Mobilenet140.load_from_v1(
-                        self,
-                        latest_checkpoint=latest_checkpoint,
-                        target_model="mobilenetv2_stn_base_1.40_224_",
-                        model_name="MobilenetV2",
-                        include_prediction_layer=True,
-                    )
+                    try:
+                        var_loaded = Orchids52Mobilenet140.load_from_v1(
+                            self,
+                            latest_checkpoint=latest_checkpoint,
+                            target_model="mobilenetv2_stn_base_1.40_224_",
+                            model_name="MobilenetV2",
+                            include_prediction_layer=True,
+                        )
+                    except Exception:
+                        logging.info("Can't load checkpoint: %s", latest_checkpoint)
+                        logging.info("Continue load from load format file...")
                 else:
                     var_loaded = self.load_from_v1(latest_checkpoint, **kwargs)
 
-                result = load_weight(var_loaded, self.model.weights)
+                if var_loaded:
+                    result = load_weight(var_loaded, self.model.weights)
 
-            else:
-                result = False
         return result
 
 
@@ -449,7 +459,7 @@ def create_orchid_mobilenet_v2_15(
             outputs = tf.keras.activations.softmax(outputs)
 
     else:
-        prediction_layer = PredictionLayer(num_classes=num_classes, activation="softmax", name=step)
+        prediction_layer = PredictionLayer(num_classes=num_classes, activation="softmax")
         branches_prediction_models.append(prediction_layer)
         mobilenet_logits = stn_base_model(processed_inputs, training=training)
         outputs = prediction_layer(mobilenet_logits, training=training)

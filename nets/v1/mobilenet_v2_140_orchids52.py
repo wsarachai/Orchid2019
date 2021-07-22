@@ -6,7 +6,6 @@ import os
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
-import nets
 
 from nets.const_vars import default_image_size, IMG_SHAPE_224
 from nets.core_functions import load_orchids52_weight_from_old_checkpoint
@@ -16,7 +15,7 @@ from tensorflow.python.keras import initializers
 from tensorflow.python.keras import activations
 from nets.mobilenet_v2 import create_mobilenet_v2
 from nets.v1.mobilenet_v2_140 import Orchids52Mobilenet140
-from utils.const import TRAIN_STEP1, TRAIN_STEP2, TRAIN_STEP3, TRAIN_STEP4
+from utils.const import TRAIN_STEP1, TRAIN_STEP2, TRAIN_STEP3, TRAIN_STEP4, TRAIN_TEMPLATE
 from utils.const import TRAIN_V2_STEP1, TRAIN_V2_STEP2
 
 
@@ -193,7 +192,7 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
         assert self.checkpoint_path is not None
 
         checkpoint, _ = self.checkpoint
-        checkpoint_prefix = os.path.join(self.checkpoint_path, nets.utils.TRAIN_TEMPLATE.format(step=3))
+        checkpoint_prefix = os.path.join(self.checkpoint_path, TRAIN_TEMPLATE.format(step=3))
         checkpoint_manager = tf.train.CheckpointManager(
             checkpoint, directory=checkpoint_prefix, max_to_keep=self.max_to_keep
         )
@@ -230,9 +229,9 @@ class BranchBlock(keras.layers.Layer):
             input_shape=IMG_SHAPE_224, alpha=1.4, include_top=False, weights="imagenet", sub_name="shared_branch"
         )
         self.branches_prediction_models = [
-            PredictionLayer(num_classes=num_classes, name=""),
-            PredictionLayer(num_classes=num_classes, name=""),
-            PredictionLayer(num_classes=num_classes, name=""),
+            PredictionLayer(num_classes=num_classes),
+            PredictionLayer(num_classes=num_classes),
+            PredictionLayer(num_classes=num_classes),
         ]
 
     def call(self, inputs, **kwargs):
@@ -350,7 +349,7 @@ def create_orchid_mobilenet_v2_15(
     num_classes, optimizer=None, loss_fn=None, training=False, drop_out_prop=0.8, **kwargs
 ):
     stn_denses = None
-    branch_base_model = None
+    branches_block = None
     boundary_loss = None
     estimate_block = None
     branches_prediction_models = []
@@ -444,7 +443,7 @@ def create_orchid_mobilenet_v2_15(
             outputs = estimate_block(logits)
 
     else:
-        prediction_layer = PredictionLayer(num_classes=num_classes, activation="softmax")
+        prediction_layer = PredictionLayer(num_classes=num_classes, activation="softmax", name="")
         branches_prediction_models.append(prediction_layer)
         mobilenet_logits = stn_base_model(processed_inputs, training=training)
         outputs = prediction_layer(mobilenet_logits, training=training)

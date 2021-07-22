@@ -41,6 +41,13 @@ def decode_example(serialize_example):
     return image, label_values
 
 
+def decode_example_one_hot(serialize_example):
+    image = serialize_example["image/encoded"]
+    image = tf.image.decode_jpeg(image, channels=3)
+    label_values = get_label_one_hot(serialize_example)
+    return image, label_values
+
+
 def parse_function(example_proto):
     return tf.io.parse_single_example(example_proto, feature_description)
 
@@ -48,6 +55,7 @@ def parse_function(example_proto):
 def _load_dataset(
     split, root_path, batch_size, train_size, test_size, repeat=False, num_readers=1, num_map_threads=1, **kwargs
 ):
+    one_hot = kwargs.get("one_hot", False)
     pattern = "orchids52_{split}*.tfrecord".format(split=split)
     pattern = os.path.join(root_path, pattern)
     dataset = tf.data.Dataset.list_files(file_pattern=pattern)
@@ -58,7 +66,11 @@ def _load_dataset(
         deterministic=False,
     )
     parsed_dataset = dataset.map(parse_function, num_parallel_calls=num_map_threads)
-    decode_dataset = parsed_dataset.map(decode_example)
+
+    if one_hot:
+        decode_dataset = parsed_dataset.map(decode_example_one_hot)
+    else:
+        decode_dataset = parsed_dataset.map(decode_example)
 
     preprocess_image = wrapped_partial(orchids52_dataset.preprocess_image, image_size=IMG_SIZE_224)
     decode_dataset = decode_dataset.map(preprocess_image)
@@ -83,6 +95,7 @@ def _load_dataset(
 
 
 get_label = wrapped_partial(_get_label, depth=orchids52_dataset.NUM_OF_CLASSES)
+get_label_one_hot = wrapped_partial(_get_label, depth=orchids52_dataset.NUM_OF_CLASSES, one_hot=True)
 
 load_dataset_v1 = wrapped_partial(
     _load_dataset, train_size=orchids52_dataset.TRAIN_SIZE_V1, test_size=orchids52_dataset.TEST_SIZE_V1

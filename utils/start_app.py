@@ -55,7 +55,8 @@ flags.DEFINE_string(
 
 flags.DEFINE_string(
     "trained_dir",
-    "/home/keng/Documents/_trained_models/model-v1/mobilenet_v2_140_orchids52_0001/pretrain2/model.ckpt-12000",
+    None,
+    #"/home/keng/Documents/_trained_models/model-v1/mobilenet_v2_140_orchids52_0001/pretrain2/model.ckpt-12000",
     "Checkpoint Path",
 )
 

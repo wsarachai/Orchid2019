@@ -119,6 +119,7 @@ class DisplayInfo(object):
         self.total_images = total_images
 
     def display_info(self, result, label, count):
+        predict_string = ""
         predict = np.argmax(result, axis=1)[0]
         confident = result[0][predict]
         try:
@@ -127,12 +128,12 @@ class DisplayInfo(object):
                 label = "n{:04d}".format(label)
             if predict_string == label:
                 self.corrected += 1
-        except:
+        except Exception:
             try:
                 label = np.argmax(label, axis=1)[0]
                 if predict == label:
                     self.corrected += 1
-            except:
+            except Exception:
                 if predict == label:
                     self.corrected += 1
 

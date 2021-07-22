@@ -23,7 +23,7 @@ def main(unused_argv):
     workspace_path = os.environ["WORKSPACE"] if "WORKSPACE" in os.environ else "/Users/watcharinsarachai/Documents/"
     create_model = nets_mapping[FLAGS.model]
 
-    trained_weights_dir = os.path.join(workspace_path, FLAGS.trained_dir)
+    trained_weights_dir = None if FLAGS.trained_dir is None else os.path.join(workspace_path, FLAGS.trained_dir)
     training_dir = os.path.join(workspace_path, "_trained_models", "orchids2019", FLAGS.model)
     if not tf.io.gfile.exists(training_dir):
         os.makedirs(training_dir)

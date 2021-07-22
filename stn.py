@@ -351,7 +351,8 @@ class SpatialTransformerNetwork(tf.keras.layers.Layer):
 
         self.batch_grids_m = tf.keras.Model(stn_inputs, grid, name="affine_grid_generator")
 
-    def call(self, inputs, thetas, **kwargs):
+    def call(self, inputs, **kwargs):
+        thetas = kwargs.get("thetas", None)
         training = kwargs.get("training", False)
         bound_err = []
 

@@ -13,8 +13,9 @@ from tensorflow.python.keras import activations
 
 
 class PreprocessLayer(keras.layers.Layer):
-    def __init__(self):
+    def __init__(self, fast=True):
         super(PreprocessLayer, self).__init__()
+        self.fast = fast
 
     def call(self, inputs, **kwargs):
         training = kwargs.get("training", False)
@@ -30,30 +31,31 @@ class PreprocessLayer(keras.layers.Layer):
                 default=lambda: inputs,
             )
 
-            sel = tf.random.uniform([], maxval=5, dtype=tf.int32)
-            inputs = tf.switch_case(
-                sel,
-                branch_fns={
-                    0: lambda: tf.image.random_brightness(inputs, max_delta=0.2),
-                    1: lambda: tf.image.random_saturation(inputs, lower=1, upper=5),
-                    2: lambda: tf.image.random_contrast(inputs, lower=0.2, upper=0.5),
-                    3: lambda: tf.image.random_hue(inputs, max_delta=0.2),
-                },
-                default=lambda: inputs,
-            )
+            if not self.fast:
+                sel = tf.random.uniform([], maxval=5, dtype=tf.int32)
+                inputs = tf.switch_case(
+                    sel,
+                    branch_fns={
+                        0: lambda: tf.image.random_brightness(inputs, max_delta=0.2),
+                        1: lambda: tf.image.random_saturation(inputs, lower=1, upper=5),
+                        2: lambda: tf.image.random_contrast(inputs, lower=0.2, upper=0.5),
+                        3: lambda: tf.image.random_hue(inputs, max_delta=0.2),
+                    },
+                    default=lambda: inputs,
+                )
         return inputs
 
 
 class PredictionLayer(keras.layers.Layer):
-    def __init__(self, num_classes, name, activation=None, stddev=0.09, dropout_ratio=0.2, weight_decay=0.00004):
+    def __init__(self, num_classes, activation=None, stddev=0.09, dropout_ratio=0.2):
         super(PredictionLayer, self).__init__()
-        self.layer_name = name
         self.global_average_pooling = tf.keras.layers.GlobalAveragePooling2D()
         self.dropout = keras.layers.Dropout(dropout_ratio)
+
         self.dense = keras.layers.Dense(
             num_classes,
             kernel_initializer=tf.keras.initializers.TruncatedNormal(mean=0.0, stddev=stddev),
-            kernel_regularizer=tf.keras.regularizers.L2(weight_decay),
+            kernel_regularizer=None,
         )
         self.prediction_fn = activations.get(activation)
 
@@ -87,9 +89,9 @@ class BranchBlock(keras.layers.Layer):
             input_shape=IMG_SHAPE_224, alpha=1.4, include_top=False, weights="imagenet", sub_name="shared_branch"
         )
         self.branches_prediction_models = [
-            PredictionLayer(num_classes=num_classes, name="BranchBlock-global"),
-            PredictionLayer(num_classes=num_classes, name="BranchBlock-1"),
-            PredictionLayer(num_classes=num_classes, name="BranchBlock-2"),
+            PredictionLayer(num_classes=num_classes),
+            PredictionLayer(num_classes=num_classes),
+            PredictionLayer(num_classes=num_classes),
         ]
 
     def call(self, inputs, **kwargs):
@@ -182,7 +184,7 @@ class FullyConnectedLayer(tf.keras.layers.Layer):
             "kernel", shape=[int(input_shape[-1]), self.num_outputs], initializer=self.kernel_initializer
         )
 
-    def call(self, inputs):
+    def call(self, inputs, **kwargs):
         if self.trainable:
             k_summary.histogram_update("kernel", self.kernel)
 

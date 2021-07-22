@@ -11,7 +11,7 @@ from tensorflow.python.keras.utils import data_utils
 from tensorflow.python.keras.utils import layer_utils
 from tensorflow.python.keras.applications import imagenet_utils
 
-from nets.const_vars import regularizers_l2, BASE_WEIGHT_PATH, IMG_SHAPE_224
+from nets.const_vars import REGULARIZER_L2, BASE_WEIGHT_PATH, IMG_SHAPE_224
 from nets.v1.mobilenet_v2_140 import Orchids52Mobilenet140 as Orchids52Mobilenet140_V1
 from nets.mobilenet_v2_140 import Orchids52Mobilenet140 as Orchids52Mobilenet140_V2
 
@@ -39,7 +39,7 @@ def _inverted_res_block(name, inputs, expansion, stride, alpha, filters, block_i
             padding="same",
             use_bias=False,
             activation=None,
-            kernel_regularizer=tf.keras.regularizers.l2(regularizers_l2),
+            kernel_regularizer=tf.keras.regularizers.l2(REGULARIZER_L2),
             name=prefix + "expand",
         )(x)
         x = keras.layers.BatchNormalization(
@@ -76,7 +76,7 @@ def _inverted_res_block(name, inputs, expansion, stride, alpha, filters, block_i
         padding="same",
         use_bias=False,
         activation=None,
-        kernel_regularizer=tf.keras.regularizers.l2(regularizers_l2),
+        kernel_regularizer=tf.keras.regularizers.l2(REGULARIZER_L2),
         name=prefix + "project",
     )(x)
     x = keras.layers.BatchNormalization(axis=channel_axis, epsilon=1e-3, momentum=0.999, name=prefix + "project_BN")(x)
@@ -250,7 +250,7 @@ def create_mobilenet_v2(
         strides=(2, 2),
         padding="valid",
         use_bias=False,
-        kernel_regularizer=tf.keras.regularizers.l2(regularizers_l2),
+        kernel_regularizer=tf.keras.regularizers.l2(REGULARIZER_L2),
         name="%s_Conv1" % model_name,
     )(x)
     x = keras.layers.BatchNormalization(
@@ -341,11 +341,11 @@ def create_mobilenet_v2_14(ver, num_classes, optimizer=None, loss_fn=None, train
 
     inputs = keras.Input(shape=IMG_SHAPE_224)
     preprocess_layer = PreprocessLayer()
-    mobilenet = create_mobilenet_v2(input_shape=IMG_SHAPE_224, alpha=1.4, include_top=False, weights=None)
+    mobilenet = create_mobilenet_v2(input_shape=IMG_SHAPE_224, alpha=1.4, include_top=False)
     processed_inputs = preprocess_layer(inputs, training=training)
     mobilenet_logits = mobilenet(processed_inputs, training=training)
 
-    prediction_layer = PredictionLayer(num_classes=num_classes, name="final-prediction")
+    prediction_layer = PredictionLayer(num_classes=num_classes)
     outputs = prediction_layer(mobilenet_logits, training=training)
 
     if ver == 1:

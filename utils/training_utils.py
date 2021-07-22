@@ -86,6 +86,7 @@ class TrainClassifier:
 
     def fit(self, initial_epoch, **kwargs):
         target = self.data_handler_steps.size // self.batch_size
+        fine_grain_step = max(0, (initial_epoch-1)) * target
         is_run_from_bash = kwargs.pop("bash") if "bash" in kwargs else False
         save_best_only = kwargs.pop("save_best_only") if "save_best_only" in kwargs else False
         finalize = False if not is_run_from_bash else True
@@ -116,7 +117,8 @@ class TrainClassifier:
 
             for inputs, labels in self.data_handler_steps:
                 if inputs.shape.as_list()[0] == self.batch_size:
-                    if first_graph_writing and epoch == 1:
+                    tfv = tf.version.VERSION.split(".")
+                    if first_graph_writing and epoch == 1 and (tfv[0] == 2 and tfv[1] == 4):
                         k_summary.trace_on(graph=True)
                     logs = self.train_step(inputs, labels)
                     logs = copy.copy(logs) if logs else {}
@@ -130,6 +132,9 @@ class TrainClassifier:
                     )
                     first_graph_writing = False
 
+                accuracy = self.accuracy_metric.result().numpy()
+                k_summary.scalar_update("accuracy/fine_grain", accuracy, fine_grain_step)
+                fine_grain_step += 1
                 k_summary.end_step()
 
             print("\n")
@@ -141,14 +146,14 @@ class TrainClassifier:
             total_loss = self.total_loss_metric.result().numpy()
             accuracy = self.accuracy_metric.result().numpy()
 
-            k_summary.scalar_update("scalar/train_loss", train_loss, epoch)
-            k_summary.scalar_update("scalar/regularization_loss", regularization_loss, epoch)
-            k_summary.scalar_update("scalar/boundary_loss", boundary_loss, epoch)
-            k_summary.scalar_update("scalar/total_loss", total_loss, epoch)
+            k_summary.scalar_update("accuracy/accuracy", accuracy, epoch)
+            k_summary.scalar_update("accuracy/validation", t_acc, epoch)
+            k_summary.scalar_update("loss/train_loss", train_loss, epoch)
+            k_summary.scalar_update("loss/regularization_loss", regularization_loss, epoch)
+            k_summary.scalar_update("loss/boundary_loss", boundary_loss, epoch)
+            k_summary.scalar_update("loss/total_loss", total_loss, epoch)
+            k_summary.scalar_update("loss/validation/loss", t_loss, epoch)
             k_summary.scalar_update("scalar/learning_rate", self.model.optimizer.lr, epoch)
-            k_summary.scalar_update("scalar/accuracy", accuracy, epoch)
-            k_summary.scalar_update("scalar/validation", t_acc, epoch)
-            k_summary.scalar_update("scalar/loss", t_loss, epoch)
 
             k_summary.end_epoch()
 
@@ -177,6 +182,6 @@ class TrainClassifier:
                 seen += num_steps
                 progbar.update(seen, list(logs.items()), finalize=finalize)
         logs = copy.copy(logs) if logs else {}
-        print("loss: {:.3f}, accuracy: {:.3f}\n".format(logs["loss"], logs["accuracy"]))
+        print("\nloss: {:.3f}, accuracy: {:.3f}".format(logs["loss"], logs["accuracy"]))
 
         return logs["accuracy"], logs["loss"]

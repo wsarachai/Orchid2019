@@ -10,9 +10,9 @@ import numpy as np
 from datetime import datetime
 from data import data_utils, orchids52_dataset
 from data.orchids52_dataset_file import get_label
-from utils.lib_utils import start
-from utils.lib_utils import wrapped_partial
-from nets import mobilenet_v2
+from nets.const_vars import IMG_SIZE_224
+from utils.start_app import start
+from utils.wrapped_tools import wrapped_partial
 
 ORCHIDS52_DATA_V1 = "data-v1"
 ORCHIDS52_DATA_V2 = "data-v2"
@@ -149,7 +149,7 @@ def _create_dataset(images_dir, output_directory, image_size):
         _write_tf_file(tf_file=os.path.join(output_directory, "orchids52-validate.tfrecord"), ds=validate_ds)
 
 
-create_dataset = wrapped_partial(_create_dataset, image_size=mobilenet_v2.IMG_SIZE_224)
+create_dataset = wrapped_partial(_create_dataset, image_size=IMG_SIZE_224)
 
 
 def main(unused_argv):
