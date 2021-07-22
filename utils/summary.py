@@ -6,6 +6,7 @@ import traceback
 import tensorflow as tf
 import random
 
+from absl import logging
 from tensorboard.plugins.hparams import api_pb2
 from tensorboard.plugins.hparams import summary
 from tensorboard.plugins.hparams import summary_v2
@@ -53,6 +54,9 @@ class KSummary(object):
                 tf.summary.graph(graph)
             except Exception:
                 traceback.print_exc()
+                logging.warning(
+                    "tf.summary.graph(...) is not support on tensorflow version < 2.5, try using tf.summary.trace_export(...) instead..."
+                )
                 tf.summary.trace_export(name=fn_name, step=0)
 
     def get_writer(self):
