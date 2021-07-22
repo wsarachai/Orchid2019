@@ -197,10 +197,10 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
             self.branch_model.set_trainable_for_global_branch(trainable, **kwargs)
             self.branch_model.set_trainable_for_share_branch(trainable, **kwargs)
 
-    def config_layers(self, **kwargs):
+    def config_layers(self, fine_tune, **kwargs):
         training_step = TRAIN_TEMPLATE.format(self.step)
         if training_step == TRAIN_STEP1:
-            self.set_mobilenet_training_status(False, **kwargs)
+            self.set_mobilenet_training_status(fine_tune, **kwargs)
         elif training_step == TRAIN_STEP2:
             self.set_mobilenet_training_status(False, **kwargs)
             self.set_prediction_training_status(False, **kwargs)
@@ -215,7 +215,7 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
             for stn_dense in self.stn_denses:
                 stn_dense.trainable = False
         elif training_step == TRAIN_STEP5:
-            self.set_mobilenet_training_status(True)
+            self.set_mobilenet_training_status(fine_tune, **kwargs)
             self.set_prediction_training_status(True, **kwargs)
             self.estimate_block.trainable = True
             for stn_dense in self.stn_denses:

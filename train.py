@@ -55,7 +55,9 @@ def main(unused_argv):
         checkpoint_dir=_checkpoint_dir, training_for_tf25=True, pop_key=False, training_step=FLAGS.train_step,
     )
 
-    model.config_layers(fine_tune_at=FLAGS.fine_tune_at)
+    model.config_layers(
+        fine_tune=FLAGS.fine_tune, fine_tune_at=FLAGS.fine_tune_at
+    )
     for var in model.trainable_variables:
         logging.info("trainable variable: %s", var.name)
 
