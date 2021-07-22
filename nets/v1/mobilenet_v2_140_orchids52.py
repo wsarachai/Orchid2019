@@ -156,27 +156,27 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
                 _, stn_dense_checkpoint_manager = checkpoint
                 stn_dense_checkpoint_manager.save()
 
-    def set_mobilenet_training_status(self, trainable):
-        super(Orchids52Mobilenet140STN, self).set_mobilenet_training_status(trainable)
+    def set_mobilenet_training_status(self, trainable, **kwargs):
+        super(Orchids52Mobilenet140STN, self).set_mobilenet_training_status(trainable, **kwargs)
         if self.branch_model:
-            self.branch_model.set_trainable_for_global_branch(trainable)
-            self.branch_model.set_trainable_for_share_branch(trainable)
+            self.branch_model.set_trainable_for_global_branch(trainable, **kwargs)
+            self.branch_model.set_trainable_for_share_branch(trainable, **kwargs)
 
-    def config_layers(self):
+    def config_layers(self, **kwargs):
         if self.step == TRAIN_STEP1:
-            self.set_mobilenet_training_status(False)
+            self.set_mobilenet_training_status(False, **kwargs)
         elif self.step == TRAIN_STEP2:
-            self.set_mobilenet_training_status(False)
-            self.set_prediction_training_status(False)
+            self.set_mobilenet_training_status(False, **kwargs)
+            self.set_prediction_training_status(False, **kwargs)
         elif self.step == TRAIN_STEP3:
-            self.set_mobilenet_training_status(False)
-            self.set_prediction_training_status(False)
+            self.set_mobilenet_training_status(False, **kwargs)
+            self.set_prediction_training_status(False, **kwargs)
             for stn_dense in self.stn_denses:
                 stn_dense.trainable = False
         elif self.step == TRAIN_V2_STEP1:
-            self.set_mobilenet_training_status(False)
+            self.set_mobilenet_training_status(False, **kwargs)
         elif self.step == TRAIN_V2_STEP2:
-            self.set_mobilenet_training_status(True)
+            self.set_mobilenet_training_status(True, **kwargs)
 
     def load_model_step2(self, **kwargs):
         self.load_model_step1()

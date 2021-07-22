@@ -13,6 +13,7 @@ from utils.lib_utils import config_loss
 from utils.start_app import FLAGS, start
 from utils.training_utils import TrainClassifier
 from utils import const
+from nets import const_vars
 
 
 def main(unused_argv):
@@ -51,8 +52,13 @@ def main(unused_argv):
     model.config_checkpoint(training_dir)
     _checkpoint_dir = training_dir if FLAGS.train_step > 1 else trained_weights_dir
     epoch = model.restore_model_variables(
-        checkpoint_dir=_checkpoint_dir, training_for_tf25=True, pop_key=False, training_step=FLAGS.train_step
+        checkpoint_dir=_checkpoint_dir, training_for_tf25=True, pop_key=False, training_step=FLAGS.train_step,
     )
+
+    model.config_layers(fine_tune_at=FLAGS.fine_tune_at)
+    for var in model.trainable_variables:
+        logging.info("trainable variable: %s", var.name)
+
     model.summary()
 
     def scheduler(epochs, _):
@@ -87,9 +93,7 @@ def main(unused_argv):
     )
 
     train_model.fit(
-        initial_epoch=epoch,
-        bash=FLAGS.bash,
-        save_best_only=FLAGS.save_best_only,
+        initial_epoch=epoch, bash=FLAGS.bash, save_best_only=FLAGS.save_best_only,
     )
 
     # if FLAGS.save_model and model:

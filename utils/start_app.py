@@ -19,6 +19,8 @@ flags.DEFINE_integer("batch_size", 32, "Batch size")
 
 flags.DEFINE_integer("train_step", 1, "Training step")
 
+flags.DEFINE_integer("fine_tune_at", 100, "The starting number of model layer that will be trained.")
+
 flags.DEFINE_float("learning_rate", 0.001, "Learning Rate")
 
 flags.DEFINE_float("dropout", 0.8, "Learning Rate")

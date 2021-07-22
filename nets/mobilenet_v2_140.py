@@ -112,6 +112,10 @@ class Orchids52Mobilenet140(object):
     def summary(self):
         self.model.summary()
 
+    @property
+    def trainable_variables(self):
+        return self.model.trainable_variables
+
     def config_checkpoint(self, checkpoint_dir):
         assert self.optimizer is not None and self.predict_layers is not None
 
@@ -186,15 +190,11 @@ class Orchids52Mobilenet140(object):
             step = self.get_step_number_from_latest_checkpoint() + 1
         else:
             self.load_model_variables()
-
-        self.config_layers()
-        for var in self.model.trainable_variables:
-            logging.info("trainable variable: %s", var.name)
         return step
 
-    def config_layers(self):
+    def config_layers(self, **kwargs):
         if self.step == TRAIN_STEP1:
-            self.set_mobilenet_training_status(False)
+            self.set_mobilenet_training_status(False, **kwargs)
 
     def set_mobilenet_training_status(self, trainable, fine_tune_at=100):
         if self.mobilenet:
@@ -207,7 +207,7 @@ class Orchids52Mobilenet140(object):
             else:
                 self.mobilenet.trainable = False
 
-    def set_prediction_training_status(self, trainable):
+    def set_prediction_training_status(self, trainable, **kwargs):
         if self.predict_layers:
             for p in self.predict_layers:
                 p.trainable = trainable
