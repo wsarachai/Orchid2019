@@ -237,7 +237,7 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
                 prediction_layer_prefix = get_checkpoint_file(predict_layers_path, idx)
                 if not tf.io.gfile.exists(prediction_layer_prefix + ".h5"):
                     prediction_layer_prefix = _prediction_layer_prefix
-                    if not tf.io.gfile.exists(prediction_layer_prefix):
+                    if not tf.io.gfile.exists(prediction_layer_prefix + ".h5"):
                         prediction_layer_prefix = latest_checkpoint
 
                 from_name = (

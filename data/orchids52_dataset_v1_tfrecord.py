@@ -73,6 +73,8 @@ def _load_dataset(
     else:
         decode_dataset = parsed_dataset.map(decode_example)
 
+    decode_dataset = decode_dataset.shuffle(batch_size * 8, reshuffle_each_iteration=True)
+
     preprocess_image = wrapped_partial(orchids52_dataset.preprocess_image, image_size=IMG_SIZE_224)
     decode_dataset = decode_dataset.map(preprocess_image)
     decode_dataset = decode_dataset.batch(batch_size=batch_size).cache()

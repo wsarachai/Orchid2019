@@ -137,14 +137,15 @@ class TrainClassifier:
                 fine_grain_step += 1
                 k_summary.end_step()
 
-            print("\n")
-            t_acc, t_loss = self.evaluate(datasets=self.test_ds)
-
             train_loss = self.train_loss_metric.result().numpy()
             regularization_loss = self.regularization_loss_metric.result().numpy()
             boundary_loss = self.boundary_loss_metric.result().numpy()
             total_loss = self.total_loss_metric.result().numpy()
             accuracy = self.accuracy_metric.result().numpy()
+
+            print("\n")
+            self.reset_metric()
+            t_acc, t_loss = self.evaluate(datasets=self.test_ds)
 
             k_summary.scalar_update("accuracy/accuracy", accuracy, epoch)
             k_summary.scalar_update("accuracy/validation", t_acc, epoch)
