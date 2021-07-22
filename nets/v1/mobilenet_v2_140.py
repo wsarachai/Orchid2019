@@ -153,7 +153,7 @@ class Orchids52Mobilenet140(object):
         if self.step == TRAIN_STEP1:
             self.load_model_step1()
 
-    def load_model_step1(self):
+    def load_model_step1(self, **kwargs):
         latest_checkpoint = None
         for checkpoint, checkpoint_manager in self.prediction_layer_checkpoints:
             if checkpoint_manager.latest_checkpoint:

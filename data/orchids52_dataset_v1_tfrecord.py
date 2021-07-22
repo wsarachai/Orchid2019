@@ -29,6 +29,7 @@ def _get_label(serialize_example, depth, one_hot=False):
     label = serialize_example["image/class/label"]
     if one_hot:
         label_values = tf.one_hot(label, depth=depth)
+        tf.assert_equal(tf.argmax(label_values), label)
     else:
         label_values = label
     return label_values

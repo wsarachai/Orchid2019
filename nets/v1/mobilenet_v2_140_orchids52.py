@@ -177,7 +177,7 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
         elif self.step == TRAIN_V2_STEP2:
             self.set_mobilenet_training_status(True)
 
-    def load_model_step2(self):
+    def load_model_step2(self, **kwargs):
         self.load_model_step1()
         for checkpoint in self.stn_dense_checkpoints:
             stn_dense_checkpoint, stn_dense_checkpoint_manager = checkpoint
@@ -185,10 +185,10 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
                 status = stn_dense_checkpoint.restore(stn_dense_checkpoint_manager.latest_checkpoint)
                 status.assert_existing_objects_matched()
 
-    def load_model_step3(self):
+    def load_model_step3(self, **kwargs):
         self.load_model_step2()
 
-    def load_model_step4(self):
+    def load_model_step4(self, **kwargs):
         assert self.checkpoint_path is not None
 
         checkpoint, _ = self.checkpoint
@@ -200,20 +200,20 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
             status = checkpoint.restore(checkpoint_manager.latest_checkpoint)
             status.assert_existing_objects_matched()
 
-    def load_model_v2_step2(self):
+    def load_model_v2_step2(self, **kwargs):
         pass
 
-    def load_model_variables(self):
+    def load_model_variables(self, **kwargs):
         if self.step == TRAIN_STEP1:
-            self.load_model_step1()
+            self.load_model_step1(**kwargs)
         elif self.step == TRAIN_STEP2:
-            self.load_model_step2()
+            self.load_model_step2(**kwargs)
         elif self.step == TRAIN_STEP3:
-            self.load_model_step3()
+            self.load_model_step3(**kwargs)
         elif self.step == TRAIN_STEP4:
-            self.load_model_step4()
+            self.load_model_step4(**kwargs)
         elif self.step == TRAIN_V2_STEP2:
-            self.load_model_v2_step2()
+            self.load_model_v2_step2(**kwargs)
 
 
 class BranchBlock(keras.layers.Layer):

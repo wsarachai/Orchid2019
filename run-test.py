@@ -28,7 +28,7 @@ def main(unused_argv):
     model.restore_model_variables(checkpoint_path=checkpoint_dir)
     model.summary()
 
-    info = DisplayInfo(datasets.size)
+    info = DisplayInfo(datasets.size, training_step=FLAGS.train_step)
 
     @tf.function
     def process_step(model, inputs):

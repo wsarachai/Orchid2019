@@ -31,17 +31,20 @@ def get_dataset_keys(f):
     return keys
 
 
-def load_model_from_hdf5(filepath, model, to_name=None, from_name=None, show_all_key=False):
+def load_model_from_hdf5(filepath, model, to_name=None, from_name=None, **kwargs):
+    verbose = kwargs.get("verbose", 0)
     file_loaded = None
     try:
         filepath = filepath + ".h5"
         file_loaded = h5py.File(filepath, mode="r")
         g = file_loaded["model_weights"]
-        if show_all_key:
+        if verbose == 1:
             keys = get_dataset_keys(g)
             for v in keys:
                 print(v)
         for var in model.weights:
+            if verbose == 1:
+                print(var.name)
             var_name = var.name
 
             if var_name not in g:
@@ -220,37 +223,38 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
         elif training_step == TRAIN_V2_STEP2:
             self.set_mobilenet_training_status(True)
 
-    def load_model_step1(self):
+    def load_model_step1(self, **kwargs):
         training_step = TRAIN_TEMPLATE.format(1)
         checkpoint_dir = os.path.join(self.checkpoint_dir, training_step)
         latest_checkpoint = tf.train.latest_checkpoint(checkpoint_dir=checkpoint_dir)
 
-        load_model_from_hdf5(latest_checkpoint, self.mobilenet)
+        load_model_from_hdf5(latest_checkpoint, self.mobilenet, **kwargs)
 
-        _prediction_layer_prefix = ""
-        predict_layers_path = os.path.join(self.checkpoint_dir, "predict_layers")
-        for idx, predict_layer in enumerate(self.predict_layers):
-            prediction_layer_prefix = get_checkpoint_file(predict_layers_path, idx)
-            if not tf.io.gfile.exists(prediction_layer_prefix + ".h5"):
-                prediction_layer_prefix = _prediction_layer_prefix
-                if not tf.io.gfile.exists(prediction_layer_prefix):
-                    prediction_layer_prefix = latest_checkpoint
+        if self.step > 1:
+            _prediction_layer_prefix = ""
+            predict_layers_path = os.path.join(self.checkpoint_dir, "predict_layers")
+            for idx, predict_layer in enumerate(self.predict_layers):
+                prediction_layer_prefix = get_checkpoint_file(predict_layers_path, idx)
+                if not tf.io.gfile.exists(prediction_layer_prefix + ".h5"):
+                    prediction_layer_prefix = _prediction_layer_prefix
+                    if not tf.io.gfile.exists(prediction_layer_prefix):
+                        prediction_layer_prefix = latest_checkpoint
 
-            from_name = (
-                "branch_block/prediction_layer/dense"
-                if idx == 0
-                else "branch_block/prediction_layer_{}/dense_{}".format(idx, idx)
-            )
+                from_name = (
+                    "branch_block/prediction_layer/dense"
+                    if idx == 0
+                    else "branch_block/prediction_layer_{}/dense_{}".format(idx, idx)
+                )
 
-            load_model_from_hdf5(
-                prediction_layer_prefix,
-                predict_layer,
-                from_name=from_name,
-                to_name="prediction_layer/dense",
-            )
-            _prediction_layer_prefix = prediction_layer_prefix
+                load_model_from_hdf5(
+                    prediction_layer_prefix,
+                    predict_layer,
+                    from_name=from_name,
+                    to_name="prediction_layer/dense",
+                )
+                _prediction_layer_prefix = prediction_layer_prefix
 
-    def load_model_step2(self):
+    def load_model_step2(self, **kwargs):
         self.load_model_step1()
 
         training_step = TRAIN_TEMPLATE.format(1)
@@ -276,14 +280,14 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
                 if tf.io.gfile.exists(checkpoint_prefix):
                     load_model_from_hdf5(checkpoint_prefix + "/stn_dense_{}".format(i), stn_dense)
 
-    def load_model_step3(self):
+    def load_model_step3(self, **kwargs):
         training_step = TRAIN_TEMPLATE.format(2)
         checkpoint_dir = os.path.join(self.checkpoint_dir, training_step)
         latest_checkpoint = tf.train.latest_checkpoint(checkpoint_dir=checkpoint_dir)
 
         load_model_from_hdf5(latest_checkpoint, self.model)
 
-    def load_model_step4(self):
+    def load_model_step4(self, **kwargs):
         training_step = TRAIN_TEMPLATE.format(self.step)
         checkpoint_dir = os.path.join(self.checkpoint_dir, training_step)
         if not tf.io.gfile.exists(checkpoint_dir):
@@ -294,7 +298,7 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
 
         load_model_from_hdf5(latest_checkpoint, self.model)
 
-    def load_model_step5(self):
+    def load_model_step5(self, **kwargs):
         training_step = TRAIN_TEMPLATE.format(self.step)
         checkpoint_dir = os.path.join(self.checkpoint_dir, training_step)
         if not tf.io.gfile.exists(checkpoint_dir):
@@ -305,18 +309,18 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
 
         load_model_from_hdf5(latest_checkpoint, self.model)
 
-    def load_model_variables(self):
+    def load_model_variables(self, **kwargs):
         training_step = TRAIN_TEMPLATE.format(self.step)
         if training_step == TRAIN_STEP1:
-            self.load_model_step1()
+            self.load_model_step1(**kwargs)
         elif training_step == TRAIN_STEP2:
-            self.load_model_step2()
+            self.load_model_step2(**kwargs)
         elif training_step == TRAIN_STEP3:
-            self.load_model_step3()
+            self.load_model_step3(**kwargs)
         elif training_step == TRAIN_STEP4:
-            self.load_model_step4()
+            self.load_model_step4(**kwargs)
         elif training_step == TRAIN_STEP5:
-            self.load_model_step5()
+            self.load_model_step5(**kwargs)
 
     def restore_model_from_latest_checkpoint_if_exist(self, **kwargs):
         result = False

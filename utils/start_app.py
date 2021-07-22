@@ -41,8 +41,6 @@ flags.DEFINE_boolean("save_model", False, "Save the model on each state.")
 
 flags.DEFINE_integer("total_epochs", 1, "Total epochs")
 
-flags.DEFINE_integer("start_state", 1, "Start state")
-
 flags.DEFINE_integer("end_state", 2, "End state")
 
 flags.DEFINE_string("file", "trainHistory", "Train history")
@@ -56,7 +54,7 @@ flags.DEFINE_string(
 flags.DEFINE_string(
     "trained_dir",
     None,
-    #"/home/keng/Documents/_trained_models/model-v1/mobilenet_v2_140_orchids52_0001/pretrain2/model.ckpt-12000",
+    # "/home/keng/Documents/_trained_models/model-v1/mobilenet_v2_140_orchids52_0001/pretrain2/model.ckpt-12000",
     "Checkpoint Path",
 )
 

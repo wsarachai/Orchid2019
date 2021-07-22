@@ -9,7 +9,7 @@ from absl import logging
 
 from data.data_utils import load_dataset
 from nets.mapping import nets_mapping
-from utils.lib_utils import DisplayInfo
+from utils.lib_utils import DisplayInfo, config_optimizer, config_loss
 from utils.start_app import FLAGS, start
 
 
@@ -27,16 +27,31 @@ def main(unused_argv):
     test_ds = load_dataset(flags=FLAGS, workspace_path=workspace_path, split="test", preprocessing=True)
 
     create_model = nets_mapping[FLAGS.model]
+
+    #model.checkpoint_dir = checkpoint_dir
+    #model.load_model_variables(verbose=1)
+
+    optimizer = config_optimizer(FLAGS.optimizer, learning_rate=FLAGS.learning_rate)
+    loss_fn = config_loss()
+
     model = create_model(
-        num_classes=test_ds.num_of_classes, step=FLAGS.train_step, batch_size=FLAGS.batch_size, activation="softmax"
+        num_classes=test_ds.num_of_classes,
+        optimizer=optimizer,
+        loss_fn=loss_fn,
+        training=False,
+        step=FLAGS.train_step,
+        activation="softmax",
+        batch_size=FLAGS.batch_size,
     )
 
-    model.checkpoint_dir = checkpoint_dir
-    model.load_model_variables()
+    model.config_checkpoint(checkpoint_dir)
+    model.restore_model_variables(
+        checkpoint_dir=checkpoint_dir, training_for_tf25=True, pop_key=False, training_step=FLAGS.train_step
+    )
 
     model.summary()
 
-    info = DisplayInfo(test_ds.size)
+    info = DisplayInfo(test_ds.size, training_step=FLAGS.train_step)
 
     count = 0
     for data, label in test_ds:

@@ -113,9 +113,10 @@ class MyLRSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
 
 
 class DisplayInfo(object):
-    def __init__(self, total_images):
+    def __init__(self, total_images, training_step):
         self.count = 0
         self.corrected = 0
+        self.training_step = training_step
         self.total_images = total_images
 
     def display_info(self, result, label, count):
@@ -138,8 +139,8 @@ class DisplayInfo(object):
                     self.corrected += 1
 
         sys.stdout.write(
-            "\r>> {}/{}: Predict: {}, expected: {}, confident: {:.4f}, acc: {:.4f}".format(
-                count, self.total_images, predict_string, label, confident, self.corrected / count
+            "\r>> {}/{}: Predict step#{}: {}, expected: {}, confident: {:.4f}, acc: {:.4f}".format(
+                count, self.total_images, self.training_step, predict_string, label, confident, self.corrected / count
             )
         )
         sys.stdout.flush()
