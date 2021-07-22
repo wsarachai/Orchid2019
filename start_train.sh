@@ -5,11 +5,11 @@ trained_dir="${WORKSPACE}/_trained_models/model-v1/mobilenet_v2_140_orchids52_00
 script="${TRAIN_DIR}/train.py"
 
 readonly connections=(       
-    #'1|32|100|0.001'
-    #'2|4|15|0.001'
-    #'3|4|15|0.001'
-    #'4|4|12|0.001'
-    '5|4|200|0.0001'
+    '1|32|200|0.001'
+    '2|4|5|0.001'
+    '3|4|5|0.001'
+    '4|4|15|0.001'
+    '5|4|200|0.00008'
 )
 
 function training_model(){

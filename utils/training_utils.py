@@ -86,7 +86,7 @@ class TrainClassifier:
 
     def fit(self, initial_epoch, **kwargs):
         target = self.data_handler_steps.size // self.batch_size
-        fine_grain_step = max(0, (initial_epoch-1)) * target
+        fine_grain_step = max(0, (initial_epoch - 1)) * target
         is_run_from_bash = kwargs.pop("bash") if "bash" in kwargs else False
         save_best_only = kwargs.pop("save_best_only") if "save_best_only" in kwargs else False
         finalize = False if not is_run_from_bash else True
@@ -118,7 +118,7 @@ class TrainClassifier:
             for inputs, labels in self.data_handler_steps:
                 if inputs.shape.as_list()[0] == self.batch_size:
                     tfv = tf.version.VERSION.split(".")
-                    if first_graph_writing and epoch == 1 and (tfv[0] == 2 and tfv[1] == 4):
+                    if first_graph_writing and epoch == 1 and (tfv[0] == "2" and tfv[1] == "4"):
                         k_summary.trace_on(graph=True)
                     logs = self.train_step(inputs, labels)
                     logs = copy.copy(logs) if logs else {}
