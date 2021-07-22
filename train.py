@@ -13,6 +13,7 @@ from utils.lib_utils import config_loss
 from utils.start_app import FLAGS, start
 from utils.training_utils import TrainClassifier
 from utils import const
+from nets import const_vars
 
 
 def main(unused_argv):
@@ -45,17 +46,28 @@ def main(unused_argv):
         step=FLAGS.train_step,
         activation="softmax",
         batch_size=FLAGS.batch_size,
+        dropout=FLAGS.dropout,
     )
 
     model.config_checkpoint(training_dir)
     _checkpoint_dir = training_dir if FLAGS.train_step > 1 else trained_weights_dir
     epoch = model.restore_model_variables(
-        checkpoint_dir=_checkpoint_dir, training_for_tf25=True, pop_key=False, training_step=FLAGS.train_step
+        checkpoint_dir=_checkpoint_dir, training_for_tf25=True, pop_key=False, training_step=FLAGS.train_step,
     )
+
+    model.config_layers(
+        fine_tune=FLAGS.fine_tune, fine_tune_at=FLAGS.fine_tune_at
+    )
+    for var in model.trainable_variables:
+        logging.info("trainable variable: %s", var.name)
+
     model.summary()
 
     def scheduler(epochs, _):
-        return learning_rate_schedule(epochs)
+        _epochs = epochs
+        if FLAGS.fine_tune:
+            _epochs = _epochs - epoch
+        return learning_rate_schedule(_epochs)
 
     callback = tf.keras.callbacks.LearningRateScheduler(scheduler)
 
@@ -77,7 +89,7 @@ def main(unused_argv):
             "optimizer": FLAGS.optimizer,
             "weight_decay": FLAGS.learning_rate_decay,
             "batch_size": FLAGS.batch_size,
-            "dropout": 0.2,
+            "dropout": FLAGS.dropout,
             "epoches": FLAGS.total_epochs,
         },
     )

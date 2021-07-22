@@ -140,14 +140,14 @@ class Orchids52Mobilenet140(object):
             self.load_model_variables()
         else:
             step = self.get_step_number_from_latest_checkpoint() + 1
-        self.config_layers()
+        self.config_layers(**kwargs)
         for var in self.model.trainable_variables:
             print("trainable variable: ", var.name)
         return step
 
-    def config_layers(self):
+    def config_layers(self, **kwargs):
         if self.step == TRAIN_STEP1:
-            self.set_mobilenet_training_status(False)
+            self.set_mobilenet_training_status(False, **kwargs)
 
     def load_model_variables(self):
         if self.step == TRAIN_STEP1:
@@ -163,11 +163,11 @@ class Orchids52Mobilenet140(object):
                 status = checkpoint.restore(latest_checkpoint)
                 status.assert_existing_objects_matched()
 
-    def set_mobilenet_training_status(self, trainable):
+    def set_mobilenet_training_status(self, trainable, **kwargs):
         if self.mobilenet:
             self.mobilenet.trainable = trainable
 
-    def set_prediction_training_status(self, trainable):
+    def set_prediction_training_status(self, trainable, **kwargs):
         if self.predict_layers:
             for p in self.predict_layers:
                 p.trainable = trainable

@@ -192,36 +192,36 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
                 save_h5_weights(checkpoint_prefix + "/stn_dense_{}".format(i), stn_dense.weights)
 
     def set_mobilenet_training_status(self, trainable, **kwargs):
-        super(Orchids52Mobilenet140STN, self).set_mobilenet_training_status(trainable)
+        super(Orchids52Mobilenet140STN, self).set_mobilenet_training_status(trainable, **kwargs)
         if self.branch_model:
-            self.branch_model.set_trainable_for_global_branch(trainable)
-            self.branch_model.set_trainable_for_share_branch(trainable)
+            self.branch_model.set_trainable_for_global_branch(trainable, **kwargs)
+            self.branch_model.set_trainable_for_share_branch(trainable, **kwargs)
 
-    def config_layers(self):
+    def config_layers(self, fine_tune, **kwargs):
         training_step = TRAIN_TEMPLATE.format(self.step)
         if training_step == TRAIN_STEP1:
-            self.set_mobilenet_training_status(False)
+            self.set_mobilenet_training_status(fine_tune, **kwargs)
         elif training_step == TRAIN_STEP2:
-            self.set_mobilenet_training_status(False)
-            self.set_prediction_training_status(False)
+            self.set_mobilenet_training_status(False, **kwargs)
+            self.set_prediction_training_status(False, **kwargs)
             self.stn_denses[0].trainable = False
         elif training_step == TRAIN_STEP3:
-            self.set_mobilenet_training_status(False)
-            self.set_prediction_training_status(False)
+            self.set_mobilenet_training_status(False, **kwargs)
+            self.set_prediction_training_status(False, **kwargs)
             self.stn_denses[1].trainable = False
         elif training_step == TRAIN_STEP4:
-            self.set_mobilenet_training_status(False)
-            self.set_prediction_training_status(False)
+            self.set_mobilenet_training_status(False, **kwargs)
+            self.set_prediction_training_status(False, **kwargs)
             for stn_dense in self.stn_denses:
                 stn_dense.trainable = False
         elif training_step == TRAIN_STEP5:
-            self.set_mobilenet_training_status(True)
-            self.set_prediction_training_status(True)
+            self.set_mobilenet_training_status(fine_tune, **kwargs)
+            self.set_prediction_training_status(True, **kwargs)
             self.estimate_block.trainable = True
             for stn_dense in self.stn_denses:
                 stn_dense.trainable = True
         elif training_step == TRAIN_V2_STEP2:
-            self.set_mobilenet_training_status(True)
+            self.set_mobilenet_training_status(True, **kwargs)
 
     def load_model_step1(self, **kwargs):
         training_step = TRAIN_TEMPLATE.format(1)
@@ -247,12 +247,12 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
                 )
 
                 load_model_from_hdf5(
-                    prediction_layer_prefix,
-                    predict_layer,
-                    from_name=from_name,
-                    to_name="prediction_layer/dense",
+                    prediction_layer_prefix, predict_layer, from_name=from_name, to_name="prediction_layer/dense",
                 )
                 _prediction_layer_prefix = prediction_layer_prefix
+        else:
+            for predict_layer in self.predict_layers:
+                load_model_from_hdf5(latest_checkpoint, predict_layer, **kwargs)
 
     def load_model_step2(self, **kwargs):
         self.load_model_step1()
@@ -367,9 +367,7 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
         return result
 
 
-def create_orchid_mobilenet_v2_15(
-    num_classes, optimizer=None, loss_fn=None, training=False, drop_out_prop=0.8, **kwargs
-):
+def create_orchid_mobilenet_v2_15(num_classes, optimizer=None, loss_fn=None, training=False, dropout=0.8, **kwargs):
     stn_denses = None
     boundary_loss = None
     branches_block = None
@@ -403,7 +401,7 @@ def create_orchid_mobilenet_v2_15(
                 Conv2DWrapper(filters=128, kernel_size=[1, 1], activation="relu", name="stn_conv2d_1"),
                 keras.layers.Flatten(),
                 DenseWrapper(units=128, activation="tanh", name="stn_dense_128_1"),
-                keras.layers.Dropout(rate=drop_out_prop),
+                keras.layers.Dropout(rate=dropout),
                 FullyConnectedLayer(
                     fc_num,
                     kernel_initializer=tf.keras.initializers.TruncatedNormal(mean=0.0, stddev=0.4),
@@ -420,7 +418,7 @@ def create_orchid_mobilenet_v2_15(
                 Conv2DWrapper(filters=128, kernel_size=[1, 1], activation="relu", name="stn_conv2d_2"),
                 keras.layers.Flatten(),
                 DenseWrapper(units=128, activation="tanh", name="stn_dense_128_2"),
-                keras.layers.Dropout(rate=drop_out_prop),
+                keras.layers.Dropout(rate=dropout),
                 FullyConnectedLayer(
                     fc_num,
                     kernel_initializer=tf.keras.initializers.TruncatedNormal(mean=0.0, stddev=0.4),
@@ -463,7 +461,7 @@ def create_orchid_mobilenet_v2_15(
             outputs = tf.keras.activations.softmax(outputs)
 
     else:
-        prediction_layer = PredictionLayer(num_classes=num_classes, activation="softmax")
+        prediction_layer = PredictionLayer(num_classes=num_classes, dropout_ratio=dropout, activation="softmax")
         branches_prediction_models.append(prediction_layer)
         mobilenet_logits = stn_base_model(processed_inputs, training=training)
         outputs = prediction_layer(mobilenet_logits, training=training)

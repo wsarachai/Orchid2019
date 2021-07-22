@@ -336,7 +336,7 @@ def create_mobilenet_v2(
     return model
 
 
-def create_mobilenet_v2_14(ver, num_classes, optimizer=None, loss_fn=None, training=False, **kwargs):
+def create_mobilenet_v2_14(ver, num_classes, dropout=0.8, optimizer=None, loss_fn=None, training=False, **kwargs):
     step = kwargs.pop("step") if "step" in kwargs else TRAIN_TEMPLATE.format(1)
 
     inputs = keras.Input(shape=IMG_SHAPE_224)
@@ -345,7 +345,7 @@ def create_mobilenet_v2_14(ver, num_classes, optimizer=None, loss_fn=None, train
     processed_inputs = preprocess_layer(inputs, training=training)
     mobilenet_logits = mobilenet(processed_inputs, training=training)
 
-    prediction_layer = PredictionLayer(num_classes=num_classes)
+    prediction_layer = PredictionLayer(num_classes=num_classes, dropout_ratio=dropout)
     outputs = prediction_layer(mobilenet_logits, training=training)
 
     if ver == 1:

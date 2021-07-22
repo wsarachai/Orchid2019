@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import numpy as np
 import tensorflow as tf
+from tensorflow.python.keras import backend as K
 
 from utils.summary import k_summary
 
@@ -351,9 +352,11 @@ class SpatialTransformerNetwork(tf.keras.layers.Layer):
 
         self.batch_grids_m = tf.keras.Model(stn_inputs, grid, name="affine_grid_generator")
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs, training=None, **kwargs):
+        if training is None:
+            training = K.learning_phase()
+
         thetas = kwargs.get("thetas", None)
-        training = kwargs.get("training", False)
         bound_err = []
 
         parameter1, b_err1 = get_parameter(self.batch_size, thetas[0], self.x_zero, self.y_zero, self.scale1)
