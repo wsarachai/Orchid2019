@@ -21,15 +21,15 @@ def process_step(model, inputs):
 def main(unused_argv):
     logging.debug(unused_argv)
 
+    # tf.config.run_functions_eagerly(True)
+
     workspace_path = os.environ["WORKSPACE"] if "WORKSPACE" in os.environ else "/Users/watcharinsarachai/Documents/"
     checkpoint_dir = os.path.join(workspace_path, FLAGS.checkpoint_dir)
 
-    test_ds = load_dataset(flags=FLAGS, workspace_path=workspace_path, split="test", preprocessing=True)
+    train_ds = load_dataset(flags=FLAGS, workspace_path=workspace_path, split="train")
+    test_ds = load_dataset(flags=FLAGS, workspace_path=workspace_path, split="test")
 
     create_model = nets_mapping[FLAGS.model]
-
-    #model.checkpoint_dir = checkpoint_dir
-    #model.load_model_variables(verbose=1)
 
     optimizer = config_optimizer(FLAGS.optimizer, learning_rate=FLAGS.learning_rate)
     loss_fn = config_loss()
@@ -51,16 +51,22 @@ def main(unused_argv):
 
     model.summary()
 
-    info = DisplayInfo(test_ds.size, training_step=FLAGS.train_step)
+    info1 = DisplayInfo(train_ds.size, training_step=FLAGS.train_step)
+    info2 = DisplayInfo(test_ds.size, training_step=FLAGS.train_step)
+
+    count = 0
+    for data, label in train_ds:
+        result = process_step(model, data)
+        count += 1
+        info1.display_info(result.numpy(), label[0], count)
+    info1.display_summary()
 
     count = 0
     for data, label in test_ds:
         result = process_step(model, data)
-
         count += 1
-        info.display_info(result.numpy(), label[0], count)
-
-    info.display_summary()
+        info2.display_info(result.numpy(), label[0], count)
+    info2.display_summary()
 
 
 if __name__ == "__main__":

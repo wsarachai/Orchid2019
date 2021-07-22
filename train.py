@@ -45,6 +45,7 @@ def main(unused_argv):
         step=FLAGS.train_step,
         activation="softmax",
         batch_size=FLAGS.batch_size,
+        dropout=FLAGS.dropout,
     )
 
     model.config_checkpoint(training_dir)
@@ -55,7 +56,10 @@ def main(unused_argv):
     model.summary()
 
     def scheduler(epochs, _):
-        return learning_rate_schedule(epochs)
+        _epochs = epochs
+        if FLAGS.fine_tune:
+            _epochs = _epochs - epoch
+        return learning_rate_schedule(_epochs)
 
     callback = tf.keras.callbacks.LearningRateScheduler(scheduler)
 
@@ -77,13 +81,15 @@ def main(unused_argv):
             "optimizer": FLAGS.optimizer,
             "weight_decay": FLAGS.learning_rate_decay,
             "batch_size": FLAGS.batch_size,
-            "dropout": 0.2,
+            "dropout": FLAGS.dropout,
             "epoches": FLAGS.total_epochs,
         },
     )
 
     train_model.fit(
-        initial_epoch=epoch, bash=FLAGS.bash, save_best_only=FLAGS.save_best_only,
+        initial_epoch=epoch,
+        bash=FLAGS.bash,
+        save_best_only=FLAGS.save_best_only,
     )
 
     # if FLAGS.save_model and model:

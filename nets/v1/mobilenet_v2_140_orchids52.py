@@ -5,6 +5,7 @@ from __future__ import print_function
 import os
 import numpy as np
 import tensorflow as tf
+from tensorflow.core.framework.types_pb2 import DT_DOUBLE
 import tensorflow.keras as keras
 
 from nets.const_vars import default_image_size, IMG_SHAPE_224
@@ -217,7 +218,7 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
 
 
 class BranchBlock(keras.layers.Layer):
-    def __init__(self, num_classes, batch_size, width=default_image_size, height=default_image_size):
+    def __init__(self, num_classes, batch_size, dropout=0.8, width=default_image_size, height=default_image_size):
         super(BranchBlock, self).__init__()
         self.batch_size = batch_size
         self.width = width
@@ -229,9 +230,9 @@ class BranchBlock(keras.layers.Layer):
             input_shape=IMG_SHAPE_224, alpha=1.4, include_top=False, weights="imagenet", sub_name="shared_branch"
         )
         self.branches_prediction_models = [
-            PredictionLayer(num_classes=num_classes),
-            PredictionLayer(num_classes=num_classes),
-            PredictionLayer(num_classes=num_classes),
+            PredictionLayer(num_classes=num_classes, dropout_ratio=dropout),
+            PredictionLayer(num_classes=num_classes, dropout_ratio=dropout),
+            PredictionLayer(num_classes=num_classes, dropout_ratio=dropout),
         ]
 
     def call(self, inputs, **kwargs):
@@ -345,9 +346,7 @@ class PrintingNode(tf.keras.layers.Layer):
         return tf.compat.v1.Print(inputs, [inputs])
 
 
-def create_orchid_mobilenet_v2_15(
-    num_classes, optimizer=None, loss_fn=None, training=False, drop_out_prop=0.8, **kwargs
-):
+def create_orchid_mobilenet_v2_15(num_classes, optimizer=None, loss_fn=None, training=False, dropout=0.8, **kwargs):
     stn_denses = None
     branches_block = None
     boundary_loss = None
@@ -374,7 +373,7 @@ def create_orchid_mobilenet_v2_15(
                 keras.layers.Conv2D(128, [1, 1], activation="relu", name="stn_conv2d_1"),
                 keras.layers.Flatten(),
                 keras.layers.Dense(128, activation="tanh", name="stn_dense_128_1"),
-                keras.layers.Dropout(rate=drop_out_prop),
+                keras.layers.Dropout(rate=dropout),
                 FullyConnectedLayer(
                     fc_num,
                     kernel_initializer=tf.keras.initializers.TruncatedNormal(mean=0.0, stddev=0.4),
@@ -391,7 +390,7 @@ def create_orchid_mobilenet_v2_15(
                 keras.layers.Conv2D(128, [1, 1], activation="relu", name="stn_conv2d_2"),
                 keras.layers.Flatten(),
                 keras.layers.Dense(128, activation="tanh", name="stn_dense_128_2"),
-                keras.layers.Dropout(rate=drop_out_prop),
+                keras.layers.Dropout(rate=dropout),
                 FullyConnectedLayer(
                     fc_num,
                     kernel_initializer=tf.keras.initializers.TruncatedNormal(mean=0.0, stddev=0.4),
@@ -443,7 +442,9 @@ def create_orchid_mobilenet_v2_15(
             outputs = estimate_block(logits)
 
     else:
-        prediction_layer = PredictionLayer(num_classes=num_classes, activation="softmax", name="")
+        prediction_layer = PredictionLayer(
+            num_classes=num_classes, dropout_ratio=dropout, activation="softmax", name=""
+        )
         branches_prediction_models.append(prediction_layer)
         mobilenet_logits = stn_base_model(processed_inputs, training=training)
         outputs = prediction_layer(mobilenet_logits, training=training)

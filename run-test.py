@@ -15,6 +15,8 @@ from utils.start_app import FLAGS, start
 def main(unused_argv):
     logging.debug(unused_argv)
 
+    # tf.config.run_functions_eagerly(True)
+
     workspace_path = os.environ["WORKSPACE"] if "WORKSPACE" in os.environ else "/Users/watcharinsarachai/Documents/"
     checkpoint_dir = os.path.join(workspace_path, "_trained_models", "model-v1", FLAGS.checkpoint_dir)
 
@@ -47,5 +49,4 @@ def main(unused_argv):
 
 
 if __name__ == "__main__":
-    # tf.config.run_functions_eagerly(True)
     start(main)

@@ -3,6 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
+from tensorflow.python.keras import backend as K
 import tensorflow.keras as keras
 import nets
 from utils.summary import k_summary
@@ -18,7 +19,9 @@ class PreprocessLayer(keras.layers.Layer):
         self.fast = fast
 
     def call(self, inputs, **kwargs):
-        training = kwargs.get("training", False)
+        # WARNING: this ignore training from graph
+        training = True if K.learning_phase() == 1 else False
+
         if training:
             sel = tf.random.uniform([], maxval=10, dtype=tf.int32)
             inputs = tf.switch_case(
@@ -60,10 +63,11 @@ class PredictionLayer(keras.layers.Layer):
         self.prediction_fn = activations.get(activation)
 
     def call(self, inputs, **kwargs):
-        training = kwargs.get("training", False)
+        # WARNING: this ignore training from graph
+        training = True if K.learning_phase() == 1 else False
+
         inputs = self.global_average_pooling(inputs, training=training)
-        if training:
-            inputs = self.dropout(inputs, training=training)
+        inputs = self.dropout(inputs, training=training)
         inputs = self.dense(inputs, training=training)
         inputs = self.prediction_fn(inputs)
         if training and self.trainable:
@@ -95,7 +99,9 @@ class BranchBlock(keras.layers.Layer):
         ]
 
     def call(self, inputs, **kwargs):
-        training = kwargs.get("training", False)
+        # WARNING: this ignore training from graph
+        training = True if K.learning_phase() == 1 else False
+
         return [
             self.get_prediction_layer(1, inputs[0], self.branches_prediction_models[0], training),
             self.get_prediction_layer(2, inputs[1], self.branches_prediction_models[1], training),
@@ -148,7 +154,9 @@ class EstimationBlock(keras.layers.Layer):
         )
 
     def call(self, inputs, **kwargs):
-        training = kwargs.get("training", False)
+        # WARNING: this ignore training from graph
+        training = True if K.learning_phase() == 1 else False
+
         main_net = c_t = inputs[0]
 
         input_and_hstate_concatenated = tf.concat(values=[c_t, inputs[1]], axis=1)
@@ -185,7 +193,9 @@ class FullyConnectedLayer(tf.keras.layers.Layer):
         )
 
     def call(self, inputs, **kwargs):
-        if self.trainable:
+        training = True if K.learning_phase() == 1 else False
+
+        if training and self.trainable:
             k_summary.histogram_update("kernel", self.kernel)
 
         x = tf.matmul(inputs, self.kernel)
@@ -224,4 +234,3 @@ class DenseWrapper(keras.layers.Dense):
             k_summary.histogram_update("bias", self.bias)
 
         return super(DenseWrapper, self).call(inputs)
-

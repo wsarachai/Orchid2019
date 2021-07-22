@@ -5,6 +5,7 @@ from __future__ import print_function
 import copy
 import tensorflow as tf
 
+from tensorflow.python.keras import backend as K
 from absl import logging
 from utils.summary import k_summary
 
@@ -108,6 +109,8 @@ class TrainClassifier:
         for epoch in range(initial_epoch, self.epoches + 1):
             print("\nEpoch: {}/{}".format(epoch, self.epoches))
 
+            K.set_learning_phase(1)  # 0=test, 1=train
+
             self.on_epoch_begin(epoch=epoch)
             k_summary.set_epoch(epoch=epoch)
             k_summary.hparams(self._hparams)
@@ -137,14 +140,16 @@ class TrainClassifier:
                 fine_grain_step += 1
                 k_summary.end_step()
 
-            print("\n")
-            t_acc, t_loss = self.evaluate(datasets=self.test_ds)
-
             train_loss = self.train_loss_metric.result().numpy()
             regularization_loss = self.regularization_loss_metric.result().numpy()
             boundary_loss = self.boundary_loss_metric.result().numpy()
             total_loss = self.total_loss_metric.result().numpy()
             accuracy = self.accuracy_metric.result().numpy()
+
+            print("\n")
+            self.reset_metric()
+            K.set_learning_phase(0)  # 0=test, 1=train
+            t_acc, t_loss = self.evaluate(datasets=self.test_ds)
 
             k_summary.scalar_update("accuracy/accuracy", accuracy, epoch)
             k_summary.scalar_update("accuracy/validation", t_acc, epoch)
@@ -181,6 +186,7 @@ class TrainClassifier:
                 num_steps = logs.pop("num_steps", 1)
                 seen += num_steps
                 progbar.update(seen, list(logs.items()), finalize=finalize)
+
         logs = copy.copy(logs) if logs else {}
         print("\nloss: {:.3f}, accuracy: {:.3f}".format(logs["loss"], logs["accuracy"]))
 

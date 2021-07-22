@@ -78,4 +78,6 @@ dataset_mapping = {
 def load_dataset(flags, workspace_path, split="train", **kwargs):
     dataset = PATTERNS.format(flags.dataset, flags.dataset_format, flags.dataset_version)
     data_dir = os.path.join(workspace_path, "_datasets", flags.dataset, flags.dataset_format, flags.dataset_version)
-    return dataset_mapping[dataset](split=split, batch_size=flags.batch_size, root_path=data_dir, **kwargs)
+    return dataset_mapping[dataset](
+        split=split, batch_size=flags.batch_size, root_path=data_dir, **kwargs
+    )

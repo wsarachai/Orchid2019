@@ -60,6 +60,7 @@ def _load_dataset(
     pattern = "orchids52_{split}*.tfrecord".format(split=split)
     pattern = os.path.join(root_path, pattern)
     dataset = tf.data.Dataset.list_files(file_pattern=pattern)
+    dataset = dataset.shuffle(batch_size*4, reshuffle_each_iteration=True)
     dataset = dataset.interleave(
         lambda x: tf.data.TFRecordDataset(x),
         cycle_length=num_readers,

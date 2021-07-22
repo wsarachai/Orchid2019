@@ -21,6 +21,8 @@ flags.DEFINE_integer("train_step", 1, "Training step")
 
 flags.DEFINE_float("learning_rate", 0.001, "Learning Rate")
 
+flags.DEFINE_float("dropout", 0.8, "Learning Rate")
+
 flags.DEFINE_string("dataset_format", DATA_FORMAT_H5, "Dataset format")
 
 flags.DEFINE_string("dataset", ORCHIDS52, "Dataset")
@@ -38,6 +40,8 @@ flags.DEFINE_string(
 flags.DEFINE_boolean("save_best_only", False, "Save the checkpoint only best result.")
 
 flags.DEFINE_boolean("save_model", False, "Save the model on each state.")
+
+flags.DEFINE_boolean("fine_tune", False, "Fine tune the model.")
 
 flags.DEFINE_integer("total_epochs", 1, "Total epochs")
 
