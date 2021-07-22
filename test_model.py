@@ -31,23 +31,26 @@ def main(unused_argv):
 
     create_model = nets_mapping[FLAGS.model]
 
-    optimizer = config_optimizer(FLAGS.optimizer, learning_rate=FLAGS.learning_rate)
-    loss_fn = config_loss()
+    # optimizer = config_optimizer(FLAGS.optimizer, learning_rate=FLAGS.learning_rate)
+    # loss_fn = config_loss()
 
     model = create_model(
         num_classes=test_ds.num_of_classes,
-        optimizer=optimizer,
-        loss_fn=loss_fn,
+        # optimizer=optimizer,
+        # loss_fn=loss_fn,
         training=False,
         step=FLAGS.train_step,
         activation="softmax",
         batch_size=FLAGS.batch_size,
     )
 
-    model.config_checkpoint(checkpoint_dir)
-    model.restore_model_variables(
-        checkpoint_dir=checkpoint_dir, training_for_tf25=True, pop_key=False, training_step=FLAGS.train_step
-    )
+    # model.config_checkpoint(checkpoint_dir)
+    # model.restore_model_variables(
+    #     checkpoint_dir=checkpoint_dir, training_for_tf25=True, pop_key=False, training_step=FLAGS.train_step
+    # )
+
+    model.checkpoint_dir = checkpoint_dir
+    model.load_model_variables()
 
     model.summary()
 

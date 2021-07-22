@@ -250,6 +250,9 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
                     prediction_layer_prefix, predict_layer, from_name=from_name, to_name="prediction_layer/dense",
                 )
                 _prediction_layer_prefix = prediction_layer_prefix
+        else:
+            for predict_layer in self.predict_layers:
+                load_model_from_hdf5(latest_checkpoint, predict_layer, **kwargs)
 
     def load_model_step2(self, **kwargs):
         self.load_model_step1()

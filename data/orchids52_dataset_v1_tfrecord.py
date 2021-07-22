@@ -60,7 +60,6 @@ def _load_dataset(
     pattern = "orchids52_{split}*.tfrecord".format(split=split)
     pattern = os.path.join(root_path, pattern)
     dataset = tf.data.Dataset.list_files(file_pattern=pattern)
-    dataset = dataset.shuffle(batch_size*4, reshuffle_each_iteration=True)
     dataset = dataset.interleave(
         lambda x: tf.data.TFRecordDataset(x),
         cycle_length=num_readers,
@@ -73,6 +72,8 @@ def _load_dataset(
         decode_dataset = parsed_dataset.map(decode_example_one_hot)
     else:
         decode_dataset = parsed_dataset.map(decode_example)
+
+    parsed_dataset = parsed_dataset.shuffle(batch_size * 8, reshuffle_each_iteration=True)
 
     preprocess_image = wrapped_partial(orchids52_dataset.preprocess_image, image_size=IMG_SIZE_224)
     decode_dataset = decode_dataset.map(preprocess_image)
