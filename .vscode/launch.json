@@ -32,7 +32,7 @@
       "program": "train.py",
       "console": "integratedTerminal",
       "args": [
-        "--train_step=2",
+        "--train_step=4",
         "--batch_size=4",
         "--dataset_format=tf-records",
         "--dataset=orchids52_data",

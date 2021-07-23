@@ -13,39 +13,46 @@ from tensorflow.python.keras import initializers
 from tensorflow.python.keras import activations
 
 
+@tf.function
+def augmentation_m1(inputs, maxval=12):
+    sel = tf.random.uniform([], maxval=maxval, dtype=tf.int32)
+    return tf.switch_case(
+        sel,
+        branch_fns={
+            0: lambda: tf.image.random_flip_left_right(inputs),
+            1: lambda: tf.image.random_flip_up_down(inputs),
+            2: lambda: tf.image.rot90(inputs),
+        },
+        default=lambda: inputs,
+    )
+
+
+@tf.function
+def augmentation_m2(inputs, maxval=12):
+    sel = tf.random.uniform([], maxval=maxval, dtype=tf.int32)
+    return tf.switch_case(
+        sel,
+        branch_fns={
+            0: lambda: tf.image.random_brightness(inputs, max_delta=0.2),
+            1: lambda: tf.image.random_contrast(inputs, lower=0.2, upper=0.5),
+            # 2: lambda: tf.image.random_saturation(inputs, lower=1, upper=5),
+            # 3: lambda: tf.image.random_hue(inputs, max_delta=0.2),
+        },
+        default=lambda: inputs,
+    )
+
+
 class PreprocessLayer(keras.layers.Layer):
     def __init__(self, fast=True):
         super(PreprocessLayer, self).__init__()
         self.fast = fast
 
-    def call(self, inputs, **kwargs):
-        # WARNING: this ignore training from graph
-        training = True if K.learning_phase() == 1 else False
-
+    def call(self, inputs, training=None, **kwargs):
+        if training is None:
+            training = True if K.learning_phase() == 1 else False
         if training:
-            sel = tf.random.uniform([], maxval=10, dtype=tf.int32)
-            inputs = tf.switch_case(
-                sel,
-                branch_fns={
-                    0: lambda: tf.image.random_flip_left_right(inputs),
-                    1: lambda: tf.image.random_flip_up_down(inputs),
-                    2: lambda: tf.image.rot90(inputs),
-                },
-                default=lambda: inputs,
-            )
-
-            if not self.fast:
-                sel = tf.random.uniform([], maxval=5, dtype=tf.int32)
-                inputs = tf.switch_case(
-                    sel,
-                    branch_fns={
-                        0: lambda: tf.image.random_brightness(inputs, max_delta=0.2),
-                        1: lambda: tf.image.random_saturation(inputs, lower=1, upper=5),
-                        2: lambda: tf.image.random_contrast(inputs, lower=0.2, upper=0.5),
-                        3: lambda: tf.image.random_hue(inputs, max_delta=0.2),
-                    },
-                    default=lambda: inputs,
-                )
+            inputs = augmentation_m1(inputs)
+            inputs = augmentation_m2(inputs) if not self.fast else inputs
         return inputs
 
 
@@ -62,9 +69,9 @@ class PredictionLayer(keras.layers.Layer):
         )
         self.prediction_fn = activations.get(activation)
 
-    def call(self, inputs, **kwargs):
-        # WARNING: this ignore training from graph
-        training = True if K.learning_phase() == 1 else False
+    def call(self, inputs, training=None, **kwargs):
+        if training is None:
+            training = True if K.learning_phase() == 1 else False
 
         inputs = self.global_average_pooling(inputs, training=training)
         inputs = self.dropout(inputs, training=training)
@@ -81,7 +88,7 @@ class PredictionLayer(keras.layers.Layer):
 
 
 class BranchBlock(keras.layers.Layer):
-    def __init__(self, num_classes, batch_size, width=default_image_size, height=default_image_size):
+    def __init__(self, num_classes, batch_size, dropout, width=default_image_size, height=default_image_size):
         super(BranchBlock, self).__init__()
         self.batch_size = batch_size
         self.width = width
@@ -93,14 +100,14 @@ class BranchBlock(keras.layers.Layer):
             input_shape=IMG_SHAPE_224, alpha=1.4, include_top=False, weights="imagenet", sub_name="shared_branch"
         )
         self.branches_prediction_models = [
-            PredictionLayer(num_classes=num_classes),
-            PredictionLayer(num_classes=num_classes),
-            PredictionLayer(num_classes=num_classes),
+            PredictionLayer(num_classes=num_classes, dropout_ratio=dropout),
+            PredictionLayer(num_classes=num_classes, dropout_ratio=dropout),
+            PredictionLayer(num_classes=num_classes, dropout_ratio=dropout),
         ]
 
-    def call(self, inputs, **kwargs):
-        # WARNING: this ignore training from graph
-        training = True if K.learning_phase() == 1 else False
+    def call(self, inputs, training=None, **kwargs):
+        if training is None:
+            training = True if K.learning_phase() == 1 else False
 
         return [
             self.get_prediction_layer(1, inputs[0], self.branches_prediction_models[0], training),
@@ -153,9 +160,9 @@ class EstimationBlock(keras.layers.Layer):
             moving_variance_initializer="ones",
         )
 
-    def call(self, inputs, **kwargs):
-        # WARNING: this ignore training from graph
-        training = True if K.learning_phase() == 1 else False
+    def call(self, inputs, training=None, **kwargs):
+        if training is None:
+            training = True if K.learning_phase() == 1 else False
 
         main_net = c_t = inputs[0]
 
@@ -192,8 +199,9 @@ class FullyConnectedLayer(tf.keras.layers.Layer):
             "kernel", shape=[int(input_shape[-1]), self.num_outputs], initializer=self.kernel_initializer
         )
 
-    def call(self, inputs, **kwargs):
-        training = True if K.learning_phase() == 1 else False
+    def call(self, inputs, training=None, **kwargs):
+        if training is None:
+            training = True if K.learning_phase() == 1 else False
 
         if training and self.trainable:
             k_summary.histogram_update("kernel", self.kernel)

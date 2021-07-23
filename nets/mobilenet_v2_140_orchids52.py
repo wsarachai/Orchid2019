@@ -378,7 +378,7 @@ def create_orchid_mobilenet_v2_15(num_classes, optimizer=None, loss_fn=None, tra
     activation = kwargs.pop("activation") if "activation" in kwargs else None
 
     inputs = keras.Input(shape=IMG_SHAPE_224)
-    preprocess_layer = PreprocessLayer()
+    preprocess_layer = PreprocessLayer(fast=False)
     stn_base_model = create_mobilenet_v2(
         input_shape=IMG_SHAPE_224, alpha=1.4, include_top=False, weights="imagenet", sub_name="stn_base"
     )
@@ -446,7 +446,7 @@ def create_orchid_mobilenet_v2_15(num_classes, optimizer=None, loss_fn=None, tra
             bound_std = tf.constant(np.full(bound_err.shape, 0.00, dtype=np.float32), name="bound_std_zero")
             boundary_loss = keras.Model(inputs, keras.losses.MSE(bound_err, bound_std), name="mse")
 
-        branches_block = BranchBlock(num_classes=num_classes, batch_size=batch_size)
+        branches_block = BranchBlock(num_classes=num_classes, dropout=dropout, batch_size=batch_size)
         branches_prediction_models = branches_block.branches_prediction_models
 
         logits = branches_block(stn_outputs, training=training)

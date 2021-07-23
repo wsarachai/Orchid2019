@@ -77,7 +77,7 @@ def _load_dataset(
 
     preprocess_image = wrapped_partial(orchids52_dataset.preprocess_image, image_size=IMG_SIZE_224)
     decode_dataset = decode_dataset.map(preprocess_image)
-    decode_dataset = decode_dataset.batch(batch_size=batch_size).cache()
+    decode_dataset = decode_dataset.batch(batch_size=batch_size).cache().prefetch(2)
 
     if repeat:
         decode_dataset = decode_dataset.repeat()
