@@ -51,8 +51,11 @@ class PreprocessLayer(keras.layers.Layer):
         if training is None:
             training = True if K.learning_phase() == 1 else False
         if training:
-            inputs = augmentation_m1(inputs)
-            inputs = augmentation_m2(inputs) if not self.fast else inputs
+            if self.fast:
+                inputs = augmentation_m1(inputs)
+            else:
+                inputs = augmentation_m1(inputs)
+                inputs = augmentation_m2(inputs)
         return inputs
 
 

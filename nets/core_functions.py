@@ -14,7 +14,7 @@ def global_pool(shape, pool_op=keras.layers.AvgPool2D):
     return output
 
 
-def load_weight(var_loaded, all_vars, show_model_weights=False, **kwargs):
+def load_weight(var_loaded, all_vars, optimizer, show_model_weights=False, **kwargs):
     result = False
     average_vars = kwargs.get("average_vars", [])
 
@@ -28,8 +28,10 @@ def load_weight(var_loaded, all_vars, show_model_weights=False, **kwargs):
             all_maps.update({var.name: var})
         for var in average_vars:
             all_maps.update({var.name: var})
+        for var in optimizer.weights:
+            all_maps.update({var.name: var})
 
-        all_vars = all_vars + average_vars
+        all_vars = all_vars + average_vars + optimizer.weights
 
         for var in all_vars:
             if var.name in var_loaded_fixed_name:
@@ -118,15 +120,21 @@ def load_weight_from_old_checkpoint(latest_checkpoint, target_model, model_name,
             value_to_load[target_model + key] = value
             if pop_key:
                 key_to_numpy.pop(_key)
-            _key = _key + "/ExponentialMovingAverage"
-            if "moving" not in _key:
-                if _key in key_to_numpy:
-                    value = key_to_numpy[_key]
+            _key1 = _key + "/ExponentialMovingAverage"
+            if "moving" not in _key1:
+                if _key1 in key_to_numpy:
+                    value = key_to_numpy[_key1]
                     value_to_load[target_model + key + "/ExponentialMovingAverage"] = value
                     if pop_key:
-                        key_to_numpy.pop(_key)
+                        key_to_numpy.pop(_key1)
                 else:
-                    print("Can't find the key: {}".format(_key))
+                    print("Can't find the key: {}".format(_key1))
+            _key2 = _key + "/RMSProp"
+            if _key2 in key_to_numpy:
+                value = key_to_numpy[_key2]
+                value_to_load[target_model + key + "/rms"] = value
+                if pop_key:
+                    key_to_numpy.pop(_key2)
         else:
             print("Can't find the key: {}".format(_key))
 
@@ -147,6 +155,12 @@ def load_weight_from_old_checkpoint(latest_checkpoint, target_model, model_name,
                             key_to_numpy.pop(_key)
                     else:
                         print("Can't find the key: {}".format(_key))
+                _key2 = _key + "/RMSProp"
+                if _key2 in key_to_numpy:
+                    value = key_to_numpy[_key2]
+                    value_to_load[target_model + key + "/rms"] = value
+                    if pop_key:
+                        key_to_numpy.pop(_key2)
             else:
                 print("Can't find the key: {}".format(_key))
 
@@ -159,15 +173,21 @@ def load_weight_from_old_checkpoint(latest_checkpoint, target_model, model_name,
                 value_to_load[target_model + key.format(i)] = value
                 if pop_key:
                     key_to_numpy.pop(_key_v)
-                _key_v = _key_v + "/ExponentialMovingAverage"
-                if "moving" not in _key_v:
-                    if _key_v in key_to_numpy:
-                        value = key_to_numpy[_key_v]
+                _key_v_2 = _key_v + "/ExponentialMovingAverage"
+                if "moving" not in _key_v_2:
+                    if _key_v_2 in key_to_numpy:
+                        value = key_to_numpy[_key_v_2]
                         value_to_load[target_model + key.format(i) + "/ExponentialMovingAverage"] = value
                         if pop_key:
-                            key_to_numpy.pop(_key_v)
+                            key_to_numpy.pop(_key_v_2)
                     else:
-                        print("Can't find the key: {}".format(_key_v))
+                        print("Can't find the key: {}".format(_key_v_2))
+                _key_v_2 = _key_v + "/RMSProp"
+                if _key_v_2 in key_to_numpy:
+                    value = key_to_numpy[_key_v_2]
+                    value_to_load[target_model + key.format(i) + "/rms"] = value
+                    if pop_key:
+                        key_to_numpy.pop(_key_v_2)
             else:
                 print("Can't find the key: {}".format(_key_v))
     return value_to_load

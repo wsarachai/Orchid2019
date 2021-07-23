@@ -31,6 +31,31 @@ def save_h5_weights(filename, weights):
         f.close()
 
 
+def save_h5_model_weights(filename, model):
+    f = h5py.File(filename + ".h5", "w")
+    try:
+        g = f.create_group("model_weights")
+        for w in model.weights:
+            val = w.numpy()
+            param_dset = g.create_dataset(w.name, val.shape, dtype=val.dtype)
+            if not val.shape:
+                # scalar
+                param_dset[()] = val
+            else:
+                param_dset[:] = val
+        g = f.create_group("model_optimizer")
+        for w in model.optimizer.weights:
+            val = w.numpy()
+            param_dset = g.create_dataset(w.name, val.shape, dtype=val.dtype)
+            if not val.shape:
+                # scalar
+                param_dset[()] = val
+            else:
+                param_dset[:] = val
+    finally:
+        f.close()
+
+
 def load_from_pretrain1(latest_checkpoint, **kwargs):
     pop_key = kwargs.get("pop_key", True)
     value_to_load = {}
@@ -89,6 +114,8 @@ class Orchids52Mobilenet140(object):
             self.model.compile(optimizer=self.optimizer, loss=self.loss_fn, metrics=metrics)
             # run_eagerly=True)
 
+        self.model.optimizer._create_all_weights(self.model.weights)
+
     def process_step(self, inputs, training=False):
         return self.model(inputs, training=training)
 
@@ -140,16 +167,16 @@ class Orchids52Mobilenet140(object):
         _, checkpoint_manager = self.checkpoint
         checkpoint_manager.save()
 
-        predict_layers_path = os.path.join(self.checkpoint_dir, "predict_layers")
-        for idx, predict_layer in enumerate(self.predict_layers):
-            if not tf.io.gfile.exists(predict_layers_path):
-                tf.io.gfile.makedirs(predict_layers_path)
-            prediction_layer_prefix = get_checkpoint_file(predict_layers_path, idx)
-            save_h5_weights(prediction_layer_prefix, predict_layer.weights)
+        # predict_layers_path = os.path.join(self.checkpoint_dir, "predict_layers")
+        # for idx, predict_layer in enumerate(self.predict_layers):
+        #     if not tf.io.gfile.exists(predict_layers_path):
+        #         tf.io.gfile.makedirs(predict_layers_path)
+        #     prediction_layer_prefix = get_checkpoint_file(predict_layers_path, idx)
+        #     save_h5_weights(prediction_layer_prefix, predict_layer.weights)
 
         file_to_save = checkpoint_manager.latest_checkpoint + ".h5"
         self.files_may_delete.append(file_to_save)
-        save_h5_weights(checkpoint_manager.latest_checkpoint, self.model.weights)
+        save_h5_model_weights(checkpoint_manager.latest_checkpoint, self.model)
 
         if len(self.files_may_delete) > self.max_to_keep:
             file_to_delete = self.files_may_delete.pop(0)

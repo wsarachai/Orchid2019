@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import os
 import tensorflow as tf
+from tensorflow.python.data import AUTOTUNE
 
 from data import orchids52_dataset
 from nets.const_vars import IMG_SIZE_224
@@ -73,11 +74,13 @@ def _load_dataset(
     else:
         decode_dataset = parsed_dataset.map(decode_example)
 
-    decode_dataset = decode_dataset.shuffle(batch_size * 8, reshuffle_each_iteration=True)
+    if split == "train":
+        decode_dataset = decode_dataset.shuffle(batch_size * 8, reshuffle_each_iteration=True)
 
     preprocess_image = wrapped_partial(orchids52_dataset.preprocess_image, image_size=IMG_SIZE_224)
     decode_dataset = decode_dataset.map(preprocess_image)
-    decode_dataset = decode_dataset.batch(batch_size=batch_size).cache().prefetch(2)
+    decode_dataset = decode_dataset.batch(batch_size=batch_size)
+    decode_dataset = decode_dataset.cache().prefetch(buffer_size=AUTOTUNE)
 
     if repeat:
         decode_dataset = decode_dataset.repeat()
