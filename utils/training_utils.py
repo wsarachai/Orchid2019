@@ -10,16 +10,18 @@ from utils.summary import k_summary
 
 
 class TrainClassifier:
-    def __init__(self,
-                 model,
-                 batch_size,
-                 summary_path,
-                 epoches,
-                 data_handler_steps,
-                 test_ds,
-                 hparams,
-                 moving_average_decay,
-                 callbacks):
+    def __init__(
+        self,
+        model,
+        batch_size,
+        summary_path,
+        epoches,
+        data_handler_steps,
+        test_ds,
+        hparams,
+        moving_average_decay,
+        callbacks,
+    ):
         self.model = model
         self.summary_path = summary_path
         self.epoches = epoches
@@ -170,6 +172,7 @@ class TrainClassifier:
 
             k_summary.scalar_update("accuracy/accuracy", accuracy, epoch)
             k_summary.scalar_update("accuracy/validation", t_acc, epoch)
+            k_summary.scalar_update("accuracy/overfitting", accuracy - t_acc, epoch)
             k_summary.scalar_update("loss/train_loss", train_loss, epoch)
             k_summary.scalar_update("loss/regularization_loss", regularization_loss, epoch)
             k_summary.scalar_update("loss/boundary_loss", boundary_loss, epoch)
@@ -180,7 +183,7 @@ class TrainClassifier:
             k_summary.end_epoch()
 
             if save_best_only and best_acc < t_acc:
-                logging.info("Saving best weights...")
+                logging.info("\nSaving best weights...")
                 best_acc = t_acc
                 self.model.save_model_variables()
             else:

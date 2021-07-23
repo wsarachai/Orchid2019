@@ -114,6 +114,7 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
         self.boundary_loss = boundary_loss
         self.stn_dense_checkpoints = []
         self.loaded_vars = {}
+        self.fast_augment = None
 
     def config_checkpoint(self, checkpoint_dir):
         super(Orchids52Mobilenet140STN, self).config_checkpoint(checkpoint_dir)
@@ -163,7 +164,7 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
             localization_params,
             key_to_numpy=key_to_numpy,
             include_prediction_layer=False,
-            **kwargs
+            **kwargs,
         )
         extract_var_loaded = super(Orchids52Mobilenet140STN, self).load_from_v1(
             latest_checkpoint,
@@ -171,7 +172,7 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
             features_extraction,
             key_to_numpy=key_to_numpy,
             include_prediction_layer=False,
-            **kwargs
+            **kwargs,
         )
         extract_comm_var_loaded = super(Orchids52Mobilenet140STN, self).load_from_v1(
             latest_checkpoint,
@@ -179,7 +180,7 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
             features_extraction_common,
             key_to_numpy=key_to_numpy,
             include_prediction_layer=False,
-            **kwargs
+            **kwargs,
         )
 
         for var_name in var_maps:
@@ -218,7 +219,6 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
         #             tf.io.gfile.makedirs(checkpoint_prefix)
         #         save_h5_weights(checkpoint_prefix + "/stn_dense_{}".format(i), stn_dense.weights)
 
-
     def set_mobilenet_training_status(self, trainable, **kwargs):
         super(Orchids52Mobilenet140STN, self).set_mobilenet_training_status(trainable, **kwargs)
         if self.branch_model:
@@ -256,11 +256,13 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
         checkpoint_dir = os.path.join(self.checkpoint_dir, training_step)
         latest_checkpoint = tf.train.latest_checkpoint(checkpoint_dir=checkpoint_dir)
 
-        load_model_from_hdf5(filepath=latest_checkpoint,
-                             model=self.mobilenet,
-                             optimizer=self.optimizer,
-                             loaded_vars=self.loaded_vars,
-                             **kwargs)
+        load_model_from_hdf5(
+            filepath=latest_checkpoint,
+            model=self.mobilenet,
+            optimizer=self.optimizer,
+            loaded_vars=self.loaded_vars,
+            **kwargs,
+        )
 
         if self.step > 1:
             for idx, predict_layer in enumerate(self.predict_layers):
@@ -338,7 +340,7 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
                         filepath=checkpoint_prefix + "/stn_dense_{}".format(i),
                         model=stn_dense,
                         optimizer=self.optimizer,
-                        loaded_vars=self.loaded_vars
+                        loaded_vars=self.loaded_vars,
                     )
 
     def load_model_step3(self, **kwargs):
@@ -346,10 +348,9 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
         checkpoint_dir = os.path.join(self.checkpoint_dir, training_step)
         latest_checkpoint = tf.train.latest_checkpoint(checkpoint_dir=checkpoint_dir)
 
-        load_model_from_hdf5(filepath=latest_checkpoint,
-                             model=self.model,
-                             optimizer=self.optimizer,
-                             loaded_vars=self.loaded_vars)
+        load_model_from_hdf5(
+            filepath=latest_checkpoint, model=self.model, optimizer=self.optimizer, loaded_vars=self.loaded_vars
+        )
 
     def load_model_step4(self, **kwargs):
         training_step = TRAIN_TEMPLATE.format(self.step)
@@ -360,10 +361,9 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
 
         latest_checkpoint = tf.train.latest_checkpoint(checkpoint_dir=checkpoint_dir)
 
-        load_model_from_hdf5(filepath=latest_checkpoint,
-                             model=self.model,
-                             optimizer=self.optimizer,
-                             loaded_vars=self.loaded_vars)
+        load_model_from_hdf5(
+            filepath=latest_checkpoint, model=self.model, optimizer=self.optimizer, loaded_vars=self.loaded_vars
+        )
 
     def load_model_step5(self, **kwargs):
         training_step = TRAIN_TEMPLATE.format(self.step)
@@ -374,10 +374,9 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
 
         latest_checkpoint = tf.train.latest_checkpoint(checkpoint_dir=checkpoint_dir)
 
-        load_model_from_hdf5(filepath=latest_checkpoint,
-                             model=self.model,
-                             optimizer=self.optimizer,
-                             loaded_vars=self.loaded_vars)
+        load_model_from_hdf5(
+            filepath=latest_checkpoint, model=self.model, optimizer=self.optimizer, loaded_vars=self.loaded_vars
+        )
 
     def load_model_variables(self, **kwargs):
         self.loaded_vars = {}
@@ -434,10 +433,9 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
                     var_loaded = self.load_from_v1(latest_checkpoint, **kwargs)
 
                 if var_loaded:
-                    result = load_weight(var_loaded=var_loaded,
-                                         all_vars=self.model.weights,
-                                         optimizer=self.model.optimizer,
-                                         **kwargs)
+                    result = load_weight(
+                        var_loaded=var_loaded, all_vars=self.model.weights, optimizer=self.model.optimizer, **kwargs
+                    )
 
         return result
 
@@ -453,7 +451,8 @@ def create_orchid_mobilenet_v2_15(num_classes, optimizer=None, loss_fn=None, tra
     activation = kwargs.pop("activation") if "activation" in kwargs else None
 
     inputs = keras.Input(shape=IMG_SHAPE_224)
-    preprocess_layer = PreprocessLayer(fast=False)
+    fast_augment = tf.Variable(True, trainable=False, dtype=tf.bool, name="fast_augment")
+    preprocess_layer = PreprocessLayer(fast=fast_augment)
     stn_base_model = create_mobilenet_v2(
         input_shape=IMG_SHAPE_224, alpha=1.4, include_top=False, weights="imagenet", sub_name="stn_base"
     )
