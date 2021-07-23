@@ -10,13 +10,23 @@ from utils.summary import k_summary
 
 
 class TrainClassifier:
-    def __init__(self, model, batch_size, summary_path, epoches, data_handler_steps, test_ds, hparams, callbacks):
+    def __init__(self,
+                 model,
+                 batch_size,
+                 summary_path,
+                 epoches,
+                 data_handler_steps,
+                 test_ds,
+                 hparams,
+                 moving_average_decay,
+                 callbacks):
         self.model = model
         self.summary_path = summary_path
         self.epoches = epoches
         self.data_handler_steps = data_handler_steps
         self.test_ds = test_ds
         self._hparams = dict(hparams)
+        self.moving_average_decay = moving_average_decay
         self.callbacks = callbacks
         self.train_loss_metric = tf.keras.metrics.Mean(name="train_loss")
         self.regularization_loss_metric = tf.keras.metrics.Mean(name="regularization_loss")
@@ -34,8 +44,17 @@ class TrainClassifier:
 
         self.model.compile(self.metrics)
 
+        if self.moving_average_decay:
+            self.variable_averages = tf.train.ExponentialMovingAverage(self.moving_average_decay)
+            self.model.variable_averages = self.variable_averages
+            self.variable_averages.apply(model.variables)
+
         for callback in self.callbacks:
             callback.set_model(self.model.model)
+
+    def get_average(self, var):
+        if self.variable_averages:
+            return self.variable_averages.average(var)
 
     @tf.function
     def train_step(self, inputs, labels):
@@ -48,8 +67,10 @@ class TrainClassifier:
             regularization_loss = tf.reduce_sum(self.model.get_regularization_loss())
             total_loss = regularization_loss + train_loss + boundary_loss
 
-        gradients = tape.gradient(total_loss, self.model.get_trainable_variables())
-        self.model.optimizer.apply_gradients(zip(gradients, self.model.get_trainable_variables()))
+        if self.variable_averages:
+            self.variable_averages.apply(self.model.trainable_variables)
+        gradients = tape.gradient(total_loss, self.model.trainable_variables)
+        self.model.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
 
         self.train_loss_metric.update_state(train_loss)
         self.regularization_loss_metric.update_state(regularization_loss)

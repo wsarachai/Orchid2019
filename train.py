@@ -13,7 +13,6 @@ from utils.lib_utils import config_loss
 from utils.start_app import FLAGS, start
 from utils.training_utils import TrainClassifier
 from utils import const
-from nets import const_vars
 
 
 def main(unused_argv):
@@ -49,20 +48,6 @@ def main(unused_argv):
         dropout=FLAGS.dropout,
     )
 
-    model.config_checkpoint(training_dir)
-    _checkpoint_dir = training_dir if FLAGS.train_step > 1 else trained_weights_dir
-    epoch = model.restore_model_variables(
-        checkpoint_dir=_checkpoint_dir, training_for_tf25=True, pop_key=False, training_step=FLAGS.train_step,
-    )
-
-    model.config_layers(
-        fine_tune=FLAGS.fine_tune, fine_tune_at=FLAGS.fine_tune_at
-    )
-    for var in model.trainable_variables:
-        logging.info("trainable variable: %s", var.name)
-
-    model.summary()
-
     def scheduler(epochs, _):
         _epochs = epochs
         if FLAGS.fine_tune:
@@ -80,6 +65,7 @@ def main(unused_argv):
         epoches=FLAGS.total_epochs,
         data_handler_steps=train_ds,
         test_ds=test_ds,
+        moving_average_decay=FLAGS.moving_average_decay,
         callbacks=[callback],
         hparams={
             "model": FLAGS.model,
@@ -93,6 +79,28 @@ def main(unused_argv):
             "epoches": FLAGS.total_epochs,
         },
     )
+
+    model.config_layers(
+        fine_tune=FLAGS.fine_tune, fine_tune_at=FLAGS.fine_tune_at
+    )
+    for var in model.trainable_variables:
+        logging.info("trainable variable: %s", var.name)
+
+    average_vars = []
+    for v in model.variables:
+        if "moving" not in v.name:
+            average_vars.append(train_model.get_average(v))
+
+    model.config_checkpoint(training_dir)
+    _checkpoint_dir = training_dir if FLAGS.train_step > 1 else trained_weights_dir
+    epoch = model.restore_model_variables(
+        checkpoint_dir=_checkpoint_dir,
+        training_for_tf25=True, pop_key=False,
+        training_step=FLAGS.train_step,
+        average_vars=average_vars
+    )
+
+    model.summary()
 
     train_model.fit(
         initial_epoch=epoch, bash=FLAGS.bash, save_best_only=FLAGS.save_best_only,

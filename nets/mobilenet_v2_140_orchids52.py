@@ -353,7 +353,8 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
                             latest_checkpoint=latest_checkpoint,
                             target_model="mobilenetv2_stn_base_1.40_224_",
                             model_name="MobilenetV2",
-                            include_prediction_layer=True,
+                            include_prediction_layer=False,
+                            **kwargs,
                         )
                     except Exception:
                         logging.info("Can't load checkpoint: %s", latest_checkpoint)
@@ -362,7 +363,7 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
                     var_loaded = self.load_from_v1(latest_checkpoint, **kwargs)
 
                 if var_loaded:
-                    result = load_weight(var_loaded, self.model.weights)
+                    result = load_weight(var_loaded, self.model.weights, **kwargs)
 
         return result
 

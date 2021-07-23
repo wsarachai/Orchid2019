@@ -14,18 +14,24 @@ def global_pool(shape, pool_op=keras.layers.AvgPool2D):
     return output
 
 
-def load_weight(var_loaded, all_vars, show_model_weights=False):
+def load_weight(var_loaded, all_vars, show_model_weights=False, **kwargs):
     result = False
+    average_vars = kwargs.get("average_vars", [])
+
     if var_loaded:
         var_loaded_fixed_name = {}
         for key in var_loaded:
             var_loaded_fixed_name.update({key + ":0": var_loaded[key]})
 
         all_maps = {}
-        for _, var in enumerate(all_vars):
+        for var in all_vars:
+            all_maps.update({var.name: var})
+        for var in average_vars:
             all_maps.update({var.name: var})
 
-        for _, var in enumerate(all_vars):
+        all_vars = all_vars + average_vars
+
+        for var in all_vars:
             if var.name in var_loaded_fixed_name:
                 saved_var = var_loaded_fixed_name[var.name]
                 if var.shape != saved_var.shape:
@@ -112,6 +118,15 @@ def load_weight_from_old_checkpoint(latest_checkpoint, target_model, model_name,
             value_to_load[target_model + key] = value
             if pop_key:
                 key_to_numpy.pop(_key)
+            _key = _key + "/ExponentialMovingAverage"
+            if "moving" not in _key:
+                if _key in key_to_numpy:
+                    value = key_to_numpy[_key]
+                    value_to_load[target_model + key + "/ExponentialMovingAverage"] = value
+                    if pop_key:
+                        key_to_numpy.pop(_key)
+                else:
+                    print("Can't find the key: {}".format(_key))
         else:
             print("Can't find the key: {}".format(_key))
 
@@ -123,6 +138,15 @@ def load_weight_from_old_checkpoint(latest_checkpoint, target_model, model_name,
                 value_to_load[key] = value
                 if pop_key:
                     key_to_numpy.pop(_key)
+                _key = _key + "/ExponentialMovingAverage"
+                if "moving" not in _key:
+                    if _key in key_to_numpy:
+                        value = key_to_numpy[_key]
+                        value_to_load[target_model + key + "/ExponentialMovingAverage"] = value
+                        if pop_key:
+                            key_to_numpy.pop(_key)
+                    else:
+                        print("Can't find the key: {}".format(_key))
             else:
                 print("Can't find the key: {}".format(_key))
 
@@ -135,6 +159,15 @@ def load_weight_from_old_checkpoint(latest_checkpoint, target_model, model_name,
                 value_to_load[target_model + key.format(i)] = value
                 if pop_key:
                     key_to_numpy.pop(_key_v)
+                _key_v = _key_v + "/ExponentialMovingAverage"
+                if "moving" not in _key_v:
+                    if _key_v in key_to_numpy:
+                        value = key_to_numpy[_key_v]
+                        value_to_load[target_model + key.format(i) + "/ExponentialMovingAverage"] = value
+                        if pop_key:
+                            key_to_numpy.pop(_key_v)
+                    else:
+                        print("Can't find the key: {}".format(_key_v))
             else:
                 print("Can't find the key: {}".format(_key_v))
     return value_to_load

@@ -25,6 +25,10 @@ flags.DEFINE_float("learning_rate", 0.001, "Learning Rate")
 
 flags.DEFINE_float("dropout", 0.2, "Learning Rate")
 
+flags.DEFINE_float('moving_average_decay', 0.9999,
+                   'The decay to use for the moving average.'
+                   'If left as None, then moving averages are not used.')
+
 flags.DEFINE_string("dataset_format", DATA_FORMAT_H5, "Dataset format")
 
 flags.DEFINE_string("dataset", ORCHIDS52, "Dataset")

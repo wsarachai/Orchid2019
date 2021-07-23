@@ -98,8 +98,13 @@ class Orchids52Mobilenet140(object):
     def get_regularization_loss(self):
         return self.model.losses
 
-    def get_trainable_variables(self):
+    @property
+    def trainable_variables(self):
         return self.model.trainable_variables
+
+    @property
+    def variables(self):
+        return self.model.variables
 
     def fit(self, train_ds, initial_epoch, epochs, validation_data=None, callbacks=None):
         return self.model.fit(
@@ -115,6 +120,10 @@ class Orchids52Mobilenet140(object):
     @property
     def trainable_variables(self):
         return self.model.trainable_variables
+
+    @property
+    def variables(self):
+        return self.model.variables
 
     def config_checkpoint(self, checkpoint_dir):
         assert self.optimizer is not None and self.predict_layers is not None
@@ -149,8 +158,11 @@ class Orchids52Mobilenet140(object):
     def load_from_v1(
         self, latest_checkpoint, target_model="mobilenetv2_01_1.40_224_", model_name="MobilenetV2", **kwargs
     ):
-        load_weight_from_old_checkpoint(
-            latest_checkpoint=latest_checkpoint, target_model=target_model, model_name=model_name
+        return load_weight_from_old_checkpoint(
+            latest_checkpoint=latest_checkpoint,
+            target_model=target_model,
+            model_name=model_name,
+            **kwargs
         )
 
     def restore_model_from_latest_checkpoint_if_exist(self, **kwargs):

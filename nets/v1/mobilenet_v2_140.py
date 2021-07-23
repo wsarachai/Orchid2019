@@ -109,7 +109,8 @@ class Orchids52Mobilenet140(object):
                 else:
                     var_loaded = self.load_from_v1(latest_checkpoint, **kwargs)
 
-                result = load_weight(var_loaded, self.model.weights)
+                var_list = kwargs.get("var_list", self.model.weights)
+                result = load_weight(var_loaded, var_list)
 
             else:
                 result = False
