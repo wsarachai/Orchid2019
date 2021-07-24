@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import sys
 import tensorflow as tf
 
 from absl import app
@@ -19,15 +20,17 @@ flags.DEFINE_integer("batch_size", 32, "Batch size")
 
 flags.DEFINE_integer("train_step", 1, "Training step")
 
-flags.DEFINE_integer("fine_tune_at", 100, "The starting number of model layer that will be trained.")
+flags.DEFINE_integer("fine_tune_at", None, "The starting number of model layer that will be trained.")
 
 flags.DEFINE_float("learning_rate", 0.001, "Learning Rate")
 
 flags.DEFINE_float("dropout", 0.2, "Learning Rate")
 
-flags.DEFINE_float('moving_average_decay', 0.9999,
-                   'The decay to use for the moving average.'
-                   'If left as None, then moving averages are not used.')
+flags.DEFINE_float(
+    "moving_average_decay",
+    0.9999,
+    "The decay to use for the moving average." "If left as None, then moving averages are not used.",
+)
 
 flags.DEFINE_string("dataset_format", DATA_FORMAT_H5, "Dataset format")
 
@@ -69,7 +72,15 @@ flags.DEFINE_string(
 )
 
 
-def start(start_fn, **kwargs):
+def start(start_fn):
     logging.set_verbosity(logging.INFO)
     logging.info("tf.version %s" % tf.version.VERSION)
-    app.run(start_fn, **kwargs)
+
+    argv = []
+    for arg in sys.argv:
+        if "eagerly" == arg:
+            tf.config.run_functions_eagerly(True)
+        else:
+            argv.append(arg)
+
+    app.run(start_fn, argv=argv)

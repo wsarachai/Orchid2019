@@ -156,7 +156,9 @@ class TrainClassifier:
                     first_graph_writing = False
 
                 accuracy = self.accuracy_metric.result().numpy()
+                train_loss = self.train_loss_metric.result().numpy()
                 k_summary.scalar_update("accuracy/fine_grain", accuracy, fine_grain_step)
+                k_summary.scalar_update("loss/fine_grain_loss", train_loss, fine_grain_step)
                 fine_grain_step += 1
                 k_summary.end_step()
 
@@ -170,9 +172,17 @@ class TrainClassifier:
             self.reset_metric()
             t_acc, t_loss = self.evaluate(datasets=self.test_ds)
 
+            overfitting = accuracy - t_acc
+            self.model.overfitting.assign(overfitting)
+
+            if overfitting > 0.1:
+                self.model.fast_augment.assign(0)
+            else:
+                self.model.fast_augment.assign(1)
+
             k_summary.scalar_update("accuracy/accuracy", accuracy, epoch)
             k_summary.scalar_update("accuracy/validation", t_acc, epoch)
-            k_summary.scalar_update("accuracy/overfitting", accuracy - t_acc, epoch)
+            k_summary.scalar_update("accuracy/overfitting", overfitting, epoch)
             k_summary.scalar_update("loss/train_loss", train_loss, epoch)
             k_summary.scalar_update("loss/regularization_loss", regularization_loss, epoch)
             k_summary.scalar_update("loss/boundary_loss", boundary_loss, epoch)

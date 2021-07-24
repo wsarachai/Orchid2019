@@ -186,10 +186,7 @@ class Orchids52Mobilenet140(object):
         self, latest_checkpoint, target_model="mobilenetv2_01_1.40_224_", model_name="MobilenetV2", **kwargs
     ):
         return load_weight_from_old_checkpoint(
-            latest_checkpoint=latest_checkpoint,
-            target_model=target_model,
-            model_name=model_name,
-            **kwargs
+            latest_checkpoint=latest_checkpoint, target_model=target_model, model_name=model_name, **kwargs
         )
 
     def restore_model_from_latest_checkpoint_if_exist(self, **kwargs):
@@ -240,9 +237,10 @@ class Orchids52Mobilenet140(object):
             if trainable:
                 self.mobilenet.trainable = True
 
-                # Freeze all the layers before the `fine_tune_at` layer
-                for layer in self.mobilenet.layers[:fine_tune_at]:
-                    layer.trainable = False
+                if fine_tune_at:
+                    # Freeze all the layers before the `fine_tune_at` layer
+                    for layer in self.mobilenet.layers[:fine_tune_at]:
+                        layer.trainable = False
             else:
                 self.mobilenet.trainable = False
 

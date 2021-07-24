@@ -18,8 +18,6 @@ from utils import const
 def main(unused_argv):
     logging.debug(unused_argv)
 
-    # tf.config.run_functions_eagerly(True)
-
     workspace_path = os.environ["WORKSPACE"] if "WORKSPACE" in os.environ else "/Users/watcharinsarachai/Documents/"
     create_model = nets_mapping[FLAGS.model]
 
@@ -49,6 +47,7 @@ def main(unused_argv):
     )
 
     def scheduler(epochs, _):
+        # tf.keras.optimizers.schedules.InverseTimeDecay
         _epochs = epochs
         if FLAGS.fine_tune:
             _epochs = _epochs - epoch
@@ -80,9 +79,7 @@ def main(unused_argv):
         },
     )
 
-    model.config_layers(
-        fine_tune=FLAGS.fine_tune, fine_tune_at=FLAGS.fine_tune_at
-    )
+    model.config_layers(fine_tune=FLAGS.fine_tune, fine_tune_at=FLAGS.fine_tune_at)
     for var in model.trainable_variables:
         logging.info("trainable variable: %s", var.name)
 
@@ -95,9 +92,10 @@ def main(unused_argv):
     _checkpoint_dir = training_dir if FLAGS.train_step > 1 else trained_weights_dir
     epoch = model.restore_model_variables(
         checkpoint_dir=_checkpoint_dir,
-        training_for_tf25=True, pop_key=False,
+        training_for_tf25=True,
+        pop_key=False,
         training_step=FLAGS.train_step,
-        average_vars=average_vars
+        average_vars=average_vars,
     )
 
     model.summary()

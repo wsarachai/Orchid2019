@@ -2,10 +2,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
-from tensorflow.python.keras import backend as K
-import tensorflow.keras as keras
 import nets
+import tensorflow as tf
+import tensorflow.keras as keras
+from tensorflow.python.keras import backend as K
 from utils.summary import k_summary
 from nets.const_vars import default_image_size
 from nets.mobilenet_v2 import IMG_SHAPE_224
@@ -28,15 +28,15 @@ def augmentation_m1(inputs, maxval=12):
 
 
 @tf.function
-def augmentation_m2(inputs, maxval=12):
+def augmentation_m2(inputs, maxval=24):
     sel = tf.random.uniform([], maxval=maxval, dtype=tf.int32)
     return tf.switch_case(
         sel,
         branch_fns={
             0: lambda: tf.image.random_brightness(inputs, max_delta=0.2),
             1: lambda: tf.image.random_contrast(inputs, lower=0.2, upper=0.5),
-            # 2: lambda: tf.image.random_saturation(inputs, lower=1, upper=5),
-            # 3: lambda: tf.image.random_hue(inputs, max_delta=0.2),
+            2: lambda: tf.image.random_saturation(inputs, lower=1, upper=5),
+            3: lambda: tf.image.random_hue(inputs, max_delta=0.2),
         },
         default=lambda: inputs,
     )
@@ -51,7 +51,7 @@ class PreprocessLayer(keras.layers.Layer):
         if training is None:
             training = True if K.learning_phase() == 1 else False
         if training:
-            if self.fast:
+            if tf.math.equal(self.fast, 1):
                 inputs = augmentation_m1(inputs)
             else:
                 inputs = augmentation_m1(inputs)
@@ -59,16 +59,35 @@ class PreprocessLayer(keras.layers.Layer):
         return inputs
 
 
+class ADropout(keras.layers.Layer):
+    def __init__(self, overfitting, **kwargs):
+        super().__init__(**kwargs)
+        self.overfitting = overfitting
+        self.dropout2 = keras.layers.Dropout(0.2)
+        self.dropout8 = keras.layers.Dropout(0.8)
+
+    def call(self, inputs, training=None, **kwargs):
+        if training is None:
+            training = True if K.learning_phase() == 1 else False
+
+        if tf.math.less_equal(self.overfitting, 0.15):
+            outputs = self.dropout2(inputs, training=training)
+        else:
+            outputs = self.dropout8(inputs, training=training)
+        return outputs
+
+
 class PredictionLayer(keras.layers.Layer):
-    def __init__(self, num_classes, activation=None, stddev=0.09, dropout_ratio=0.2):
+    def __init__(self, num_classes, overfitting, activation=None, stddev=0.09):
         super(PredictionLayer, self).__init__()
         self.global_average_pooling = tf.keras.layers.GlobalAveragePooling2D()
-        self.dropout = keras.layers.Dropout(dropout_ratio)
+        self.dropout = ADropout(overfitting=overfitting)
 
         self.dense = keras.layers.Dense(
             num_classes,
             kernel_initializer=tf.keras.initializers.TruncatedNormal(mean=0.0, stddev=stddev),
             kernel_regularizer=None,
+            # activation='elu',
         )
         self.prediction_fn = activations.get(activation)
 
@@ -91,7 +110,7 @@ class PredictionLayer(keras.layers.Layer):
 
 
 class BranchBlock(keras.layers.Layer):
-    def __init__(self, num_classes, batch_size, dropout, width=default_image_size, height=default_image_size):
+    def __init__(self, num_classes, batch_size, overfitting, width=default_image_size, height=default_image_size):
         super(BranchBlock, self).__init__()
         self.batch_size = batch_size
         self.width = width
@@ -103,9 +122,9 @@ class BranchBlock(keras.layers.Layer):
             input_shape=IMG_SHAPE_224, alpha=1.4, include_top=False, weights="imagenet", sub_name="shared_branch"
         )
         self.branches_prediction_models = [
-            PredictionLayer(num_classes=num_classes, dropout_ratio=dropout),
-            PredictionLayer(num_classes=num_classes, dropout_ratio=dropout),
-            PredictionLayer(num_classes=num_classes, dropout_ratio=dropout),
+            PredictionLayer(num_classes=num_classes, overfitting=overfitting),
+            PredictionLayer(num_classes=num_classes, overfitting=overfitting),
+            PredictionLayer(num_classes=num_classes, overfitting=overfitting),
         ]
 
     def call(self, inputs, training=None, **kwargs):
@@ -131,9 +150,10 @@ class BranchBlock(keras.layers.Layer):
         if trainable:
             self.global_branch_model.trainable = True
 
-            # Freeze all the layers before the `fine_tune_at` layer
-            for layer in self.global_branch_model.layers[:fine_tune_at]:
-                layer.trainable = False
+            if fine_tune_at:
+                # Freeze all the layers before the `fine_tune_at` layer
+                for layer in self.global_branch_model.layers[:fine_tune_at]:
+                    layer.trainable = False
         else:
             self.global_branch_model.trainable = False
 
@@ -141,9 +161,10 @@ class BranchBlock(keras.layers.Layer):
         if trainable:
             self.shared_branch_model.trainable = True
 
-            # Freeze all the layers before the `fine_tune_at` layer
-            for layer in self.shared_branch_model.layers[:fine_tune_at]:
-                layer.trainable = False
+            if fine_tune_at:
+                # Freeze all the layers before the `fine_tune_at` layer
+                for layer in self.shared_branch_model.layers[:fine_tune_at]:
+                    layer.trainable = False
         else:
             self.shared_branch_model.trainable = False
 
