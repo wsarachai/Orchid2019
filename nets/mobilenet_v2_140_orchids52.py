@@ -212,8 +212,8 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
 
         return value_to_load
 
-    def save_model_variables(self):
-        super(Orchids52Mobilenet140STN, self).save_model_variables()
+    def save_model_variables(self, checkpoint_number=None):
+        super(Orchids52Mobilenet140STN, self).save_model_variables(checkpoint_number)
 
         # if self.stn_denses and len(self.stn_denses) > 0:
         #     for i, stn_dense in enumerate(self.stn_denses):

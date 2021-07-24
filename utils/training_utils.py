@@ -107,14 +107,17 @@ class TrainClassifier:
         for callback in self.callbacks:
             callback.on_epoch_begin(epoch, logs)
 
+    def on_epoch_end(self, epoch, logs=None):
+        for callback in self.callbacks:
+            callback.on_epoch_end(epoch, logs)
+
     def fit(self, initial_epoch, **kwargs):
         target = self.data_handler_steps.size // self.batch_size
-        fine_grain_step = max(0, (initial_epoch - 1)) * target
         is_run_from_bash = kwargs.pop("bash") if "bash" in kwargs else False
         save_best_only = kwargs.pop("save_best_only") if "save_best_only" in kwargs else False
         finalize = False if not is_run_from_bash else True
         progbar = tf.keras.utils.Progbar(
-            target,
+            self.epoches,
             width=30,
             verbose=1,
             interval=0.05,
@@ -125,79 +128,82 @@ class TrainClassifier:
         best_acc = 0
         first_graph_writing = True
 
+        tf_version = "2.5"
+        tfv = tf.version.VERSION.split(".")
+        if tfv[0] == "2" and tfv[1] == "4":
+            tf_version = "2.4"
+
         k_summary.re_init(self.summary_path, target)
         k_summary.hparams_pb(self._hparams)
+        global_step = tf.compat.v1.train.get_global_step()
+        global_step.assign(initial_epoch)
+        for inputs, labels in self.data_handler_steps:
+            k_summary.set_epoch(epoch=global_step)
+            if global_step == initial_epoch or global_step % target == 0:
+                self.on_epoch_begin(epoch=global_step)
+                k_summary.hparams(self._hparams)
 
-        for epoch in range(initial_epoch, self.epoches + 1):
-            print("\nEpoch: {}/{}".format(epoch, self.epoches))
+            if first_graph_writing and global_step == 1 and tf_version == "2.4":
+                k_summary.trace_on(graph=True)
 
-            self.on_epoch_begin(epoch=epoch)
-            k_summary.set_epoch(epoch=epoch)
-            k_summary.hparams(self._hparams)
+            logs = self.train_step(inputs, labels)
+            logs = copy.copy(logs) if logs else {}
+            progbar.update(global_step.numpy(), list(logs.items()), finalize=finalize)
 
-            self.reset_metric()
-            seen = 0
+            if first_graph_writing and global_step == 1:
+                k_summary.graph(
+                    fn_name="train_step", graph=self.train_step.get_concrete_function(inputs, labels).graph
+                )
+                first_graph_writing = False
 
-            for inputs, labels in self.data_handler_steps:
-                if inputs.shape.as_list()[0] == self.batch_size:
-                    tfv = tf.version.VERSION.split(".")
-                    if first_graph_writing and epoch == 1 and (tfv[0] == "2" and tfv[1] == "4"):
-                        k_summary.trace_on(graph=True)
-                    logs = self.train_step(inputs, labels)
-                    logs = copy.copy(logs) if logs else {}
-                    num_steps = logs.pop("num_steps", 1)
-                    seen += num_steps
-                    progbar.update(seen, list(logs.items()), finalize=finalize)
+            if global_step % 10 == 0:
+                k_summary.scalar_update("accuracy/fine_grain", logs['accuracy'], global_step)
+                k_summary.scalar_update("loss/fine_grain_loss", logs['total_loss'], global_step)
+            k_summary.end_step()
 
-                if first_graph_writing and epoch == 1:
-                    k_summary.graph(
-                        fn_name="train_step", graph=self.train_step.get_concrete_function(inputs, labels).graph
-                    )
-                    first_graph_writing = False
-
-                accuracy = self.accuracy_metric.result().numpy()
+            if global_step % target == 0:
                 train_loss = self.train_loss_metric.result().numpy()
-                k_summary.scalar_update("accuracy/fine_grain", accuracy, fine_grain_step)
-                k_summary.scalar_update("loss/fine_grain_loss", train_loss, fine_grain_step)
-                fine_grain_step += 1
-                k_summary.end_step()
+                regularization_loss = self.regularization_loss_metric.result().numpy()
+                boundary_loss = self.boundary_loss_metric.result().numpy()
+                total_loss = self.total_loss_metric.result().numpy()
+                accuracy = self.accuracy_metric.result().numpy()
 
-            train_loss = self.train_loss_metric.result().numpy()
-            regularization_loss = self.regularization_loss_metric.result().numpy()
-            boundary_loss = self.boundary_loss_metric.result().numpy()
-            total_loss = self.total_loss_metric.result().numpy()
-            accuracy = self.accuracy_metric.result().numpy()
+                print("\n")
+                t_acc, t_loss = self.evaluate(datasets=self.test_ds)
 
-            print("\n")
-            self.reset_metric()
-            t_acc, t_loss = self.evaluate(datasets=self.test_ds)
+                overfitting = accuracy - t_acc
+                self.model.overfitting.assign(overfitting)
 
-            overfitting = accuracy - t_acc
-            self.model.overfitting.assign(overfitting)
+                if overfitting > 0.1:
+                    self.model.fast_augment.assign(0)
+                else:
+                    self.model.fast_augment.assign(1)
 
-            if overfitting > 0.1:
-                self.model.fast_augment.assign(0)
-            else:
-                self.model.fast_augment.assign(1)
+                k_summary.scalar_update("accuracy/accuracy", accuracy, global_step)
+                k_summary.scalar_update("accuracy/validation", t_acc, global_step)
+                k_summary.scalar_update("accuracy/overfitting", overfitting, global_step)
+                k_summary.scalar_update("loss/train_loss", train_loss, global_step)
+                k_summary.scalar_update("loss/regularization_loss", regularization_loss, global_step)
+                k_summary.scalar_update("loss/boundary_loss", boundary_loss, global_step)
+                k_summary.scalar_update("loss/total_loss", total_loss, global_step)
+                k_summary.scalar_update("loss/validation/loss", t_loss, global_step)
+                k_summary.scalar_update("scalar/learning_rate", self.model.optimizer.lr, global_step)
+                self.reset_metric()
 
-            k_summary.scalar_update("accuracy/accuracy", accuracy, epoch)
-            k_summary.scalar_update("accuracy/validation", t_acc, epoch)
-            k_summary.scalar_update("accuracy/overfitting", overfitting, epoch)
-            k_summary.scalar_update("loss/train_loss", train_loss, epoch)
-            k_summary.scalar_update("loss/regularization_loss", regularization_loss, epoch)
-            k_summary.scalar_update("loss/boundary_loss", boundary_loss, epoch)
-            k_summary.scalar_update("loss/total_loss", total_loss, epoch)
-            k_summary.scalar_update("loss/validation/loss", t_loss, epoch)
-            k_summary.scalar_update("scalar/learning_rate", self.model.optimizer.lr, epoch)
+                k_summary.end_epoch()
 
-            k_summary.end_epoch()
+                if save_best_only and best_acc < t_acc:
+                    logging.info("\nSaving best weights...")
+                    best_acc = t_acc
+                    self.model.save_model_variables(checkpoint_number=global_step)
+                else:
+                    self.model.save_model_variables(checkpoint_number=global_step)
 
-            if save_best_only and best_acc < t_acc:
-                logging.info("\nSaving best weights...")
-                best_acc = t_acc
-                self.model.save_model_variables()
-            else:
-                self.model.save_model_variables()
+                self.on_epoch_end(epoch=global_step)
+
+            global_step.assign_add(1)
+            if global_step >= self.epoches:
+                break
 
         k_summary.session_end_pb()
 

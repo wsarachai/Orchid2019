@@ -155,17 +155,18 @@ class Orchids52Mobilenet140(object):
     def config_checkpoint(self, checkpoint_dir):
         assert self.optimizer is not None and self.predict_layers is not None
 
+        global_step = tf.compat.v1.train.get_global_step()
         self.checkpoint_dir = checkpoint_dir
-        checkpoint = tf.train.Checkpoint(step=tf.Variable(1), optimizer=self.optimizer, model=self.model)
+        checkpoint = tf.train.Checkpoint(step=global_step, optimizer=self.optimizer, model=self.model)
         checkpoint_prefix = os.path.join(checkpoint_dir, TRAIN_TEMPLATE.format(self.step))
         checkpoint_manager = tf.train.CheckpointManager(
             checkpoint, directory=checkpoint_prefix, max_to_keep=self.max_to_keep
         )
         self.checkpoint = (checkpoint, checkpoint_manager)
 
-    def save_model_variables(self):
+    def save_model_variables(self, checkpoint_number):
         _, checkpoint_manager = self.checkpoint
-        checkpoint_manager.save()
+        checkpoint_manager.save(checkpoint_number=checkpoint_number)
 
         # predict_layers_path = os.path.join(self.checkpoint_dir, "predict_layers")
         # for idx, predict_layer in enumerate(self.predict_layers):

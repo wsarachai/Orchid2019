@@ -18,6 +18,7 @@ from utils import const
 def main(unused_argv):
     logging.debug(unused_argv)
 
+    tf.compat.v1.train.get_or_create_global_step()
     workspace_path = os.environ["WORKSPACE"] if "WORKSPACE" in os.environ else "/Users/watcharinsarachai/Documents/"
     create_model = nets_mapping[FLAGS.model]
 
@@ -27,7 +28,7 @@ def main(unused_argv):
         os.makedirs(training_dir)
 
     train_ds = load_dataset(
-        flags=FLAGS, workspace_path=workspace_path, split="train", preprocessing=True, one_hot=True
+        flags=FLAGS, workspace_path=workspace_path, split="train", preprocessing=True, one_hot=True, repeat=True
     )
     test_ds = load_dataset(flags=FLAGS, workspace_path=workspace_path, split="test", preprocessing=True, one_hot=True)
 
