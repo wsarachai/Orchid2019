@@ -219,12 +219,12 @@ class Orchids52Mobilenet140(object):
         pass
 
     def restore_model_variables(self, checkpoint_dir=None, **kwargs):
-        step = 1
+        step = 0
         loaded_successfully = self.restore_model_from_latest_checkpoint_if_exist(
             checkpoint_dir=checkpoint_dir, **kwargs
         )
         if loaded_successfully:
-            step = self.get_step_number_from_latest_checkpoint() + 1
+            step = self.get_step_number_from_latest_checkpoint()
         else:
             self.load_model_variables()
         return step
@@ -248,7 +248,8 @@ class Orchids52Mobilenet140(object):
     def set_prediction_training_status(self, trainable, **kwargs):
         if self.predict_layers:
             for p in self.predict_layers:
-                p.trainable = trainable
+                if p:
+                    p.trainable = trainable
 
     def save(self, filepath, overwrite=True, include_optimizer=True, save_format=None, signatures=None, options=None):
         model_path = os.path.join(filepath, "model")

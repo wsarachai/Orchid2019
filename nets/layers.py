@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+from utils.const import TRAIN_STEP2, TRAIN_STEP3, TRAIN_STEP4, TRAIN_STEP5
 
 import nets
 import tensorflow as tf
@@ -56,6 +57,12 @@ class PreprocessLayer(keras.layers.Layer):
             else:
                 inputs = augmentation_m1(inputs)
                 inputs = augmentation_m2(inputs)
+
+            image_update_1_0 = tf.function(k_summary.image_update).get_concrete_function(
+                name="stn/image/1.0", unit=inputs, max_outputs=3
+            )
+            image_update_1_0(unit=inputs)
+
         return inputs
 
 
@@ -110,32 +117,57 @@ class PredictionLayer(keras.layers.Layer):
 
 
 class BranchBlock(keras.layers.Layer):
-    def __init__(self, num_classes, batch_size, overfitting, width=default_image_size, height=default_image_size):
+    def __init__(
+        self, step, num_classes, batch_size, overfitting, width=default_image_size, height=default_image_size
+    ):
         super(BranchBlock, self).__init__()
+        self.step = step
         self.batch_size = batch_size
         self.width = width
         self.height = height
-        self.global_branch_model = nets.mobilenet_v2.create_mobilenet_v2(
-            input_shape=IMG_SHAPE_224, alpha=1.4, include_top=False, weights="imagenet", sub_name="global_branch"
-        )
-        self.shared_branch_model = nets.mobilenet_v2.create_mobilenet_v2(
-            input_shape=IMG_SHAPE_224, alpha=1.4, include_top=False, weights="imagenet", sub_name="shared_branch"
-        )
+
         self.branches_prediction_models = [
             PredictionLayer(num_classes=num_classes, overfitting=overfitting),
             PredictionLayer(num_classes=num_classes, overfitting=overfitting),
             PredictionLayer(num_classes=num_classes, overfitting=overfitting),
         ]
 
+        if self.step >= 4:
+            self.global_branch_model = nets.mobilenet_v2.create_mobilenet_v2(
+                input_shape=IMG_SHAPE_224, alpha=1.4, include_top=False, weights="imagenet", sub_name="global_branch"
+            )
+            self.shared_branch_model = nets.mobilenet_v2.create_mobilenet_v2(
+                input_shape=IMG_SHAPE_224, alpha=1.4, include_top=False, weights="imagenet", sub_name="shared_branch"
+            )
+
+        else:
+            self.shared_branch_model = nets.mobilenet_v2.create_mobilenet_v2(
+                input_shape=IMG_SHAPE_224, alpha=1.4, include_top=False, weights="imagenet", sub_name="shared_branch"
+            )
+
     def call(self, inputs, training=None, **kwargs):
         if training is None:
             training = True if K.learning_phase() == 1 else False
 
-        return [
-            self.get_prediction_layer(1, inputs[0], self.branches_prediction_models[0], training),
-            self.get_prediction_layer(2, inputs[1], self.branches_prediction_models[1], training),
-            self.get_prediction_layer(2, inputs[2], self.branches_prediction_models[2], training),
-        ]
+        if self.step >= 4:
+            return [
+                self.get_prediction_layer(1, inputs[0], self.branches_prediction_models[0], training),
+                self.get_prediction_layer(2, inputs[1], self.branches_prediction_models[1], training),
+                self.get_prediction_layer(2, inputs[2], self.branches_prediction_models[2], training),
+            ]
+        else:
+            if self.step == 2:
+                return [
+                    None,
+                    None,
+                    self.get_prediction_layer(2, inputs[2], self.branches_prediction_models[2], training),
+                ]
+            elif self.step == 3:
+                return [
+                    None,
+                    self.get_prediction_layer(2, inputs[1], self.branches_prediction_models[1], training),
+                    None,
+                ]
 
     def get_prediction_layer(self, branch, inp, prediction, training):
         if branch == 1:
@@ -155,7 +187,8 @@ class BranchBlock(keras.layers.Layer):
                 for layer in self.global_branch_model.layers[:fine_tune_at]:
                     layer.trainable = False
         else:
-            self.global_branch_model.trainable = False
+            if hasattr(self, "global_branch_model") and self.global_branch_model:
+                self.global_branch_model.trainable = False
 
     def set_trainable_for_share_branch(self, trainable, fine_tune_at=100):
         if trainable:
@@ -166,7 +199,8 @@ class BranchBlock(keras.layers.Layer):
                 for layer in self.shared_branch_model.layers[:fine_tune_at]:
                     layer.trainable = False
         else:
-            self.shared_branch_model.trainable = False
+            if hasattr(self, "shared_branch_model") and self.shared_branch_model:
+                self.shared_branch_model.trainable = False
 
 
 class EstimationBlock(keras.layers.Layer):

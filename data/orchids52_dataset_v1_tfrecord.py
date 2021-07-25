@@ -75,7 +75,7 @@ def _load_dataset(
         decode_dataset = parsed_dataset.map(decode_example)
 
     if split == "train":
-        decode_dataset = decode_dataset.shuffle(280, reshuffle_each_iteration=True)
+        decode_dataset = decode_dataset.shuffle(batch_size * 10, reshuffle_each_iteration=True)
 
     preprocess_image = wrapped_partial(orchids52_dataset.preprocess_image, image_size=IMG_SIZE_224)
     decode_dataset = decode_dataset.map(preprocess_image)

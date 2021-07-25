@@ -338,62 +338,37 @@ def get_parameter(batch_size, input, x_zero, y_zero, scale):
 
 
 class SpatialTransformerNetwork(tf.keras.layers.Layer):
-    def __init__(self, batch_size, width, height, scales):
+    def __init__(self, batch_size, width, height, scale):
         super(SpatialTransformerNetwork, self).__init__()
         self.batch_size = batch_size
-        self.scales = scales
+        self.scale = scale
         self.x_zero = tf.constant(0.0, shape=(batch_size, 1), dtype=tf.float32)
         self.y_zero = tf.constant(0.0, shape=(batch_size, 1), dtype=tf.float32)
-        self.scale1 = tf.constant(scales[0], shape=(batch_size, 1), dtype=tf.float32)
-        self.scale2 = tf.constant(scales[1], shape=(batch_size, 1), dtype=tf.float32)
+        self.scale_mat = tf.constant(scale, shape=(batch_size, 1), dtype=tf.float32)
 
-        stn_inputs = tf.keras.Input(shape=(2, 3))
-        grid = affine_grid_generator(width, height, stn_inputs)
-
-        self.batch_grids_m = tf.keras.Model(stn_inputs, grid, name="affine_grid_generator")
+        self.stn_inputs = tf.keras.Input(shape=(2, 3))
+        grid = affine_grid_generator(width, height, self.stn_inputs)
+        self.batch_grids_m = tf.keras.Model(self.stn_inputs, grid, name="affine_grid_generator")
 
     def call(self, inputs, training=None, **kwargs):
         if training is None:
             training = K.learning_phase()
 
-        thetas = kwargs.get("thetas", None)
-        bound_err = []
+        theta = kwargs.get("theta", None)
+        thetas, bound_err = get_parameter(self.batch_size, theta, self.x_zero, self.y_zero, self.scale_mat)
 
-        parameter1, b_err1 = get_parameter(self.batch_size, thetas[0], self.x_zero, self.y_zero, self.scale1)
-        parameter2, b_err2 = get_parameter(self.batch_size, thetas[1], self.x_zero, self.y_zero, self.scale2)
-        thetas = [parameter1, parameter2]
+        _theta = tf.squeeze(thetas, axis=1)
+        batch_grids = self.batch_grids_m(_theta)
 
-        h_trans = [inputs]
+        x_s = batch_grids[:, 0, :, :]
+        y_s = batch_grids[:, 1, :, :]
+
+        out_fmap = bilinear_sampler(inputs, x_s, y_s)
 
         if training and self.trainable:
-            bound_err = [b_err1, b_err2]
-
-            bound_err = tf.concat(bound_err, axis=1)
-            histogram_update = tf.function(k_summary.histogram_update).get_concrete_function(
-                name="boundary_error", unit=bound_err
+            image_update_s = tf.function(k_summary.image_update).get_concrete_function(
+                name="stn/image/{}".format(self.scale), unit=out_fmap, max_outputs=3
             )
-            histogram_update(unit=bound_err)
+            image_update_s(unit=out_fmap)
 
-            image_update_1_0 = tf.function(k_summary.image_update).get_concrete_function(
-                name="stn/image/1.0", unit=inputs, max_outputs=3
-            )
-            image_update_1_0(unit=inputs)
-
-        for i in range(2):
-            _theta = tf.squeeze(thetas[i], axis=1)
-
-            batch_grids = self.batch_grids_m(_theta)
-
-            x_s = batch_grids[:, 0, :, :]
-            y_s = batch_grids[:, 1, :, :]
-
-            out_fmap = bilinear_sampler(inputs, x_s, y_s)
-            h_trans.append(out_fmap)
-
-            if training and self.trainable:
-                image_update_s = tf.function(k_summary.image_update).get_concrete_function(
-                    name="stn/image/{}".format(self.scales[i]), unit=out_fmap, max_outputs=3
-                )
-                image_update_s(unit=out_fmap)
-
-        return h_trans, bound_err
+        return out_fmap, bound_err

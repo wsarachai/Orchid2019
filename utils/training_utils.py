@@ -11,20 +11,10 @@ from utils.summary import k_summary
 
 class TrainClassifier:
     def __init__(
-        self,
-        model,
-        batch_size,
-        summary_path,
-        epoches,
-        data_handler_steps,
-        test_ds,
-        hparams,
-        moving_average_decay,
-        callbacks,
+        self, model, batch_size, summary_path, data_handler_steps, test_ds, hparams, moving_average_decay, callbacks,
     ):
         self.model = model
         self.summary_path = summary_path
-        self.epoches = epoches
         self.data_handler_steps = data_handler_steps
         self.test_ds = test_ds
         self._hparams = dict(hparams)
@@ -111,13 +101,13 @@ class TrainClassifier:
         for callback in self.callbacks:
             callback.on_epoch_end(epoch, logs)
 
-    def fit(self, initial_epoch, **kwargs):
+    def fit(self, initial_epoch, epoches, **kwargs):
         target = self.data_handler_steps.size // self.batch_size
         is_run_from_bash = kwargs.pop("bash") if "bash" in kwargs else False
         save_best_only = kwargs.pop("save_best_only") if "save_best_only" in kwargs else False
         finalize = False if not is_run_from_bash else True
         progbar = tf.keras.utils.Progbar(
-            self.epoches,
+            epoches,
             width=30,
             verbose=1,
             interval=0.05,
@@ -138,6 +128,7 @@ class TrainClassifier:
         global_step = tf.compat.v1.train.get_global_step()
         global_step.assign(initial_epoch)
         for inputs, labels in self.data_handler_steps:
+            global_step.assign_add(1)
             k_summary.set_epoch(epoch=global_step)
             if global_step == initial_epoch or global_step % target == 0:
                 self.on_epoch_begin(epoch=global_step)
@@ -157,8 +148,8 @@ class TrainClassifier:
                 first_graph_writing = False
 
             if global_step % 10 == 0:
-                k_summary.scalar_update("accuracy/fine_grain", logs['accuracy'], global_step)
-                k_summary.scalar_update("loss/fine_grain_loss", logs['total_loss'], global_step)
+                k_summary.scalar_update("accuracy/fine_grain", logs["accuracy"], global_step)
+                k_summary.scalar_update("loss/fine_grain_loss", logs["total_loss"], global_step)
             k_summary.end_step()
 
             if global_step % target == 0:
@@ -169,7 +160,9 @@ class TrainClassifier:
                 accuracy = self.accuracy_metric.result().numpy()
 
                 print("\n")
+                self.reset_metric()
                 t_acc, t_loss = self.evaluate(datasets=self.test_ds)
+                self.reset_metric()
 
                 overfitting = accuracy - t_acc
                 self.model.overfitting.assign(overfitting)
@@ -188,21 +181,20 @@ class TrainClassifier:
                 k_summary.scalar_update("loss/total_loss", total_loss, global_step)
                 k_summary.scalar_update("loss/validation/loss", t_loss, global_step)
                 k_summary.scalar_update("scalar/learning_rate", self.model.optimizer.lr, global_step)
-                self.reset_metric()
 
                 k_summary.end_epoch()
 
-                if save_best_only and best_acc < t_acc:
-                    logging.info("\nSaving best weights...")
-                    best_acc = t_acc
-                    self.model.save_model_variables(checkpoint_number=global_step)
+                if save_best_only:
+                    if best_acc < t_acc:
+                        logging.info("\nSaving best weights...")
+                        best_acc = t_acc
+                        self.model.save_model_variables(checkpoint_number=global_step)
                 else:
                     self.model.save_model_variables(checkpoint_number=global_step)
 
                 self.on_epoch_end(epoch=global_step)
 
-            global_step.assign_add(1)
-            if global_step >= self.epoches:
+            if global_step >= epoches:
                 break
 
         k_summary.session_end_pb()

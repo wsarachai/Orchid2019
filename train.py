@@ -62,7 +62,6 @@ def main(unused_argv):
         model=model,
         batch_size=FLAGS.batch_size,
         summary_path=log_dir,
-        epoches=FLAGS.total_epochs,
         data_handler_steps=train_ds,
         test_ds=test_ds,
         moving_average_decay=FLAGS.moving_average_decay,
@@ -101,8 +100,9 @@ def main(unused_argv):
 
     model.summary()
 
+    total_epochs = epoch + FLAGS.total_epochs
     train_model.fit(
-        initial_epoch=epoch, bash=FLAGS.bash, save_best_only=FLAGS.save_best_only,
+        initial_epoch=epoch, epoches=total_epochs, bash=FLAGS.bash, save_best_only=FLAGS.save_best_only,
     )
 
     # if FLAGS.save_model and model:

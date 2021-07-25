@@ -140,7 +140,7 @@ class Orchids52Mobilenet140(object):
         if not loaded_successfully:
             self.load_model_variables()
         else:
-            step = self.get_step_number_from_latest_checkpoint() + 1
+            step = self.get_step_number_from_latest_checkpoint()
         self.config_layers(**kwargs)
         for var in self.model.trainable_variables:
             print("trainable variable: ", var.name)
