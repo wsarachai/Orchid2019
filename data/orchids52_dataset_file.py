@@ -72,7 +72,11 @@ class OrchidsDataset(object):
     ):
         image_path = os.path.join(root_path, split)
         images_dir = Path(image_path)
-        dataset = tf.data.Dataset.list_files(str(images_dir / "*/*"), shuffle=False)
+
+        shuffle = True if split == "train" else False
+        dataset = tf.data.Dataset.list_files(str(images_dir / "*/*"), shuffle=shuffle)
+        # dataset = tf.data.Dataset.list_files(str(images_dir / "*/*"), shuffle=shuffle) for 0.3 detector
+        # dataset = tf.data.Dataset.list_files(str(images_dir / "*/*"), shuffle=shuffle) for 0.5 detector
 
         self.extracting_label_warping(data_dir=images_dir, **kwargs)
         decode_dataset = dataset.map(self.extracting_label, num_parallel_calls=tf.data.experimental.AUTOTUNE)

@@ -12,7 +12,7 @@
       "console": "integratedTerminal",
       "args": [
         "--train_step=1",
-        "--batch_size=16",
+        "--batch_size=64",
         "--dataset_format=tf-records",
         "--dataset=orchids52_data",
         "--dataset_version=v1",
@@ -22,9 +22,9 @@
         "--save_model=True",
         "--bash=False",
         "--learning_rate_decay=exponential",
-        "--fine_tune=True",
+        "--fine_tune=False",
         "--save_best_only=True",
-        "--trained_dir=_trained_models/checkpoints/mobilenet_v2_1.4_224/mobilenet_v2_1.4_224.ckpt"
+        "--trained_dir=_trained_models/model-v1/mobilenet_v2_140_orchids52_0001/pretrain2/model.ckpt-12000"
       ]
     },
     {
@@ -36,12 +36,12 @@
       "args": [
         "--train_step=4",
         "--batch_size=4",
-        "--dataset_format=tf-records",
+        "--dataset_format=files",
         "--dataset=orchids52_data",
         "--dataset_version=v1",
         "--model=mobilenet_v2_140_stn_v15",
         "--learning_rate=0.001",
-        "--total_epochs=5000",
+        "--total_epochs=20000",
         "--save_model=False",
         "--bash=False",
         "--learning_rate_decay=exponential",

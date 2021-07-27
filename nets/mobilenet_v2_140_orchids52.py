@@ -236,7 +236,7 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
             # self.stn_denses[0].trainable = False
         elif self.step == 3:
             self.set_mobilenet_training_status(False, **kwargs)
-            # self.set_prediction_training_status(False, **kwargs)
+            self.set_prediction_training_status(False, **kwargs)
             # self.stn_denses[1].trainable = False
         elif self.step == 4:
             self.set_mobilenet_training_status(False, **kwargs)
@@ -284,7 +284,13 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
                     )
         else:
             for predict_layer in self.predict_layers:
-                load_model_from_hdf5(latest_checkpoint, predict_layer, **kwargs)
+                load_model_from_hdf5(
+                    filepath=latest_checkpoint,
+                    model=predict_layer,
+                    optimizer=self.optimizer,
+                    loaded_vars=self.loaded_vars,
+                    **kwargs,
+                )
 
     def load_model_step2(self, **kwargs):
         self.load_model_step1()
@@ -417,7 +423,8 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
                             latest_checkpoint=latest_checkpoint,
                             target_model="mobilenetv2_stn_base_1.40_224_",
                             model_name="MobilenetV2",
-                            include_prediction_layer=False,
+                            # include_prediction_layer=False,
+                            include_prediction_layer=True,
                             **kwargs,
                         )
                     except Exception:
@@ -536,7 +543,7 @@ def create_orchid_mobilenet_v2_15(num_classes, optimizer=None, loss_fn=None, tra
         branches_block = BranchBlock(step, num_classes=num_classes, overfitting=overfitting, batch_size=batch_size)
         branches_prediction_models = branches_block.branches_prediction_models
 
-        logits = branches_block([inputs, output2, output3], training=training)
+        logits = branches_block([processed_inputs, output2, output3], training=training)
 
         if step >= 4:
             estimate_block = EstimationBlock(num_classes=num_classes, batch_size=batch_size)

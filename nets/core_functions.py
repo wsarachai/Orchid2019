@@ -173,21 +173,21 @@ def load_weight_from_old_checkpoint(latest_checkpoint, target_model, model_name,
                 value_to_load[target_model + key.format(i)] = value
                 if pop_key:
                     key_to_numpy.pop(_key_v)
-                _key_v_2 = _key_v + "/ExponentialMovingAverage"
-                if "moving" not in _key_v_2:
-                    if _key_v_2 in key_to_numpy:
-                        value = key_to_numpy[_key_v_2]
-                        value_to_load[target_model + key.format(i) + "/ExponentialMovingAverage"] = value
-                        if pop_key:
-                            key_to_numpy.pop(_key_v_2)
-                    else:
-                        print("Can't find the key: {}".format(_key_v_2))
-                _key_v_2 = _key_v + "/RMSProp"
-                if _key_v_2 in key_to_numpy:
-                    value = key_to_numpy[_key_v_2]
-                    value_to_load[target_model + key.format(i) + "/rms"] = value
-                    if pop_key:
-                        key_to_numpy.pop(_key_v_2)
+                # _key_v_2 = _key_v + "/ExponentialMovingAverage"
+                # if "moving" not in _key_v_2:
+                #     if _key_v_2 in key_to_numpy:
+                #         value = key_to_numpy[_key_v_2]
+                #         value_to_load[target_model + key.format(i) + "/ExponentialMovingAverage"] = value
+                #         if pop_key:
+                #             key_to_numpy.pop(_key_v_2)
+                #     else:
+                #         print("Can't find the key: {}".format(_key_v_2))
+                # _key_v_2 = _key_v + "/RMSProp"
+                # if _key_v_2 in key_to_numpy:
+                #     value = key_to_numpy[_key_v_2]
+                #     value_to_load[target_model + key.format(i) + "/rms"] = value
+                #     if pop_key:
+                #         key_to_numpy.pop(_key_v_2)
             else:
                 print("Can't find the key: {}".format(_key_v))
     return value_to_load

@@ -21,20 +21,27 @@ class TrainClassifier:
         self.moving_average_decay = moving_average_decay
         self.callbacks = callbacks
         self.train_loss_metric = tf.keras.metrics.Mean(name="train_loss")
-        self.regularization_loss_metric = tf.keras.metrics.Mean(name="regularization_loss")
-        self.boundary_loss_metric = tf.keras.metrics.Mean(name="boundary_loss")
-        self.total_loss_metric = tf.keras.metrics.Mean(name="total_loss")
-        self.accuracy_metric = tf.keras.metrics.CategoricalAccuracy(name="accuracy")
-        self.metrics = [
+        self.train_regularization_loss_metric = tf.keras.metrics.Mean(name="train_regularization_loss")
+        self.train_boundary_loss_metric = tf.keras.metrics.Mean(name="train_boundary_loss")
+        self.train_total_loss_metric = tf.keras.metrics.Mean(name="train_total_loss")
+        self.train_accuracy_metric = tf.keras.metrics.CategoricalAccuracy(name="train_accuracy")
+
+        self.validation_loss_metric = tf.keras.metrics.Mean(name="validation_loss")
+        self.validation_accuracy_metric = tf.keras.metrics.CategoricalAccuracy(name="validation_accuracy")
+
+        self.fine_accuracy_metric = tf.keras.metrics.Mean(name="fine_accuracy")
+        self.fine_loss_metrix = tf.keras.metrics.Mean(name="fine_loss")
+
+        self.train_metrics = [
             self.train_loss_metric,
-            self.regularization_loss_metric,
-            self.boundary_loss_metric,
-            self.total_loss_metric,
-            self.accuracy_metric,
+            self.train_regularization_loss_metric,
+            self.train_boundary_loss_metric,
+            self.train_total_loss_metric,
+            self.train_accuracy_metric,
         ]
         self.batch_size = batch_size
 
-        self.model.compile(self.metrics)
+        self.model.compile(self.train_metrics)
 
         if self.moving_average_decay:
             self.variable_averages = tf.train.ExponentialMovingAverage(self.moving_average_decay)
@@ -65,33 +72,40 @@ class TrainClassifier:
         self.model.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
 
         self.train_loss_metric.update_state(train_loss)
-        self.regularization_loss_metric.update_state(regularization_loss)
-        self.boundary_loss_metric.update_state(boundary_loss)
-        self.total_loss_metric.update_state(total_loss)
-        self.accuracy_metric.update_state(labels, predictions)
+        self.train_regularization_loss_metric.update_state(regularization_loss)
+        self.train_boundary_loss_metric.update_state(boundary_loss)
+        self.train_total_loss_metric.update_state(total_loss)
+        self.train_accuracy_metric.update_state(labels, predictions)
 
         return {
             # "train_loss": self.train_loss_metric.result(),
-            # "reg_loss": self.regularization_loss_metric.result(),
-            # "b_loss": self.boundary_loss_metric.result(),
-            "total_loss": self.total_loss_metric.result(),
-            "accuracy": self.accuracy_metric.result(),
+            # "reg_loss": self.train_regularization_loss_metric.result(),
+            # "b_loss": self.train_boundary_loss_metric.result(),
+            "total_loss": self.train_total_loss_metric.result(),
+            "accuracy": self.train_accuracy_metric.result(),
         }
 
     @tf.function
     def evaluate_step(self, inputs, labels):
         predictions = self.model.process_step(inputs, training=False)
         total_loss = self.model.get_loss(labels, predictions)
-        self.total_loss_metric.update_state(total_loss)
-        self.accuracy_metric.update_state(labels, predictions)
-        return {"loss": self.total_loss_metric.result(), "accuracy": self.accuracy_metric.result()}
+        self.validation_loss_metric.update_state(total_loss)
+        self.validation_accuracy_metric.update_state(labels, predictions)
+        return {
+            "loss": self.validation_loss_metric.result(),
+            "accuracy": self.validation_accuracy_metric.result(),
+        }
 
-    def reset_metric(self):
+    def reset_metric_train(self):
         self.train_loss_metric.reset_states()
-        self.regularization_loss_metric.reset_states()
-        self.boundary_loss_metric.reset_states()
-        self.total_loss_metric.reset_states()
-        self.accuracy_metric.reset_states()
+        self.train_regularization_loss_metric.reset_states()
+        self.train_boundary_loss_metric.reset_states()
+        self.fine_accuracy_metric.reset_states()
+        self.fine_loss_metrix.reset_states()
+
+    def reset_metric_validation(self):
+        self.validation_loss_metric.reset_states()
+        self.validation_accuracy_metric.reset_states()
 
     def on_epoch_begin(self, epoch, logs=None):
         for callback in self.callbacks:
@@ -139,7 +153,15 @@ class TrainClassifier:
 
             logs = self.train_step(inputs, labels)
             logs = copy.copy(logs) if logs else {}
-            progbar.update(global_step.numpy(), list(logs.items()), finalize=finalize)
+            self.fine_accuracy_metric.update_state(logs["accuracy"])
+            self.fine_loss_metrix.update_state(logs["total_loss"])
+            self.train_accuracy_metric.reset_states()
+            self.train_total_loss_metric.reset_states()
+            log = {
+                "accuracy": self.fine_accuracy_metric.result().numpy(),
+                "total_loss": self.fine_loss_metrix.result().numpy(),
+            }
+            progbar.update(global_step.numpy(), list(log.items()), finalize=finalize)
 
             if first_graph_writing and global_step == 1:
                 k_summary.graph(
@@ -148,21 +170,22 @@ class TrainClassifier:
                 first_graph_writing = False
 
             if global_step % 10 == 0:
+                self.fine_loss_metrix
                 k_summary.scalar_update("accuracy/fine_grain", logs["accuracy"], global_step)
                 k_summary.scalar_update("loss/fine_grain_loss", logs["total_loss"], global_step)
             k_summary.end_step()
 
             if global_step % target == 0:
                 train_loss = self.train_loss_metric.result().numpy()
-                regularization_loss = self.regularization_loss_metric.result().numpy()
-                boundary_loss = self.boundary_loss_metric.result().numpy()
-                total_loss = self.total_loss_metric.result().numpy()
-                accuracy = self.accuracy_metric.result().numpy()
+                regularization_loss = self.train_regularization_loss_metric.result().numpy()
+                boundary_loss = self.train_boundary_loss_metric.result().numpy()
+                total_loss = self.fine_loss_metrix.result().numpy()
+                accuracy = self.fine_accuracy_metric.result().numpy()
+                self.reset_metric_train()
 
                 print("\n")
-                self.reset_metric()
+                self.reset_metric_validation()
                 t_acc, t_loss = self.evaluate(datasets=self.test_ds)
-                self.reset_metric()
 
                 overfitting = accuracy - t_acc
                 self.model.overfitting.assign(overfitting)
