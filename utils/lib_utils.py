@@ -111,7 +111,7 @@ def config_learning_rate(
 
 def config_optimizer(optimizer, learning_rate):
     if optimizer == "rmsprop":
-        return tf.keras.optimizers.RMSprop(learning_rate=learning_rate, decay=0.9, momentum=0.9, rho=0.0, epsilon=1.0)
+        return tf.keras.optimizers.RMSprop(learning_rate=learning_rate)
     elif optimizer == "adam":
         return tf.keras.optimizers.Adam(learning_rate=learning_rate)
     else:

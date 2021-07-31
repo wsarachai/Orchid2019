@@ -50,18 +50,37 @@ class PreprocessLayer(keras.layers.Layer):
     def call(self, inputs, training=None, **kwargs):
         if training is None:
             training = True if K.learning_phase() == 1 else False
+
         if training:
-            if tf.math.equal(self.fast, 1):
-                inputs = augmentation_m1(inputs)
-            else:
-                inputs = augmentation_m1(inputs)
-                inputs = augmentation_m2(inputs)
+            inputs = tf.image.adjust_brightness(image=inputs, delta=0.2)
+            tf.function(k_summary.image_update).get_concrete_function(name="image/input", unit=inputs, max_outputs=1)(
+                unit=inputs
+            )
+
+        # if inputs.dtype != tf.float32:
+        #     inputs = tf.image.convert_image_dtype(inputs, dtype=tf.float32)
+
+        # image_resize = tf.multiply(inputs, 1.0 / 255.0)
+        # image_resize = tf.subtract(image_resize, 0.5)
+        # inputs = tf.multiply(image_resize, 2.0)
+
+        # if training:
+        #     if tf.math.equal(self.fast, 1):
+        #         inputs = augmentation_m1(inputs)
+        #     else:
+        #         inputs = augmentation_m1(inputs)
+        #         inputs = augmentation_m2(inputs)
+
+        #     tf.function(k_summary.image_update).get_concrete_function(
+        #         name="image/input/preprocess", unit=inputs, max_outputs=1
+        #     )(unit=inputs)
+
         return inputs
 
 
 class ADropout(keras.layers.Layer):
     def __init__(self, overfitting, **kwargs):
-        super().__init__(**kwargs)
+        super(ADropout, self).__init__(**kwargs)
         self.overfitting = overfitting
         self.dropout2 = keras.layers.Dropout(0.2)
         self.dropout8 = keras.layers.Dropout(0.8)

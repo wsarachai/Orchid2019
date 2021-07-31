@@ -24,7 +24,7 @@ flags.DEFINE_integer("fine_tune_at", None, "The starting number of model layer t
 
 flags.DEFINE_float("learning_rate", 0.001, "Learning Rate")
 
-flags.DEFINE_float("dropout", 0.2, "Learning Rate")
+flags.DEFINE_float("dropout", 0.8, "Learning Rate")
 
 flags.DEFINE_float(
     "moving_average_decay",
@@ -60,7 +60,7 @@ flags.DEFINE_string("file", "trainHistory", "Train history")
 
 flags.DEFINE_string(
     "optimizer",
-    "rmsprop",
+    "adam",
     'The name of the optimizer, one of "adadelta", "adagrad", "adam",' '"ftrl", "momentum", "sgd" or "rmsprop".',
 )
 

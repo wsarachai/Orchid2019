@@ -67,12 +67,23 @@ class TrainClassifier:
                 boundary_loss = self.model.boundary_loss(inputs, training=True)
             train_loss = self.model.get_loss(labels, predictions)
             regularization_loss = tf.reduce_sum(self.model.get_regularization_loss())
-            total_loss = regularization_loss + train_loss + boundary_loss
+            if tf.math.less(self.fine_grain_step, 2000):
+                total_loss = train_loss
+            else:
+                total_loss = regularization_loss + train_loss + boundary_loss
 
-        if self.variable_averages:
+        if hasattr(self, "variable_averages") and self.variable_averages:
             self.variable_averages.apply(self.model.trainable_variables)
         gradients = tape.gradient(total_loss, self.model.trainable_variables)
+
+        update_scale = tf.linalg.global_norm([gradients[0]])
+        param_scale = tf.linalg.global_norm([self.model.trainable_variables[0]])
         self.model.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
+
+        ratio_of_weights_updates = update_scale / param_scale
+        k_summary.scalar_update("scalar/param_scale", param_scale, self.fine_grain_step)
+        k_summary.scalar_update("scalar/update_scale", update_scale, self.fine_grain_step)
+        k_summary.scalar_update("scalar/ratio_of_weights_updates", ratio_of_weights_updates, self.fine_grain_step)
 
         self.train_loss_metric.update_state(train_loss)
         self.regularization_loss_metric.update_state(regularization_loss)
@@ -109,7 +120,7 @@ class TrainClassifier:
 
     def fit(self, initial_epoch, **kwargs):
         target = self.data_handler_steps.size // self.batch_size
-        fine_grain_step = max(0, (initial_epoch - 1)) * target
+        self.fine_grain_step = tf.Variable(max(0, (initial_epoch - 1)) * target, dtype=tf.int64)
         is_run_from_bash = kwargs.pop("bash") if "bash" in kwargs else False
         save_best_only = kwargs.pop("save_best_only") if "save_best_only" in kwargs else False
         finalize = False if not is_run_from_bash else True
@@ -151,15 +162,16 @@ class TrainClassifier:
 
                 if first_graph_writing and epoch == 1:
                     k_summary.graph(
-                        fn_name="train_step", graph=self.train_step.get_concrete_function(inputs, labels).graph
+                        fn_name="train_step",
+                        graph=self.train_step.get_concrete_function(inputs, labels).graph,
                     )
                     first_graph_writing = False
 
                 accuracy = self.accuracy_metric.result().numpy()
                 train_loss = self.train_loss_metric.result().numpy()
-                k_summary.scalar_update("accuracy/fine_grain", accuracy, fine_grain_step)
-                k_summary.scalar_update("loss/fine_grain_loss", train_loss, fine_grain_step)
-                fine_grain_step += 1
+                k_summary.scalar_update("accuracy/fine_grain", accuracy, self.fine_grain_step)
+                k_summary.scalar_update("loss/fine_grain_loss", train_loss, self.fine_grain_step)
+                self.fine_grain_step.assign_add(1)
                 k_summary.end_step()
 
             train_loss = self.train_loss_metric.result().numpy()

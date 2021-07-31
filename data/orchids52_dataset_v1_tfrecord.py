@@ -77,10 +77,10 @@ def _load_dataset(
     if split == "train":
         decode_dataset = decode_dataset.shuffle(280, reshuffle_each_iteration=True)
 
-    preprocess_image = wrapped_partial(orchids52_dataset.preprocess_image, image_size=IMG_SIZE_224)
-    decode_dataset = decode_dataset.map(preprocess_image)
-    decode_dataset = decode_dataset.batch(batch_size=batch_size)
-    decode_dataset = decode_dataset.cache().prefetch(buffer_size=AUTOTUNE)
+    # preprocess_image = wrapped_partial(orchids52_dataset.preprocess_image, image_size=IMG_SIZE_224)
+    # decode_dataset = decode_dataset.map(preprocess_image)
+    # decode_dataset = decode_dataset.batch(batch_size=batch_size)
+    # decode_dataset = decode_dataset.cache().prefetch(buffer_size=AUTOTUNE)
 
     if repeat:
         decode_dataset = decode_dataset.repeat()
