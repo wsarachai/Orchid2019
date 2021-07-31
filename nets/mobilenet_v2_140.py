@@ -114,7 +114,7 @@ class Orchids52Mobilenet140(object):
             self.model.compile(optimizer=self.optimizer, loss=self.loss_fn, metrics=metrics)
             # run_eagerly=True)
 
-        self.model.optimizer._create_all_weights(self.model.weights)
+        #self.model.optimizer._create_all_weights(self.model.weights)
 
     def process_step(self, inputs, training=False):
         return self.model(inputs, training=training)

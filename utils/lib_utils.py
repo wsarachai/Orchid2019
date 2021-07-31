@@ -75,13 +75,32 @@ def apply_with_random_selector(x, func, num_cases):
     )[0]
 
 
-def config_learning_rate(learning_rate=0.001, decay=""):
+def config_learning_rate(
+    decay, learning_rate, num_samples_per_epoch, batch_size, num_epochs_per_decay, learning_rate_decay_factor=0.96
+):
+    decay_steps = int(num_samples_per_epoch / batch_size * num_epochs_per_decay)
+
     if decay == "exponential":
         learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(
-            initial_learning_rate=learning_rate, decay_steps=10, decay_rate=0.96
+            initial_learning_rate=learning_rate,
+            decay_steps=decay_steps,
+            decay_rate=learning_rate_decay_factor,
+            staircase=True,
+            name="exponential_decay_learning_rate",
         )
+
+    elif decay == "fixed":
+        learning_rate = tf.constant(learning_rate, name="fixed_learning_rate")
     elif decay == "cosine":
         learning_rate = tf.keras.optimizers.schedules.CosineDecay(initial_learning_rate=learning_rate, decay_steps=710)
+    # elif decay == 'polynomial':
+    #     return tf.train.polynomial_decay(FLAGS.learning_rate,
+    #                                     global_step,
+    #                                     decay_steps,
+    #                                     FLAGS.end_learning_rate,
+    #                                     power=1.0,
+    #                                     cycle=False,
+    #                                     name='polynomial_decay_learning_rate')
     elif decay == "piecewise_constant":
         boundaries = [700, 1400]
         values = [learning_rate, learning_rate / 5, learning_rate / 10]
@@ -92,7 +111,7 @@ def config_learning_rate(learning_rate=0.001, decay=""):
 
 def config_optimizer(optimizer, learning_rate):
     if optimizer == "rmsprop":
-        return tf.keras.optimizers.RMSprop(learning_rate=learning_rate)
+        return tf.keras.optimizers.RMSprop(learning_rate=learning_rate, decay=0.9, momentum=0.9, rho=0.0, epsilon=1.0)
     elif optimizer == "adam":
         return tf.keras.optimizers.Adam(learning_rate=learning_rate)
     else:

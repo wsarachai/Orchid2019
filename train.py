@@ -83,10 +83,10 @@ def main(unused_argv):
     for var in model.trainable_variables:
         logging.info("trainable variable: %s", var.name)
 
-    average_vars = []
-    for v in model.variables:
-        if "moving" not in v.name:
-            average_vars.append(train_model.get_average(v))
+    # average_vars = []
+    # for v in model.variables:
+    #     if "moving" not in v.name:
+    #         average_vars.append(train_model.get_average(v))
 
     model.config_checkpoint(training_dir)
     _checkpoint_dir = training_dir if FLAGS.train_step > 1 else trained_weights_dir
@@ -95,7 +95,7 @@ def main(unused_argv):
         training_for_tf25=True,
         pop_key=False,
         training_step=FLAGS.train_step,
-        average_vars=average_vars,
+        #average_vars=average_vars,
     )
 
     model.summary()

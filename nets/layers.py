@@ -78,14 +78,14 @@ class ADropout(keras.layers.Layer):
 
 
 class PredictionLayer(keras.layers.Layer):
-    def __init__(self, num_classes, overfitting, activation=None, stddev=0.09):
+    def __init__(self, num_classes, overfitting, activation=None):
         super(PredictionLayer, self).__init__()
         self.global_average_pooling = tf.keras.layers.GlobalAveragePooling2D()
         self.dropout = ADropout(overfitting=overfitting)
 
         self.dense = keras.layers.Dense(
             num_classes,
-            kernel_initializer=tf.keras.initializers.TruncatedNormal(mean=0.0, stddev=stddev),
+            kernel_initializer=None,
             kernel_regularizer=None,
             # activation='elu',
         )

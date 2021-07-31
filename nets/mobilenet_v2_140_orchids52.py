@@ -309,7 +309,13 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
             #     _prediction_layer_prefix = prediction_layer_prefix
         else:
             for predict_layer in self.predict_layers:
-                load_model_from_hdf5(latest_checkpoint, predict_layer, **kwargs)
+                load_model_from_hdf5(
+                    filepath=latest_checkpoint,
+                    model=predict_layer,
+                    optimizer=self.optimizer,
+                    loaded_vars=self.loaded_vars,
+                    **kwargs,
+                )
 
     def load_model_step2(self, **kwargs):
         self.load_model_step1()

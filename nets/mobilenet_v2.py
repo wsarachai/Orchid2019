@@ -50,17 +50,17 @@ def _inverted_res_block(name, inputs, expansion, stride, alpha, filters, block_i
         prefix = "{}_expanded_conv_".format(name)
 
     # Depthwise
-    # if stride == 2:
-    #     x = keras.layers.ZeroPadding2D(
-    #         padding=imagenet_utils.correct_pad(x, 3),
-    #         name=prefix + 'pad')(x)
+    if stride == 2:
+        x = keras.layers.ZeroPadding2D(
+            padding=imagenet_utils.correct_pad(x, 3),
+            name=prefix + 'pad')(x)
     x = keras.layers.DepthwiseConv2D(
         kernel_size=3,
         strides=stride,
         activation=None,
         use_bias=False,
-        # padding='same' if stride == 1 else 'valid',
-        padding="same",
+        padding='same' if stride == 1 else 'valid',
+        # padding="same",
         name=prefix + "depthwise",
     )(x)
     x = keras.layers.BatchNormalization(axis=channel_axis, epsilon=1e-3, momentum=0.999, name=prefix + "depthwise_BN")(
