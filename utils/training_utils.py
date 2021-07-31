@@ -67,17 +67,17 @@ class TrainClassifier:
                 boundary_loss = self.model.boundary_loss(inputs, training=True)
             train_loss = self.model.get_loss(labels, predictions)
             regularization_loss = tf.reduce_sum(self.model.get_regularization_loss())
-            if tf.math.less(self.fine_grain_step, 2000):
-                total_loss = train_loss
-            else:
-                total_loss = regularization_loss + train_loss + boundary_loss
+            # if self.fine_grain_step < 2000:
+            #     total_loss = train_loss
+            # else:
+            total_loss = regularization_loss + train_loss + boundary_loss
 
         if hasattr(self, "variable_averages") and self.variable_averages:
             self.variable_averages.apply(self.model.trainable_variables)
         gradients = tape.gradient(total_loss, self.model.trainable_variables)
 
-        update_scale = tf.linalg.global_norm([gradients[0]])
-        param_scale = tf.linalg.global_norm([self.model.trainable_variables[0]])
+        update_scale = tf.linalg.global_norm(gradients)
+        param_scale = tf.linalg.global_norm(self.model.trainable_variables)
         self.model.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
 
         ratio_of_weights_updates = update_scale / param_scale
@@ -139,7 +139,9 @@ class TrainClassifier:
         k_summary.re_init(self.summary_path, target)
         k_summary.hparams_pb(self._hparams)
 
+        global_step = tf.compat.v1.train.get_or_create_global_step()
         for epoch in range(initial_epoch, self.epoches + 1):
+            global_step.assign(epoch)
             print("\nEpoch: {}/{}".format(epoch, self.epoches))
 
             self.on_epoch_begin(epoch=epoch)
@@ -162,8 +164,7 @@ class TrainClassifier:
 
                 if first_graph_writing and epoch == 1:
                     k_summary.graph(
-                        fn_name="train_step",
-                        graph=self.train_step.get_concrete_function(inputs, labels).graph,
+                        fn_name="train_step", graph=self.train_step.get_concrete_function(inputs, labels).graph,
                     )
                     first_graph_writing = False
 

@@ -104,7 +104,7 @@ class PredictionLayer(keras.layers.Layer):
 
         self.dense = keras.layers.Dense(
             num_classes,
-            kernel_initializer=None,
+            kernel_initializer=tf.keras.initializers.TruncatedNormal(mean=0.0, stddev=0.001),
             kernel_regularizer=tf.keras.regularizers.l2(REGULARIZER_L2),
             # activation='elu',
         )
