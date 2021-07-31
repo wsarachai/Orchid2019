@@ -7,7 +7,7 @@ import tensorflow as tf
 import tensorflow.keras as keras
 from tensorflow.python.keras import backend as K
 from utils.summary import k_summary
-from nets.const_vars import default_image_size
+from nets.const_vars import REGULARIZER_L2, default_image_size
 from nets.mobilenet_v2 import IMG_SHAPE_224
 from tensorflow.python.keras import initializers
 from tensorflow.python.keras import activations
@@ -105,7 +105,7 @@ class PredictionLayer(keras.layers.Layer):
         self.dense = keras.layers.Dense(
             num_classes,
             kernel_initializer=None,
-            kernel_regularizer=None,
+            kernel_regularizer=tf.keras.regularizers.l2(REGULARIZER_L2),
             # activation='elu',
         )
         self.prediction_fn = activations.get(activation)

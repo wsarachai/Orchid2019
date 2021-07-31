@@ -78,12 +78,12 @@ def apply_with_random_selector(x, func, num_cases):
 def config_learning_rate(
     decay, learning_rate, num_samples_per_epoch, batch_size, num_epochs_per_decay, learning_rate_decay_factor=0.96
 ):
-    decay_steps = int(num_samples_per_epoch / batch_size * num_epochs_per_decay)
+    # decay_steps = int(num_samples_per_epoch / batch_size * num_epochs_per_decay)
 
     if decay == "exponential":
         learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(
             initial_learning_rate=learning_rate,
-            decay_steps=decay_steps,
+            decay_steps=num_epochs_per_decay,
             decay_rate=learning_rate_decay_factor,
             staircase=True,
             name="exponential_decay_learning_rate",
