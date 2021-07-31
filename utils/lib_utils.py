@@ -75,12 +75,15 @@ def apply_with_random_selector(x, func, num_cases):
     )[0]
 
 
-def config_learning_rate(
-    decay, learning_rate, num_samples_per_epoch, batch_size, num_epochs_per_decay, learning_rate_decay_factor=0.96
-):
-    # decay_steps = int(num_samples_per_epoch / batch_size * num_epochs_per_decay)
+def config_learning_rate(flags):
+    decay = flags.learning_rate_decay
+    learning_rate = flags.learning_rate
+
+    num_epochs_per_decay = 2
+    learning_rate_decay_factor = 0.96
 
     if decay == "exponential":
+        learning_rate = float(learning_rate)
         learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(
             initial_learning_rate=learning_rate,
             decay_steps=num_epochs_per_decay,
@@ -90,9 +93,18 @@ def config_learning_rate(
         )
 
     elif decay == "fixed":
+        learning_rate = float(learning_rate)
         learning_rate = tf.constant(learning_rate, name="fixed_learning_rate")
     elif decay == "cosine":
+        learning_rate = float(learning_rate)
         learning_rate = tf.keras.optimizers.schedules.CosineDecay(initial_learning_rate=learning_rate, decay_steps=710)
+    elif decay == "piecewise_constant":
+        boundaries = flags.learning_rate_boundaries.split(",")
+        boundaries = [int(x) for x in boundaries]
+        values = learning_rate.split(",")
+        values = [float(x) for x in values]
+        learning_rate = tf.keras.optimizers.schedules.PiecewiseConstantDecay(boundaries, values)
+
     # elif decay == 'polynomial':
     #     return tf.train.polynomial_decay(FLAGS.learning_rate,
     #                                     global_step,
@@ -101,25 +113,21 @@ def config_learning_rate(
     #                                     power=1.0,
     #                                     cycle=False,
     #                                     name='polynomial_decay_learning_rate')
-    elif decay == "piecewise_constant":
-        boundaries = [700, 1400]
-        values = [learning_rate, learning_rate / 5, learning_rate / 10]
-        learning_rate = tf.keras.optimizers.schedules.PiecewiseConstantDecay(boundaries, values)
 
     return learning_rate
 
 
 def config_optimizer(optimizer, learning_rate):
     if optimizer == "rmsprop":
-        return tf.keras.optimizers.RMSprop(learning_rate=learning_rate)
+        return tf.keras.optimizers.RMSprop()
     elif optimizer == "adam":
-        return tf.keras.optimizers.Adam(learning_rate=learning_rate)
+        return tf.keras.optimizers.Adam()
     else:
-        return tf.keras.optimizers.SGD(learning_rate=learning_rate)
+        return tf.keras.optimizers.SGD()
 
 
 def config_loss(**kwargs):
-    loss_fn = tf.keras.losses.CategoricalCrossentropy(from_logits=False)
+    loss_fn = tf.keras.losses.BinaryCrossentropy(from_logits=True)
     return loss_fn
 
 

@@ -17,11 +17,12 @@
         "--dataset=orchids52_data",
         "--dataset_version=v1",
         "--model=mobilenet_v2_140_stn_v15",
-        "--learning_rate=0.0001",
         "--total_epochs=200",
         "--save_model=True",
         "--bash=False",
-        "--learning_rate_decay=exponential",
+        "--learning_rate_decay=piecewise_constant",
+        "--learning_rate_boundaries=50,60,70",
+        "--learning_rate=0.00008,0.00004,0.00001,0.000008",
         "--trained_dir=_trained_models/checkpoints/mobilenet_v2_1.4_224/mobilenet_v2_1.4_224.ckpt"
       ]
     },

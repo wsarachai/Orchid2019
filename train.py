@@ -49,13 +49,7 @@ def main(unused_argv):
     test_ds.size = test_size
     train_ds.num_of_classes = num_of_classes
 
-    learning_rate_schedule = config_learning_rate(
-        learning_rate=FLAGS.learning_rate,
-        num_epochs_per_decay=2,
-        batch_size=FLAGS.batch_size,
-        num_samples_per_epoch=train_ds.size,
-        decay=FLAGS.learning_rate_decay,
-    )
+    learning_rate_schedule = config_learning_rate(FLAGS)
     optimizer = config_optimizer(FLAGS.optimizer, learning_rate=FLAGS.learning_rate)
     loss_fn = config_loss()
 
@@ -74,7 +68,7 @@ def main(unused_argv):
         # tf.keras.optimizers.schedules.InverseTimeDecay
         learning_rate = 0.000004
         _epochs = epochs
-        if _epochs > 3:
+        if _epochs > 1:
             if FLAGS.fine_tune:
                 _epochs = _epochs - epoch
             learning_rate = learning_rate_schedule(_epochs)
@@ -129,9 +123,7 @@ def main(unused_argv):
     model.summary()
 
     train_model.fit(
-        initial_epoch=epoch,
-        bash=FLAGS.bash,
-        save_best_only=FLAGS.save_best_only,
+        initial_epoch=epoch, bash=FLAGS.bash, save_best_only=FLAGS.save_best_only,
     )
 
     # if FLAGS.save_model and model:
