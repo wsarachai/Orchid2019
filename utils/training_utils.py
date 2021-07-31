@@ -133,7 +133,7 @@ class TrainClassifier:
             unit_name="step",
         )
 
-        best_acc = 0
+        # best_acc = 0
         first_graph_writing = True
 
         k_summary.re_init(self.summary_path, target)

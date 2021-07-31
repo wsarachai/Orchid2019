@@ -545,13 +545,9 @@ def create_orchid_mobilenet_v2_15(num_classes, optimizer=None, loss_fn=None, tra
             outputs = tf.keras.activations.softmax(outputs)
 
     else:
-        # batch_norm = tf.keras.layers.BatchNormalization()
-        # dropout = tf.keras.layers.Dropout(rate=dropout)
         prediction_layer = PredictionLayer(num_classes=num_classes, overfitting=overfitting, activation="softmax")
         branches_prediction_models.append(prediction_layer)
         mobilenet_logits = stn_base_model(processed_inputs, training=training)
-        # mobilenet_logits = batch_norm(mobilenet_logits)
-        # mobilenet_logits = dropout(mobilenet_logits)
         outputs = prediction_layer(mobilenet_logits, training=training)
 
     model = Orchids52Mobilenet140STN(

@@ -93,6 +93,7 @@ def main(unused_argv):
             "dataset": FLAGS.dataset,
             "training_state": const.TRAIN_TEMPLATE.format(FLAGS.train_step),
             "learning_rate": FLAGS.learning_rate,
+            "learning_rate_boundaries": FLAGS.learning_rate_boundaries,
             "optimizer": FLAGS.optimizer,
             "weight_decay": FLAGS.learning_rate_decay,
             "batch_size": FLAGS.batch_size,
