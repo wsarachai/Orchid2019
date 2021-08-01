@@ -169,12 +169,20 @@
       "console": "integratedTerminal",
       "args": [
         "--train_step=1",
+        "--batch_size=32",
         "--dataset_format=tf-records",
         "--dataset=orchids52_data",
         "--dataset_version=v1",
-        "--batch_size=1",
         "--model=mobilenet_v2_140_stn_v15",
-        "--checkpoint_dir=_trained_models/orchids2019/mobilenet_v2_140_stn_v15",
+        "--total_epochs=125",
+        "--save_model=False",
+        "--bash=False",
+        "--learning_rate_decay=piecewise_constant",
+        "--learning_rate_boundaries=100,120",
+        "--learning_rate=0.0001,0.00005,0.00001",
+        "--fine_tune=True",
+        "--fine_tune_at=100",
+        "--save_best_only=False",
       ]
     },
     {

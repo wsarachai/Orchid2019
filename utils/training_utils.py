@@ -18,9 +18,9 @@ class TrainClassifier:
         epoches,
         data_handler_steps,
         test_ds,
-        hparams,
         moving_average_decay,
         callbacks,
+        hparams={},
     ):
         self.model = model
         self.summary_path = summary_path

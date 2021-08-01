@@ -65,22 +65,24 @@ def load_model_from_hdf5(filepath, model, optimizer, loaded_vars, to_name=None, 
             keys = get_dataset_keys(g)
             for v in keys:
                 print(v)
-        for var in optimizer.weights:
-            if var.ref() not in loaded_vars:
-                if verbose == 1:
-                    print(var.name)
-                var_name = var.name
 
-                if var_name not in g:
-                    if to_name is not None and from_name is not None:
-                        var_name = var_name.replace(from_name, to_name)
-                if var_name in g:
-                    weight = np.asarray(g[var_name])
-                    if var.shape != weight.shape:
-                        raise Exception("Incompatible shapes")
-                    var.assign(weight)
-                    loaded_vars[var.ref()] = var
-                    logging.info("%s is loaded...", var.name)
+        if optimizer:
+            for var in optimizer.weights:
+                if var.ref() not in loaded_vars:
+                    if verbose == 1:
+                        print(var.name)
+                    var_name = var.name
+
+                    if var_name not in g:
+                        if to_name is not None and from_name is not None:
+                            var_name = var_name.replace(from_name, to_name)
+                    if var_name in g:
+                        weight = np.asarray(g[var_name])
+                        if var.shape != weight.shape:
+                            raise Exception("Incompatible shapes")
+                        var.assign(weight)
+                        loaded_vars[var.ref()] = var
+                        logging.info("%s is loaded...", var.name)
 
     except TypeError as e:
         logging.warning("Invalid filename [%s] not found with error: %s", filepath, e)
@@ -388,18 +390,27 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
         )
 
     def load_model_variables(self, **kwargs):
-        self.loaded_vars = {}
-        training_step = TRAIN_TEMPLATE.format(self.step)
-        if training_step == TRAIN_STEP1:
-            self.load_model_step1(**kwargs)
-        elif training_step == TRAIN_STEP2:
-            self.load_model_step2(**kwargs)
-        elif training_step == TRAIN_STEP3:
-            self.load_model_step3(**kwargs)
-        elif training_step == TRAIN_STEP4:
-            self.load_model_step4(**kwargs)
-        elif training_step == TRAIN_STEP5:
-            self.load_model_step5(**kwargs)
+        training = kwargs.get("training", True)
+        if training:
+            self.loaded_vars = {}
+            training_step = TRAIN_TEMPLATE.format(self.step)
+            if training_step == TRAIN_STEP1:
+                self.load_model_step1(**kwargs)
+            elif training_step == TRAIN_STEP2:
+                self.load_model_step2(**kwargs)
+            elif training_step == TRAIN_STEP3:
+                self.load_model_step3(**kwargs)
+            elif training_step == TRAIN_STEP4:
+                self.load_model_step4(**kwargs)
+            elif training_step == TRAIN_STEP5:
+                self.load_model_step5(**kwargs)
+        else:
+            training_step = TRAIN_TEMPLATE.format(self.step)
+            checkpoint_dir = os.path.join(self.checkpoint_dir, training_step)
+            latest_checkpoint = tf.train.latest_checkpoint(checkpoint_dir=checkpoint_dir)
+            load_model_from_hdf5(
+                filepath=latest_checkpoint, model=self.model, optimizer=self.optimizer, loaded_vars=self.loaded_vars
+            )
 
     def restore_model_from_latest_checkpoint_if_exist(self, **kwargs):
         result = False

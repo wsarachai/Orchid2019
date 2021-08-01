@@ -114,7 +114,7 @@ class Orchids52Mobilenet140(object):
             self.model.compile(optimizer=self.optimizer, loss=self.loss_fn, metrics=metrics)
             # run_eagerly=True)
 
-        #self.model.optimizer._create_all_weights(self.model.weights)
+        # self.model.optimizer._create_all_weights(self.model.weights)
 
     def process_step(self, inputs, training=False):
         return self.model(inputs, training=training)
@@ -219,6 +219,7 @@ class Orchids52Mobilenet140(object):
 
     def restore_model_variables(self, checkpoint_dir=None, **kwargs):
         step = 1
+        self.checkpoint_dir = checkpoint_dir
         loaded_successfully = self.restore_model_from_latest_checkpoint_if_exist(
             checkpoint_dir=checkpoint_dir, **kwargs
         )
