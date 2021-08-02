@@ -67,9 +67,6 @@ class TrainClassifier:
                 boundary_loss = self.model.boundary_loss(inputs, training=True)
             train_loss = self.model.get_loss(labels, predictions)
             regularization_loss = tf.reduce_sum(self.model.get_regularization_loss())
-            # if self.fine_grain_step < 2000:
-            #     total_loss = train_loss
-            # else:
             total_loss = regularization_loss + train_loss + boundary_loss
 
         if hasattr(self, "variable_averages") and self.variable_averages:

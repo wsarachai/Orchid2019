@@ -9,17 +9,15 @@ import tensorflow as tf
 import tensorflow.keras as keras
 
 from absl import logging
-
 from nets.const_vars import IMG_SHAPE_224, default_image_size
 from nets.core_functions import load_orchids52_weight_from_old_checkpoint, load_weight
 from stn import SpatialTransformerNetwork
 from nets.mobilenet_v2 import create_mobilenet_v2
-from nets.mobilenet_v2_140 import Orchids52Mobilenet140, save_h5_weights
+from nets.mobilenet_v2_140 import Orchids52Mobilenet140
 from utils.const import TRAIN_STEP1, TRAIN_STEP2, TRAIN_STEP3, TRAIN_STEP4, TRAIN_STEP5
 from utils.const import TRAIN_V2_STEP2
 from utils.const import TRAIN_TEMPLATE
-from utils.lib_utils import get_checkpoint_file
-from nets.layers import ADropout, Conv2DWrapper, DenseWrapper, PreprocessLayer, PredictionLayer
+from nets.layers import Conv2DWrapper, DenseWrapper, PreprocessLayer, PredictionLayer
 from nets.layers import FullyConnectedLayer
 from nets.layers import BranchBlock
 from nets.layers import EstimationBlock
@@ -105,8 +103,6 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
         branch_model,
         boundary_loss,
         training,
-        fast_augment,
-        overfitting,
         step,
     ):
         super(Orchids52Mobilenet140STN, self).__init__(
@@ -118,8 +114,6 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
         self.boundary_loss = boundary_loss
         self.stn_dense_checkpoints = []
         self.loaded_vars = {}
-        self.fast_augment = fast_augment
-        self.overfitting = overfitting
 
     def config_checkpoint(self, checkpoint_dir):
         super(Orchids52Mobilenet140STN, self).config_checkpoint(checkpoint_dir)
@@ -460,25 +454,25 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
         return result
 
 
-def create_orchid_mobilenet_v2_15(num_classes, optimizer=None, loss_fn=None, training=False, dropout=0.8, **kwargs):
+def create_orchid_mobilenet_v2_15(num_classes, optimizer=None, loss_fn=None, **kwargs):
     stn_denses = None
     boundary_loss = None
     branches_block = None
     estimate_block = None
     branches_prediction_models = []
+    dropout = kwargs.get("dropout", 0.5)
+    training = kwargs.get("training", False)
     step = kwargs.pop("step") if "step" in kwargs else ""
     batch_size = kwargs.pop("batch_size") if "batch_size" in kwargs else 1
     activation = kwargs.pop("activation") if "activation" in kwargs else None
 
     inputs = keras.Input(shape=IMG_SHAPE_224)
-    fast_augment = tf.Variable(1.0, trainable=False, name="fast_augment")
-    overfitting = tf.Variable(0.0, trainable=False, name="overfitting")
-    preprocess_layer = PreprocessLayer(fast=fast_augment)
+    preprocess_layer = PreprocessLayer()
     stn_base_model = create_mobilenet_v2(
         input_shape=IMG_SHAPE_224, alpha=1.4, include_top=False, weights="imagenet", sub_name="stn_base"
     )
 
-    processed_inputs = preprocess_layer(inputs, training=training)
+    processed_inputs = preprocess_layer(inputs)
 
     train_step = TRAIN_TEMPLATE.format(step)
     if train_step != TRAIN_STEP1:
@@ -496,7 +490,7 @@ def create_orchid_mobilenet_v2_15(num_classes, optimizer=None, loss_fn=None, tra
                 Conv2DWrapper(filters=128, kernel_size=[1, 1], activation="relu", name="stn_conv2d_1"),
                 keras.layers.Flatten(),
                 DenseWrapper(units=128, activation="tanh", name="stn_dense_128_1"),
-                ADropout(overfitting=overfitting),
+                keras.layers.Dropout(dropout),
                 FullyConnectedLayer(
                     fc_num,
                     kernel_initializer=tf.keras.initializers.TruncatedNormal(mean=0.0, stddev=0.4),
@@ -513,7 +507,7 @@ def create_orchid_mobilenet_v2_15(num_classes, optimizer=None, loss_fn=None, tra
                 Conv2DWrapper(filters=128, kernel_size=[1, 1], activation="relu", name="stn_conv2d_2"),
                 keras.layers.Flatten(),
                 DenseWrapper(units=128, activation="tanh", name="stn_dense_128_2"),
-                ADropout(overfitting=overfitting),
+                keras.layers.Dropout(dropout),
                 FullyConnectedLayer(
                     fc_num,
                     kernel_initializer=tf.keras.initializers.TruncatedNormal(mean=0.0, stddev=0.4),
@@ -527,7 +521,7 @@ def create_orchid_mobilenet_v2_15(num_classes, optimizer=None, loss_fn=None, tra
 
         stn_denses = [stn_dense1, stn_dense2]
 
-        stn_logits = stn_base_model(processed_inputs, training=training)
+        stn_logits = stn_base_model(processed_inputs)
         stn_logits1 = stn_dense1(stn_logits)
         stn_logits2 = stn_dense2(stn_logits)
 
@@ -541,25 +535,25 @@ def create_orchid_mobilenet_v2_15(num_classes, optimizer=None, loss_fn=None, tra
             bound_std = tf.constant(np.full(bound_err.shape, 0.00, dtype=np.float32), name="bound_std_zero")
             boundary_loss = keras.Model(inputs, keras.losses.MSE(bound_err, bound_std), name="mse")
 
-        branches_block = BranchBlock(num_classes=num_classes, overfitting=overfitting, batch_size=batch_size)
+        branches_block = BranchBlock(num_classes=num_classes, dropout=dropout, batch_size=batch_size)
         branches_prediction_models = branches_block.branches_prediction_models
 
-        logits = branches_block(stn_outputs, training=training)
+        logits = branches_block(stn_outputs)
 
         if train_step == TRAIN_STEP2 or train_step == TRAIN_STEP3:
             outputs = tf.reduce_mean(logits, axis=0)
         else:
             estimate_block = EstimationBlock(num_classes=num_classes, batch_size=batch_size)
-            outputs = estimate_block(logits, training=training)
+            outputs = estimate_block(logits)
 
         if activation == "softmax":
             outputs = tf.keras.activations.softmax(outputs)
 
     else:
-        prediction_layer = PredictionLayer(num_classes=num_classes, overfitting=overfitting, activation="softmax")
+        prediction_layer = PredictionLayer(num_classes=num_classes, dropout=dropout, activation="softmax")
         branches_prediction_models.append(prediction_layer)
-        mobilenet_logits = stn_base_model(processed_inputs, training=training)
-        outputs = prediction_layer(mobilenet_logits, training=training)
+        mobilenet_logits = stn_base_model(processed_inputs)
+        outputs = prediction_layer(mobilenet_logits)
 
     model = Orchids52Mobilenet140STN(
         inputs,
@@ -573,8 +567,6 @@ def create_orchid_mobilenet_v2_15(num_classes, optimizer=None, loss_fn=None, tra
         branch_model=branches_block,
         boundary_loss=boundary_loss,
         training=training,
-        fast_augment=fast_augment,
-        overfitting=overfitting,
         step=step,
     )
     return model

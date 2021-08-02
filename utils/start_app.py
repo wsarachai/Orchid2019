@@ -24,7 +24,7 @@ flags.DEFINE_integer("fine_tune_at", None, "The starting number of model layer t
 
 flags.DEFINE_string("learning_rate", "0.001", "Learning Rate")
 
-flags.DEFINE_string("learning_rate_boundaries", None, "Learning rate boundaries")
+flags.DEFINE_string("learning_rate_boundaries", "", "Learning rate boundaries")
 
 flags.DEFINE_float("dropout", 0.5, "Learning Rate")
 

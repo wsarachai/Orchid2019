@@ -63,9 +63,8 @@ def main(unused_argv):
     )
 
     model.config_checkpoint(training_dir)
-    _checkpoint_dir = training_dir if FLAGS.train_step > 1 else trained_weights_dir
     model.restore_model_variables(
-        checkpoint_dir=_checkpoint_dir,
+        checkpoint_dir=training_dir,
         training_for_tf25=True,
         pop_key=False,
         training_step=FLAGS.train_step,

@@ -79,7 +79,7 @@ def config_learning_rate(flags):
     decay = flags.learning_rate_decay
     learning_rate = flags.learning_rate
 
-    num_epochs_per_decay = 2
+    num_epochs_per_decay = 1
     learning_rate_decay_factor = 0.96
 
     if decay == "exponential":

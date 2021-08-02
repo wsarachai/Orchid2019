@@ -230,9 +230,9 @@ class BranchBlock(keras.layers.Layer):
             input_shape=IMG_SHAPE_224, alpha=1.4, include_top=False, weights="imagenet", sub_name="shared_branch"
         )
         self.branches_prediction_models = [
-            PredictionLayer(num_classes=num_classes, dropout_ratio=dropout),
-            PredictionLayer(num_classes=num_classes, dropout_ratio=dropout),
-            PredictionLayer(num_classes=num_classes, dropout_ratio=dropout),
+            PredictionLayer(num_classes=num_classes, dropout=dropout),
+            PredictionLayer(num_classes=num_classes, dropout=dropout),
+            PredictionLayer(num_classes=num_classes, dropout=dropout),
         ]
 
     def call(self, inputs, **kwargs):
@@ -442,9 +442,7 @@ def create_orchid_mobilenet_v2_15(num_classes, optimizer=None, loss_fn=None, tra
             outputs = estimate_block(logits)
 
     else:
-        prediction_layer = PredictionLayer(
-            num_classes=num_classes, dropout_ratio=dropout, activation="softmax", name=""
-        )
+        prediction_layer = PredictionLayer(num_classes=num_classes, dropout=dropout, activation="softmax", name="")
         branches_prediction_models.append(prediction_layer)
         mobilenet_logits = stn_base_model(processed_inputs, training=training)
         outputs = prediction_layer(mobilenet_logits, training=training)

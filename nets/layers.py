@@ -97,10 +97,10 @@ class ADropout(keras.layers.Layer):
 
 
 class PredictionLayer(keras.layers.Layer):
-    def __init__(self, num_classes, overfitting, activation=None):
+    def __init__(self, num_classes, dropout, activation=None):
         super(PredictionLayer, self).__init__()
         self.global_average_pooling = tf.keras.layers.GlobalAveragePooling2D()
-        self.dropout = ADropout(overfitting=overfitting)
+        self.dropout = keras.layers.Dropout(dropout)
 
         self.dense = keras.layers.Dense(
             num_classes,
@@ -129,7 +129,7 @@ class PredictionLayer(keras.layers.Layer):
 
 
 class BranchBlock(keras.layers.Layer):
-    def __init__(self, num_classes, batch_size, overfitting, width=default_image_size, height=default_image_size):
+    def __init__(self, num_classes, batch_size, dropout, width=default_image_size, height=default_image_size):
         super(BranchBlock, self).__init__()
         self.batch_size = batch_size
         self.width = width
@@ -141,9 +141,9 @@ class BranchBlock(keras.layers.Layer):
             input_shape=IMG_SHAPE_224, alpha=1.4, include_top=False, weights="imagenet", sub_name="shared_branch"
         )
         self.branches_prediction_models = [
-            PredictionLayer(num_classes=num_classes, overfitting=overfitting),
-            PredictionLayer(num_classes=num_classes, overfitting=overfitting),
-            PredictionLayer(num_classes=num_classes, overfitting=overfitting),
+            PredictionLayer(num_classes=num_classes, dropout=dropout),
+            PredictionLayer(num_classes=num_classes, dropout=dropout),
+            PredictionLayer(num_classes=num_classes, dropout=dropout),
         ]
 
     def call(self, inputs, training=None, **kwargs):

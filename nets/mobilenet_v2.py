@@ -10,13 +10,10 @@ from tensorflow.python.keras.engine import training
 from tensorflow.python.keras.utils import data_utils
 from tensorflow.python.keras.utils import layer_utils
 from tensorflow.python.keras.applications import imagenet_utils
-
 from nets.const_vars import REGULARIZER_L2, BASE_WEIGHT_PATH, IMG_SHAPE_224
 from nets.v1.mobilenet_v2_140 import Orchids52Mobilenet140 as Orchids52Mobilenet140_V1
 from nets.mobilenet_v2_140 import Orchids52Mobilenet140 as Orchids52Mobilenet140_V2
-
 from absl import logging
-
 from nets.layers import PreprocessLayer, PredictionLayer
 from utils.const import TRAIN_TEMPLATE
 
@@ -51,15 +48,13 @@ def _inverted_res_block(name, inputs, expansion, stride, alpha, filters, block_i
 
     # Depthwise
     if stride == 2:
-        x = keras.layers.ZeroPadding2D(
-            padding=imagenet_utils.correct_pad(x, 3),
-            name=prefix + 'pad')(x)
+        x = keras.layers.ZeroPadding2D(padding=imagenet_utils.correct_pad(x, 3), name=prefix + "pad")(x)
     x = keras.layers.DepthwiseConv2D(
         kernel_size=3,
         strides=stride,
         activation=None,
         use_bias=False,
-        padding='same' if stride == 1 else 'valid',
+        padding="same" if stride == 1 else "valid",
         # padding="same",
         name=prefix + "depthwise",
     )(x)

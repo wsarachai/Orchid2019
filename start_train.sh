@@ -10,8 +10,8 @@ readonly connections=(
     #'1|64|200|0.0005|0.8|True|True'
     #'2|4|5|0.001|0.8|False|False'
     #'3|4|5|0.001|0.8|False|False'
-    #'4|4|15|0.001|0.8|False|True'
-    '5|4|200|0.0001|0.8|True|True'
+    '4|4|100|0.0001|0.5|False|True'
+    #'5|4|200|0.001|0.5|True|True'
 )
 
 function training_model(){
