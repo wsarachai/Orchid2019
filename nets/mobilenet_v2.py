@@ -340,7 +340,7 @@ def create_mobilenet_v2_14(ver, num_classes, dropout=0.8, optimizer=None, loss_f
     processed_inputs = preprocess_layer(inputs, training=training)
     mobilenet_logits = mobilenet(processed_inputs, training=training)
 
-    prediction_layer = PredictionLayer(num_classes=num_classes, dropout_ratio=dropout)
+    prediction_layer = PredictionLayer(num_classes=num_classes, dropout=dropout)
     outputs = prediction_layer(mobilenet_logits, training=training)
 
     if ver == 1:

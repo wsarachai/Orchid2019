@@ -14,7 +14,7 @@ def global_pool(shape, pool_op=keras.layers.AvgPool2D):
     return output
 
 
-def load_weight(var_loaded, all_vars, optimizer, show_model_weights=False, **kwargs):
+def load_weight(var_loaded, all_vars, optimizer=None, show_model_weights=False, **kwargs):
     result = False
     average_vars = kwargs.get("average_vars", [])
 
@@ -28,10 +28,14 @@ def load_weight(var_loaded, all_vars, optimizer, show_model_weights=False, **kwa
             all_maps.update({var.name: var})
         for var in average_vars:
             all_maps.update({var.name: var})
-        for var in optimizer.weights:
-            all_maps.update({var.name: var})
+        if optimizer:
+            for var in optimizer.weights:
+                all_maps.update({var.name: var})
 
-        all_vars = all_vars + average_vars + optimizer.weights
+        if optimizer:
+            all_vars = all_vars + average_vars + optimizer.weights
+        else:
+            all_vars = all_vars + average_vars
 
         for var in all_vars:
             if var.name in var_loaded_fixed_name:

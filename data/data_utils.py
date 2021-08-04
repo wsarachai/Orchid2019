@@ -10,8 +10,17 @@ from data import flowers102_dataset_v1_tfrecord
 from data import orchids52_dataset_v1_tfrecord
 from data import orchids52_dataset_tfrecord
 from data import orchids52_dataset_h5
-from utils.const import PATTERNS, ORCHIDS52, DATA_FORMAT_FILES, DATASET_VERSION_V1, DATASET_VERSION_V2, \
-    DATA_FORMAT_TF_RECORDS, DATA_FORMAT_H5, FLOWERS17, FLOWERS102
+from utils.const import (
+    PATTERNS,
+    ORCHIDS52,
+    DATA_FORMAT_FILES,
+    DATASET_VERSION_V1,
+    DATASET_VERSION_V2,
+    DATA_FORMAT_TF_RECORDS,
+    DATA_FORMAT_H5,
+    FLOWERS17,
+    FLOWERS102,
+)
 
 ORCHIDS52_V1_FILE = PATTERNS.format(ORCHIDS52, DATA_FORMAT_FILES, DATASET_VERSION_V1)
 ORCHIDS52_V2_FILE = PATTERNS.format(ORCHIDS52, DATA_FORMAT_FILES, DATASET_VERSION_V2)
@@ -78,6 +87,4 @@ dataset_mapping = {
 def load_dataset(flags, workspace_path, split="train", **kwargs):
     dataset = PATTERNS.format(flags.dataset, flags.dataset_format, flags.dataset_version)
     data_dir = os.path.join(workspace_path, "_datasets", flags.dataset, flags.dataset_format, flags.dataset_version)
-    return dataset_mapping[dataset](
-        split=split, batch_size=flags.batch_size, root_path=data_dir, **kwargs
-    )
+    return dataset_mapping[dataset](split=split, batch_size=flags.batch_size, root_path=data_dir, **kwargs)

@@ -128,6 +128,7 @@ def config_optimizer(optimizer, learning_rate):
 
 def config_loss(**kwargs):
     loss_fn = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+    # loss_fn = tf.nn.softmax_cross_entropy_with_logits()
     return loss_fn
 
 

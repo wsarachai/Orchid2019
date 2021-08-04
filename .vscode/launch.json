@@ -21,7 +21,7 @@
         "--save_model=True",
         "--bash=False",
         "--learning_rate_decay=exponential",
-        "--learning_rate=0.01",
+        "--learning_rate=0.001",
         "--trained_dir=_trained_models/checkpoints/mobilenet_v2_1.4_224/mobilenet_v2_1.4_224.ckpt"
       ]
     },
@@ -190,7 +190,7 @@
       "args": [
         "--train_step=1",
         "--batch_size=32",
-        "--dataset_format=tf-records",
+        "--dataset_format=files",
         "--dataset=orchids52_data",
         "--dataset_version=v1",
         "--model=mobilenet_v2_140_stn_v15",

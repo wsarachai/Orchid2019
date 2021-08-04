@@ -2,6 +2,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from tensorflow.python.data.ops.dataset_ops import AUTOTUNE
+from nets.preprocessing import preprocess_image
+
 import os
 import tensorflow as tf
 
@@ -21,6 +24,20 @@ def main(unused_argv):
     checkpoint_dir = os.path.join(workspace_path, "_trained_models", "model-v1", FLAGS.checkpoint_dir)
 
     datasets = data_utils.load_dataset(flags=FLAGS, workspace_path=workspace_path, split="test", preprocessing=True)
+
+    if FLAGS.dataset_format == "tf-records":
+        size = datasets.size
+        num_of_classes = datasets.num_of_classes
+
+        datasets = datasets.map(
+            lambda img, lbl: (preprocess_image(img, width=224, height=224, is_training=False), lbl)
+        )
+
+        datasets = datasets.batch(batch_size=FLAGS.batch_size)
+        datasets = datasets.cache().prefetch(buffer_size=AUTOTUNE)
+
+        datasets.size = size
+        datasets.num_of_classes = num_of_classes
 
     create_model = nets_mapping[FLAGS.model]
 

@@ -4,10 +4,7 @@ from __future__ import print_function
 
 import os
 import tensorflow as tf
-from tensorflow.python.data import AUTOTUNE
-
 from data import orchids52_dataset
-from nets.const_vars import IMG_SIZE_224
 from utils.wrapped_tools import wrapped_partial
 
 feature_description = {
@@ -54,9 +51,7 @@ def parse_function(example_proto):
     return tf.io.parse_single_example(example_proto, feature_description)
 
 
-def _load_dataset(
-    split, root_path, batch_size, train_size, test_size, repeat=False, num_readers=1, num_map_threads=1, **kwargs
-):
+def _load_dataset(split, root_path, train_size, test_size, repeat=False, num_readers=1, num_map_threads=1, **kwargs):
     one_hot = kwargs.get("one_hot", False)
     pattern = "orchids52_{split}*.tfrecord".format(split=split)
     pattern = os.path.join(root_path, pattern)

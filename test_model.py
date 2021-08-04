@@ -27,14 +27,17 @@ def main(unused_argv):
     training_dir = os.path.join(workspace_path, "_trained_models", "orchids2019", FLAGS.model)
 
     test_ds = load_dataset(flags=FLAGS, workspace_path=workspace_path, split="test", preprocessing=True, one_hot=True)
-    test_size = test_ds.size
-    num_of_classes = test_ds.num_of_classes
-    test_ds = test_ds.map(lambda img, lbl: (preprocess_image(img, width=224, height=224, is_training=False), lbl))
-    test_ds = test_ds.batch(batch_size=FLAGS.batch_size)
-    test_ds = test_ds.cache().prefetch(buffer_size=AUTOTUNE)
 
-    test_ds.size = test_size
-    test_ds.num_of_classes = num_of_classes
+    if FLAGS.dataset_format == "tf-records":
+        test_size = test_ds.size
+        num_of_classes = test_ds.num_of_classes
+        test_ds = test_ds.map(lambda img, lbl: (preprocess_image(img, width=224, height=224, is_training=False), lbl))
+        test_ds = test_ds.batch(batch_size=FLAGS.batch_size)
+        test_ds = test_ds.cache().prefetch(buffer_size=AUTOTUNE)
+
+        test_ds.size = test_size
+        test_ds.num_of_classes = num_of_classes
+
     optimizer = config_optimizer(FLAGS.optimizer, learning_rate=FLAGS.learning_rate)
     loss_fn = config_loss()
 

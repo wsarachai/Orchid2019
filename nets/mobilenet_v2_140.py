@@ -120,7 +120,10 @@ class Orchids52Mobilenet140(object):
         return self.model(inputs, training=training)
 
     def get_loss(self, labels, predictions):
-        return self.loss_fn(labels, predictions)
+        if self.loss_fn == None:
+            return tf.nn.softmax_cross_entropy_with_logits(labels, predictions)
+        else:
+            return self.loss_fn(labels, predictions)
 
     def get_regularization_loss(self):
         return self.model.losses
