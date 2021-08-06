@@ -17,11 +17,12 @@
         "--dataset=orchids52_data",
         "--dataset_version=v1",
         "--model=mobilenet_v2_140_stn_v15",
-        "--total_epochs=50",
+        "--total_epochs=100",
         "--save_model=True",
         "--bash=False",
         "--learning_rate_decay=exponential",
-        "--learning_rate=0.001",
+        "--learning_rate=0.0005",
+        "--fine_tune=True",
         "--trained_dir=_trained_models/checkpoints/mobilenet_v2_1.4_224/mobilenet_v2_1.4_224.ckpt"
       ]
     },
@@ -42,8 +43,8 @@
         "--save_model=True",
         "--bash=False",
         "--learning_rate_decay=piecewise_constant",
-        "--learning_rate_boundaries=45,50",
-        "--learning_rate=0.001,0.0005,0.0001",
+        "--learning_rate_boundaries=45",
+        "--learning_rate=0.0005,0.0001",
         "--trained_dir=_trained_models/checkpoints/mobilenet_v2_1.4_224/mobilenet_v2_1.4_224.ckpt"
       ]
     },
@@ -54,7 +55,7 @@
       "program": "train.py",
       "console": "integratedTerminal",
       "args": [
-        "--train_step=5",
+        "--train_step=1",
         "--batch_size=4",
         "--dataset_format=tf-records",
         "--dataset=orchids52_data",
@@ -188,9 +189,9 @@
       "program": "test_model.py",
       "console": "integratedTerminal",
       "args": [
-        "--train_step=1",
+        "--train_step=4",
         "--batch_size=32",
-        "--dataset_format=files",
+        "--dataset_format=tf-records",
         "--dataset=orchids52_data",
         "--dataset_version=v1",
         "--model=mobilenet_v2_140_stn_v15",
