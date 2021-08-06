@@ -196,12 +196,12 @@ class EstimationBlock(keras.layers.Layer):
         self.dense = FullyConnectedLayer(
             self.num_classes, kernel_initializer=tf.keras.initializers.TruncatedNormal(mean=0.5), activation=None
         )
-        # self.batch_norm = tf.keras.layers.BatchNormalization(
-        #     beta_initializer="zeros",
-        #     gamma_initializer="ones",
-        #     moving_mean_initializer="zeros",
-        #     moving_variance_initializer="ones",
-        # )
+        self.batch_norm = tf.keras.layers.BatchNormalization(
+            beta_initializer="zeros",
+            gamma_initializer="ones",
+            moving_mean_initializer="zeros",
+            moving_variance_initializer="ones",
+        )
 
     def call(self, inputs, training=None, **kwargs):
         if training is None:
@@ -211,12 +211,12 @@ class EstimationBlock(keras.layers.Layer):
 
         input_and_hstate_concatenated = tf.concat(values=[c_t, inputs[1]], axis=1)
         c_t = self.dense(input_and_hstate_concatenated)
-        # c_t = self.batch_norm(c_t)
+        c_t = self.batch_norm(c_t)
         main_net = main_net + c_t
 
         input_and_hstate_concatenated = tf.concat(values=[c_t, inputs[2]], axis=1)
         c_t = self.dense(input_and_hstate_concatenated)
-        # c_t = self.batch_norm(c_t)
+        c_t = self.batch_norm(c_t)
         main_net = main_net + c_t
 
         if training and self.trainable:
