@@ -61,7 +61,7 @@ def main(unused_argv):
 
     info.display_summary()
 
-    checkpoint_dir = os.path.join(workspace_path, "_trained_models", "orchids2019", FLAGS.model)
+    # checkpoint_dir = os.path.join(workspace_path, "_trained_models", "orchids2019", FLAGS.model)
     # model.save(checkpoint_dir + ".h5")
 
 
