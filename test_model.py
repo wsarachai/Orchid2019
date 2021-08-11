@@ -47,7 +47,7 @@ def main(unused_argv):
         loss_fn=loss_fn,
         training=False,
         step=FLAGS.train_step,
-        activation="softmax",
+        # activation="softmax",
         batch_size=FLAGS.batch_size,
         dropout=FLAGS.dropout,
     )

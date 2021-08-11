@@ -101,14 +101,13 @@ class PredictionLayer(keras.layers.Layer):
         super(PredictionLayer, self).__init__()
         self.global_average_pooling = tf.keras.layers.GlobalAveragePooling2D()
         self.dropout = keras.layers.Dropout(dropout)
-
+        self.prediction_fn = activations.get(activation)
         self.dense = keras.layers.Dense(
             num_classes,
             kernel_initializer=tf.keras.initializers.TruncatedNormal(mean=0.0, stddev=0.001),
             kernel_regularizer=tf.keras.regularizers.l2(REGULARIZER_L2),
             # activation='elu',
         )
-        self.prediction_fn = activations.get(activation)
 
     def call(self, inputs, training=None, **kwargs):
         if training is None:

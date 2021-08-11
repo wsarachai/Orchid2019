@@ -117,7 +117,7 @@ class TrainClassifier:
 
     def fit(self, initial_epoch, **kwargs):
         target = self.data_handler_steps.size // self.batch_size
-        self.fine_grain_step = tf.Variable(max(0, (initial_epoch - 1)) * target, dtype=tf.int64)
+        self.fine_grain_step = tf.Variable(max(0, (initial_epoch - 1)) * 88, dtype=tf.int64)
         is_run_from_bash = kwargs.pop("bash") if "bash" in kwargs else False
         # save_best_only = kwargs.pop("save_best_only") if "save_best_only" in kwargs else False
         finalize = False if not is_run_from_bash else True
@@ -178,22 +178,22 @@ class TrainClassifier:
             total_loss = self.total_loss_metric.result().numpy()
             accuracy = self.accuracy_metric.result().numpy()
 
-            # if epoch % 5 == 0:
-            #     print("\n")
-            #     self.reset_metric()
-            #     t_acc, t_loss = self.evaluate(datasets=self.test_ds)
+            if epoch % 1 == 0:
+                print("\n")
+                self.reset_metric()
+                t_acc, t_loss = self.evaluate(datasets=self.test_ds)
 
-            #     overfitting = accuracy - t_acc
-            #     self.model.overfitting.assign(overfitting)
+                # overfitting = accuracy - t_acc
+                # self.model.overfitting.assign(overfitting)
 
-            #     if overfitting > 0.1:
-            #         self.model.fast_augment.assign(0)
-            #     else:
-            #         self.model.fast_augment.assign(1)
+                # if overfitting > 0.1:
+                #     self.model.fast_augment.assign(0)
+                # else:
+                #     self.model.fast_augment.assign(1)
 
-            #     k_summary.scalar_update("accuracy/validation", t_acc, epoch)
-            #     k_summary.scalar_update("loss/validation/loss", t_loss, epoch)
-            #     k_summary.scalar_update("accuracy/overfitting", overfitting, epoch)
+                k_summary.scalar_update("accuracy/validation", t_acc, epoch)
+                k_summary.scalar_update("loss/validation/loss", t_loss, epoch)
+                # k_summary.scalar_update("accuracy/overfitting", overfitting, epoch)
 
             k_summary.scalar_update("accuracy/accuracy", accuracy, epoch)
             k_summary.scalar_update("loss/train_loss", train_loss, epoch)
