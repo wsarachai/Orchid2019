@@ -62,15 +62,15 @@
         "--dataset=orchids52_data",
         "--dataset_version=v1",
         "--model=mobilenet_v2_140_stn_v15",
-        "--total_epochs=300",
+        "--total_epochs=400",
         "--save_model=False",
         "--bash=False",
         "--learning_rate_decay=piecewise_constant",
         "--learning_rate_boundaries=75",
-        "--learning_rate=0.00001,0.000005",
+        "--learning_rate=0.00001,0.000001",
         "--fine_tune=True",
-        "--fine_tune_at=82",
-        "--save_best_only=False",
+        "--fine_tune_at=117", //0, 10, 19, 28, 37, 46, 55, 64, 72, 81, 90, 99, 108, 117, 126, 135, 144
+        "--save_best_only=True",
         //"eagerly"
       ]
     },
