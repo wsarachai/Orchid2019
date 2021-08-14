@@ -262,6 +262,18 @@ class PrintingNode(tf.keras.layers.Layer):
         return tf.compat.v1.Print(inputs, [inputs])
 
 
+class IdentityLayer(tf.keras.layers.Layer):
+    def __init__(self, fine_grain_step, initial_epoch, best_acc, **kwargs):
+        super(IdentityLayer, self).__init__(**kwargs)
+
+        self.fine_grain_step = fine_grain_step
+        self.initial_epoch = initial_epoch
+        self.best_acc = best_acc
+
+    def call(self, inputs, **kwargs):
+        return tf.identity(inputs)
+
+
 class Conv2DWrapper(keras.layers.Conv2D):
     def __init__(self, **kwargs):
         super(Conv2DWrapper, self).__init__(**kwargs)

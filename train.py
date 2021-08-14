@@ -11,6 +11,7 @@ from data.data_utils import load_dataset
 from utils.lib_utils import config_learning_rate
 from utils.lib_utils import config_optimizer
 from utils.lib_utils import config_loss
+from utils.lib_utils import get_history_info, save_history_info
 from utils.start_app import FLAGS, start
 from utils.training_utils import TrainClassifier
 from utils import const
@@ -70,7 +71,7 @@ def main(unused_argv):
         _epochs = epochs
         if _epochs > 1:
             if FLAGS.fine_tune:
-                _epochs = _epochs - epoch
+                _epochs = _epochs - epochs
             learning_rate = learning_rate_schedule(_epochs)
         return learning_rate
 
@@ -113,7 +114,7 @@ def main(unused_argv):
 
     model.config_checkpoint(training_dir)
     _checkpoint_dir = training_dir if FLAGS.train_step > 1 else trained_weights_dir
-    epoch = model.restore_model_variables(
+    model.restore_model_variables(
         checkpoint_dir=_checkpoint_dir,
         training_for_tf25=True,
         pop_key=False,
@@ -123,9 +124,10 @@ def main(unused_argv):
 
     model.summary()
 
-    train_model.fit(
-        initial_epoch=epoch, bash=FLAGS.bash, save_best_only=FLAGS.save_best_only,
-    )
+    history_file = os.path.join(training_dir, "history-{}.pack".format(FLAGS.train_step))
+    history = get_history_info(history_file=history_file)
+
+    train_model.fit(history=history, bash=FLAGS.bash, save_best_only=FLAGS.save_best_only, fine_tune=FLAGS.fine_tune)
 
     # if FLAGS.save_model and model:
     #     model.save(training_dir)

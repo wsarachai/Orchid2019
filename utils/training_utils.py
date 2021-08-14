@@ -3,6 +3,8 @@ from __future__ import division
 from __future__ import print_function
 
 import copy
+import math
+from utils.lib_utils import save_history_info
 import tensorflow as tf
 
 from absl import logging
@@ -54,6 +56,10 @@ class TrainClassifier:
         for callback in self.callbacks:
             callback.set_model(self.model.model)
 
+        self.fine_grain_step = 0
+        self.initial_epoch = 0
+        self.best_acc = 0
+
     def get_average(self, var):
         if self.variable_averages:
             return self.variable_averages.average(var)
@@ -80,7 +86,9 @@ class TrainClassifier:
         ratio_of_weights_updates = update_scale / param_scale
         k_summary.scalar_update("scalar/param_scale", param_scale, self.fine_grain_step)
         k_summary.scalar_update("scalar/update_scale", update_scale, self.fine_grain_step)
-        k_summary.scalar_update("scalar/ratio_of_weights_updates", ratio_of_weights_updates, self.fine_grain_step)
+        k_summary.scalar_update(
+            "scalar/ratio_of_weights_updates", ratio_of_weights_updates, self.fine_grain_step,
+        )
 
         self.train_loss_metric.update_state(train_loss)
         self.regularization_loss_metric.update_state(regularization_loss)
@@ -115,13 +123,18 @@ class TrainClassifier:
         for callback in self.callbacks:
             callback.on_epoch_begin(epoch, logs)
 
-    def fit(self, initial_epoch, **kwargs):
-        initial_epoch = 254
+    def fit(self, history, **kwargs):
+        if "fine_grain_step" in history:
+            self.fine_grain_step = history["fine_grain_step"]
+        if "initial_epoch" in history:
+            self.initial_epoch = history["initial_epoch"]
+        if "best_acc" in history:
+            self.best_acc = history["best_acc"]
+
         target = self.data_handler_steps.size // self.batch_size
-        _target = 88 if initial_epoch == 201 else target
-        self.fine_grain_step = tf.Variable(max(0, (initial_epoch - 1)) * _target, dtype=tf.int64)  # 88
         is_run_from_bash = kwargs.pop("bash") if "bash" in kwargs else False
         save_best_only = kwargs.pop("save_best_only") if "save_best_only" in kwargs else False
+        fine_tune = kwargs.pop("fine_tune") if "fine_tune" in kwargs else False
         finalize = False if not is_run_from_bash else True
         progbar = tf.keras.utils.Progbar(
             target,
@@ -132,8 +145,10 @@ class TrainClassifier:
             unit_name="step",
         )
 
-        best_acc = 0.908
+        local_best_acc = 0
+        determine_range_count = 0
         first_graph_writing = True
+        initial_epoch = self.initial_epoch + 1
 
         k_summary.re_init(self.summary_path, target)
         k_summary.hparams_pb(self._hparams)
@@ -171,7 +186,7 @@ class TrainClassifier:
                 train_loss = self.train_loss_metric.result().numpy()
                 k_summary.scalar_update("accuracy/fine_grain", accuracy, self.fine_grain_step)
                 k_summary.scalar_update("loss/fine_grain_loss", train_loss, self.fine_grain_step)
-                self.fine_grain_step.assign_add(1)
+                self.fine_grain_step += 1
                 k_summary.end_step()
 
             train_loss = self.train_loss_metric.result().numpy()
@@ -205,14 +220,30 @@ class TrainClassifier:
             k_summary.scalar_update("scalar/learning_rate", self.model.optimizer.lr, epoch)
 
             k_summary.end_epoch()
+            self.initial_epoch = epoch
+
+            if local_best_acc < t_acc:
+                local_best_acc = t_acc
+                determine_range_count = 0
+            else:
+                determine_range_count += 1
 
             if save_best_only:
-                if best_acc <= t_acc:
+                if self.best_acc < t_acc:
                     logging.info("\nSaving best weights...")
-                    best_acc = t_acc
+                    self.best_acc = t_acc
                     self.model.save_model_variables()
+                if fine_tune and determine_range_count >= 5:
+                    break
             else:
+                if self.best_acc < t_acc:
+                    self.best_acc = t_acc
                 self.model.save_model_variables()
+
+            history["fine_grain_step"] = self.fine_grain_step
+            history["initial_epoch"] = self.initial_epoch
+            history["best_acc"] = self.best_acc
+            save_history_info(history=history)
 
         k_summary.session_end_pb()
 
@@ -223,18 +254,18 @@ class TrainClassifier:
     def evaluate(self, datasets, **kwargs):
         logs = None
         seen = 0
-        target = datasets.size // self.batch_size
+        target = int(math.ceil(datasets.size / self.batch_size))
         is_run_from_bash = kwargs.pop("bash") if "bash" in kwargs else False
         finalize = False if not is_run_from_bash else True
         progbar = tf.keras.utils.Progbar(
             target, width=30, verbose=1, interval=0.05, stateful_metrics={"loss", "accuracy"}, unit_name="step"
         )
         for inputs, labels in datasets:
-            if inputs.shape.as_list()[0] == self.batch_size:
-                logs = self.evaluate_step(inputs, labels)
-                num_steps = logs.pop("num_steps", 1)
-                seen += num_steps
-                progbar.update(seen, list(logs.items()), finalize=finalize)
+            # if inputs.shape.as_list()[0] == self.batch_size:
+            logs = self.evaluate_step(inputs, labels)
+            num_steps = logs.pop("num_steps", 1)
+            seen += num_steps
+            progbar.update(seen, list(logs.items()), finalize=finalize)
         logs = copy.copy(logs) if logs else {}
         print("\nloss: {:.3f}, accuracy: {:.3f}".format(logs["loss"], logs["accuracy"]))
 

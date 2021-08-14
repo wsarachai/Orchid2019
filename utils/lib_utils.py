@@ -6,6 +6,7 @@ import collections
 import os
 import re
 import sys
+from pickle import dump, load
 import numpy as np
 import tensorflow as tf
 
@@ -73,6 +74,19 @@ def apply_with_random_selector(x, func, num_cases):
     return tf.raw_ops.Merge(
         inputs=[func(tf.raw_ops.Switch(data=x, pred=tf.equal(sel, case))[1], case) for case in range(num_cases)]
     )[0]
+
+
+def get_history_info(history_file):
+    if tf.io.gfile.exists(history_file):
+        history = load(open(history_file, "rb"))
+    else:
+        history = {"history_file": history_file}
+    return history
+
+
+def save_history_info(history):
+    with open(history["history_file"], "wb") as handle:
+        dump(history, handle)
 
 
 def config_learning_rate(flags):
