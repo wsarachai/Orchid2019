@@ -77,6 +77,31 @@
       ]
     },
     {
+      "name": "Python: Train-v3",
+      "type": "python",
+      "request": "launch",
+      "program": "train.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--train_step=5",
+        "--batch_size=8",
+        "--dataset_format=tf-records",
+        "--dataset=orchids52_data",
+        "--dataset_version=v1",
+        "--model=mobilenet_v2_140_stn_v15",
+        "--total_epochs=100",
+        "--learning_rate_decay=fixed",
+        "--learning_rate=0.001",
+        "--fine_tune=False",
+        "--fine_tune_at=108", //0, 10, 19, 28, 37, 46, 55, 64, 72, 81, 90, 99, 108, 117, 126, 135, 144
+        "--dropout=0.6",
+        "--save_best_only=True",
+        "--save_model=False",
+        "--bash=False",
+        //"eagerly"
+      ]
+    },
+    {
       "name": "Python: Train-finetune",
       "type": "python",
       "request": "launch",

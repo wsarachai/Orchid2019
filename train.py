@@ -21,6 +21,7 @@ from nets.preprocessing import preprocess_image
 def main(unused_argv):
     logging.debug(unused_argv)
 
+    callbacks = []
     workspace_path = os.environ["WORKSPACE"] if "WORKSPACE" in os.environ else "/Users/watcharinsarachai/Documents/"
     create_model = nets_mapping[FLAGS.model]
 
@@ -51,7 +52,7 @@ def main(unused_argv):
     train_ds.num_of_classes = num_of_classes
 
     learning_rate_schedule = config_learning_rate(FLAGS)
-    optimizer = config_optimizer(FLAGS.optimizer, learning_rate=FLAGS.learning_rate)
+    optimizer = config_optimizer(FLAGS.optimizer)
     loss_fn = config_loss()
 
     model = create_model(
@@ -72,10 +73,13 @@ def main(unused_argv):
         if _epochs > 1:
             if FLAGS.fine_tune:
                 _epochs = _epochs - epochs
-            learning_rate = learning_rate_schedule(_epochs)
+            if FLAGS.learning_rate_decay == "fixed":
+                learning_rate = learning_rate_schedule
+            else:
+                learning_rate = learning_rate_schedule(_epochs)
         return learning_rate
 
-    callback = tf.keras.callbacks.LearningRateScheduler(scheduler)
+    callbacks.append(tf.keras.callbacks.LearningRateScheduler(scheduler))
 
     log_dir = os.path.join(training_dir, "logs", const.TRAIN_TEMPLATE.format(FLAGS.train_step))
 
@@ -88,7 +92,7 @@ def main(unused_argv):
         test_ds=test_ds,
         # moving_average_decay=FLAGS.moving_average_decay,
         moving_average_decay=None,
-        callbacks=[callback],
+        callbacks=callbacks,
         hparams={
             "model": FLAGS.model,
             "dataset": FLAGS.dataset,
@@ -124,7 +128,7 @@ def main(unused_argv):
 
     model.summary()
 
-    history_file = os.path.join(training_dir, "history-{}.pack".format(FLAGS.train_step))
+    history_file = os.path.join(training_dir, const.TRAIN_TEMPLATE.format(FLAGS.train_step), "history.pack")
     history = get_history_info(history_file=history_file)
 
     train_model.fit(history=history, bash=FLAGS.bash, save_best_only=FLAGS.save_best_only, fine_tune=FLAGS.fine_tune)

@@ -236,7 +236,7 @@ class Orchids52Mobilenet140(object):
         if self.step == TRAIN_STEP1:
             self.set_mobilenet_training_status(False, **kwargs)
 
-    def set_mobilenet_training_status(self, trainable, fine_tune_at=100):
+    def set_mobilenet_training_status(self, trainable, fine_tune_at):
         if self.mobilenet:
             if trainable:
                 self.mobilenet.trainable = True
@@ -251,7 +251,8 @@ class Orchids52Mobilenet140(object):
     def set_prediction_training_status(self, trainable, **kwargs):
         if self.predict_layers:
             for p in self.predict_layers:
-                p.trainable = trainable
+                if p:
+                    p.trainable = trainable
 
     def save(self, filepath, overwrite=True, include_optimizer=True, save_format=None, signatures=None, options=None):
         model_path = os.path.join(filepath, "model")

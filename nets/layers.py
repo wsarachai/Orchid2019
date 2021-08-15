@@ -97,8 +97,8 @@ class ADropout(keras.layers.Layer):
 
 
 class PredictionLayer(keras.layers.Layer):
-    def __init__(self, num_classes, dropout, activation=None):
-        super(PredictionLayer, self).__init__()
+    def __init__(self, num_classes, dropout, activation=None, **kwargs):
+        super(PredictionLayer, self).__init__(**kwargs)
         self.global_average_pooling = tf.keras.layers.GlobalAveragePooling2D()
         self.dropout = keras.layers.Dropout(dropout)
         self.prediction_fn = activations.get(activation)

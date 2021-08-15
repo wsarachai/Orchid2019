@@ -5,6 +5,7 @@ from __future__ import print_function
 import os
 import h5py
 import numpy as np
+from six import b
 import tensorflow as tf
 import tensorflow.keras as keras
 
@@ -19,7 +20,6 @@ from utils.const import TRAIN_V2_STEP2
 from utils.const import TRAIN_TEMPLATE
 from nets.layers import Conv2DWrapper, DenseWrapper, PreprocessLayer, PredictionLayer
 from nets.layers import FullyConnectedLayer
-from nets.layers import BranchBlock
 from nets.layers import EstimationBlock
 
 
@@ -55,7 +55,8 @@ def load_model_from_hdf5(filepath, model, optimizer, loaded_vars, to_name=None, 
                         raise Exception("Incompatible shapes")
                     var.assign(weight)
                     loaded_vars[var.ref()] = var
-                    logging.info("%s is loaded...", var.name)
+                    if verbose == 1:
+                        logging.info("%s is loaded...", var.name)
                 else:
                     logging.warning("Variable [%s] is not loaded..", var_name)
         g = file_loaded["model_optimizer"]
@@ -218,41 +219,61 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
         #             tf.io.gfile.makedirs(checkpoint_prefix)
         #         save_h5_weights(checkpoint_prefix + "/stn_dense_{}".format(i), stn_dense.weights)
 
-    def set_mobilenet_training_status(self, trainable, **kwargs):
-        super(Orchids52Mobilenet140STN, self).set_mobilenet_training_status(trainable, **kwargs)
-        if self.branch_model:
-            self.branch_model.set_trainable_for_global_branch(trainable, **kwargs)
-            self.branch_model.set_trainable_for_share_branch(trainable, **kwargs)
+    def config_layers(self, fine_tune, fine_tune_at=100, **kwargs):
+        if self.step == 1:
+            self.set_mobilenet_training_status(fine_tune, fine_tune_at=fine_tune_at)
+        elif self.step == 2:
+            self.set_mobilenet_training_status(False, fine_tune_at=fine_tune_at)
+            if self.branch_model:
+                for m in self.branch_model:
+                    if m:
+                        m.trainable = False
+            self.set_prediction_training_status(False, **kwargs)
+            if self.stn_denses[0]:
+                self.stn_denses[0].trainable = False
 
-    def config_layers(self, fine_tune, **kwargs):
-        training_step = TRAIN_TEMPLATE.format(self.step)
-        if training_step == TRAIN_STEP1:
-            self.set_mobilenet_training_status(fine_tune, **kwargs)
-        elif training_step == TRAIN_STEP2:
-            self.set_mobilenet_training_status(False, **kwargs)
+        elif self.step == 3:
+            self.set_mobilenet_training_status(False, fine_tune_at=fine_tune_at)
+            if self.branch_model:
+                for m in self.branch_model:
+                    if m:
+                        m.trainable = False
             self.set_prediction_training_status(False, **kwargs)
-            self.stn_denses[0].trainable = False
-        elif training_step == TRAIN_STEP3:
-            self.set_mobilenet_training_status(False, **kwargs)
+            if self.stn_denses[1]:
+                self.stn_denses[1].trainable = False
+
+        elif self.step == 4:
+            self.set_mobilenet_training_status(fine_tune, fine_tune_at=fine_tune_at)
+            if self.branch_model:
+                for m in self.branch_model:
+                    if m:
+                        m.trainable = False
             self.set_prediction_training_status(False, **kwargs)
-            self.stn_denses[1].trainable = False
-        elif training_step == TRAIN_STEP4:
-            self.set_mobilenet_training_status(False, **kwargs)
+
+        elif self.step == 5:
+            self.set_mobilenet_training_status(fine_tune, fine_tune_at=fine_tune_at)
+            if self.branch_model:
+                for m in self.branch_model:
+                    if fine_tune:
+                        if m:
+                            m.trainable = True
+
+                        if fine_tune_at:
+                            # Freeze all the layers before the `fine_tune_at` layer
+                            for layer in m.layers[:fine_tune_at]:
+                                layer.trainable = False
+                    else:
+                        m.trainable = False
+
             self.set_prediction_training_status(False, **kwargs)
-            for stn_dense in self.stn_denses:
-                stn_dense.trainable = False
-        elif training_step == TRAIN_STEP5:
-            self.set_mobilenet_training_status(fine_tune, **kwargs)
-            self.set_prediction_training_status(True, **kwargs)
             self.estimate_block.trainable = True
             for stn_dense in self.stn_denses:
-                stn_dense.trainable = True
-        elif training_step == TRAIN_V2_STEP2:
+                stn_dense.trainable = False
+        elif self.step == TRAIN_V2_STEP2:
             self.set_mobilenet_training_status(True, **kwargs)
 
     def load_model_step1(self, **kwargs):
-        training_step = TRAIN_TEMPLATE.format(1)
-        checkpoint_dir = os.path.join(self.checkpoint_dir, training_step)
+        checkpoint_dir = os.path.join(self.checkpoint_dir, TRAIN_TEMPLATE.format(1))
         latest_checkpoint = tf.train.latest_checkpoint(checkpoint_dir=checkpoint_dir)
 
         load_model_from_hdf5(
@@ -265,20 +286,19 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
 
         if self.step > 1:
             for idx, predict_layer in enumerate(self.predict_layers):
-                from_name = (
-                    "branch_block/prediction_layer/dense"
-                    if idx == 0
-                    else "branch_block/prediction_layer_{}/dense_{}".format(idx, idx)
-                )
+                if predict_layer:
+                    from_name = (
+                        "branch_block/prediction_layer/dense" if idx == 0 else "branch{}_prediction/dense".format(idx)
+                    )
 
-                load_model_from_hdf5(
-                    filepath=latest_checkpoint,
-                    model=predict_layer,
-                    optimizer=self.optimizer,
-                    loaded_vars=self.loaded_vars,
-                    from_name=from_name,
-                    to_name="prediction_layer/dense",
-                )
+                    load_model_from_hdf5(
+                        filepath=latest_checkpoint,
+                        model=predict_layer,
+                        optimizer=self.optimizer,
+                        loaded_vars=self.loaded_vars,
+                        from_name=from_name,
+                        to_name="prediction_layer/dense",
+                    )
 
             # _prediction_layer_prefix = ""
             # predict_layers_path = os.path.join(self.checkpoint_dir, "predict_layers")
@@ -316,54 +336,69 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
     def load_model_step2(self, **kwargs):
         self.load_model_step1()
 
-        training_step = TRAIN_TEMPLATE.format(1)
-        checkpoint_dir = os.path.join(self.checkpoint_dir, training_step)
+        checkpoint_dir = os.path.join(self.checkpoint_dir, TRAIN_TEMPLATE.format(1))
         latest_checkpoint = tf.train.latest_checkpoint(checkpoint_dir=checkpoint_dir)
 
-        load_model_from_hdf5(
-            filepath=latest_checkpoint,
-            model=self.branch_model.global_branch_model,
-            optimizer=self.optimizer,
-            loaded_vars=self.loaded_vars,
-            to_name="mobilenetv2_stn_base_1.40_224_",
-            from_name="mobilenetv2_global_branch_1.40_224_",
-        )
-        load_model_from_hdf5(
-            filepath=latest_checkpoint,
-            model=self.branch_model.shared_branch_model,
-            optimizer=self.optimizer,
-            loaded_vars=self.loaded_vars,
-            to_name="mobilenetv2_stn_base_1.40_224_",
-            from_name="mobilenetv2_shared_branch_1.40_224_",
-        )
+        if self.branch_model[0]:
+            load_model_from_hdf5(
+                filepath=latest_checkpoint,
+                model=self.branch_model[0],
+                optimizer=self.optimizer,
+                loaded_vars=self.loaded_vars,
+                to_name="mobilenetv2_stn_base_1.40_224_",
+                from_name="mobilenetv2_global_branch_1.40_224_",
+            )
+        if self.branch_model[1]:
+            load_model_from_hdf5(
+                filepath=latest_checkpoint,
+                model=self.branch_model[1],
+                optimizer=self.optimizer,
+                loaded_vars=self.loaded_vars,
+                to_name="mobilenetv2_stn_base_1.40_224_",
+                from_name="mobilenetv2_shared_branch_1.40_224_",
+            )
 
         if self.stn_denses and len(self.stn_denses) > 0:
             for i, stn_dense in enumerate(self.stn_denses):
-                checkpoint_prefix = os.path.join(self.checkpoint_dir, "stn_dense_layer")
-                if tf.io.gfile.exists(checkpoint_prefix):
-                    load_model_from_hdf5(
-                        filepath=checkpoint_prefix + "/stn_dense_{}".format(i),
-                        model=stn_dense,
-                        optimizer=self.optimizer,
-                        loaded_vars=self.loaded_vars,
-                    )
+                if stn_dense:
+                    checkpoint_prefix = os.path.join(self.checkpoint_dir, "stn_dense_layer")
+                    if tf.io.gfile.exists(checkpoint_prefix):
+                        load_model_from_hdf5(
+                            filepath=checkpoint_prefix + "/stn_dense_{}".format(i),
+                            model=stn_dense,
+                            optimizer=self.optimizer,
+                            loaded_vars=self.loaded_vars,
+                        )
 
     def load_model_step3(self, **kwargs):
-        training_step = TRAIN_TEMPLATE.format(2)
-        checkpoint_dir = os.path.join(self.checkpoint_dir, training_step)
+        checkpoint_dir = os.path.join(self.checkpoint_dir, TRAIN_TEMPLATE.format(2))
         latest_checkpoint = tf.train.latest_checkpoint(checkpoint_dir=checkpoint_dir)
 
         load_model_from_hdf5(
-            filepath=latest_checkpoint, model=self.model, optimizer=self.optimizer, loaded_vars=self.loaded_vars
+            filepath=latest_checkpoint,
+            model=self.model,
+            optimizer=self.optimizer,
+            loaded_vars=self.loaded_vars,
+            from_name="branch1_prediction",
+            to_name="branch2_prediction",
         )
 
     def load_model_step4(self, **kwargs):
-        training_step = TRAIN_TEMPLATE.format(self.step)
-        checkpoint_dir = os.path.join(self.checkpoint_dir, training_step)
-        if not tf.io.gfile.exists(checkpoint_dir):
-            training_step = TRAIN_TEMPLATE.format(3)
-            checkpoint_dir = os.path.join(self.checkpoint_dir, training_step)
+        checkpoint_dir = os.path.join(self.checkpoint_dir, TRAIN_TEMPLATE.format(2))
+        latest_checkpoint = tf.train.latest_checkpoint(checkpoint_dir=checkpoint_dir)
 
+        load_model_from_hdf5(
+            filepath=latest_checkpoint,
+            model=self.model,
+            optimizer=self.optimizer,
+            loaded_vars=self.loaded_vars,
+            from_name="branch2_prediction/dense_1",
+            to_name="branch2_prediction/dense",
+            **kwargs,
+        )
+
+        training_step = TRAIN_TEMPLATE.format(3)
+        checkpoint_dir = os.path.join(self.checkpoint_dir, training_step)
         latest_checkpoint = tf.train.latest_checkpoint(checkpoint_dir=checkpoint_dir)
 
         load_model_from_hdf5(
@@ -380,23 +415,36 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
         latest_checkpoint = tf.train.latest_checkpoint(checkpoint_dir=checkpoint_dir)
 
         load_model_from_hdf5(
-            filepath=latest_checkpoint, model=self.model, optimizer=self.optimizer, loaded_vars=self.loaded_vars
+            filepath=latest_checkpoint,
+            model=self.model,
+            optimizer=self.optimizer,
+            loaded_vars=self.loaded_vars,
+            to_name="mobilenetv2_stn_base_1.40_224_",
+            from_name="mobilenetv2_global_branch_1.40_224_",
+        )
+
+        load_model_from_hdf5(
+            filepath=latest_checkpoint,
+            model=self.model,
+            optimizer=self.optimizer,
+            loaded_vars=self.loaded_vars,
+            to_name="branch2_prediction/dense_1",
+            from_name="global_prediction/dense_2",
         )
 
     def load_model_variables(self, **kwargs):
         training = kwargs.get("training", True)
         if training:
             self.loaded_vars = {}
-            training_step = TRAIN_TEMPLATE.format(self.step)
-            if training_step == TRAIN_STEP1:
+            if self.step == 1:
                 self.load_model_step1(**kwargs)
-            elif training_step == TRAIN_STEP2:
+            elif self.step == 2:
                 self.load_model_step2(**kwargs)
-            elif training_step == TRAIN_STEP3:
+            elif self.step == 3:
                 self.load_model_step3(**kwargs)
-            elif training_step == TRAIN_STEP4:
+            elif self.step == 4:
                 self.load_model_step4(**kwargs)
-            elif training_step == TRAIN_STEP5:
+            elif self.step == 5:
                 self.load_model_step5(**kwargs)
         else:
             training_step = TRAIN_TEMPLATE.format(self.step)
@@ -411,7 +459,6 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
         load_from_old_format = False
 
         step = kwargs.get("training_step", 0)
-        training_step = TRAIN_TEMPLATE.format(step)
 
         if self.checkpoint:
             checkpoint, checkpoint_manager = self.checkpoint
@@ -426,7 +473,7 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
             else:
                 load_from_old_format = True
 
-        if training_step == TRAIN_STEP1 and load_from_old_format:
+        if step == 1 and load_from_old_format:
             latest_checkpoint = kwargs.pop("checkpoint_dir")
             if latest_checkpoint:
                 var_loaded = None
@@ -455,11 +502,12 @@ class Orchids52Mobilenet140STN(Orchids52Mobilenet140):
 
 
 def create_orchid_mobilenet_v2_15(num_classes, optimizer=None, loss_fn=None, **kwargs):
-    stn_denses = None
     boundary_loss = None
-    branches_block = None
     estimate_block = None
-    branches_prediction_models = []
+    global_model = None
+    shared_model = None
+    stn_dense_1 = None
+    stn_dense_2 = None
     dropout = kwargs.get("dropout", 0.5)
     training = kwargs.get("training", False)
     step = kwargs.pop("step") if "step" in kwargs else ""
@@ -474,86 +522,123 @@ def create_orchid_mobilenet_v2_15(num_classes, optimizer=None, loss_fn=None, **k
 
     processed_inputs = preprocess_layer(inputs)
 
-    train_step = TRAIN_TEMPLATE.format(step)
-    if train_step != TRAIN_STEP1:
-        scales = [0.5, 0.3]
-        fc_num = 2
+    if step > 1:
+        logits_1 = None
+        logits_2 = None
+        prediction_layer_g = None
+        prediction_layer_1 = None
+        prediction_layer_2 = None
+        bound_errs = []
+        stn_out_params = 2
 
-        if train_step == TRAIN_STEP2:
-            scales = [1.0, 0.3]
-
-        if train_step == TRAIN_STEP3:
-            scales = [0.5, 1.0]
-
-        stn_dense1 = keras.Sequential(
-            [
-                Conv2DWrapper(filters=128, kernel_size=[1, 1], activation="relu", name="stn_conv2d_1"),
-                keras.layers.Flatten(),
-                DenseWrapper(units=128, activation="tanh", name="stn_dense_128_1"),
-                keras.layers.Dropout(dropout),
-                FullyConnectedLayer(
-                    fc_num,
-                    kernel_initializer=tf.keras.initializers.TruncatedNormal(mean=0.0, stddev=0.4),
-                    normalizer_fn=tf.math.l2_normalize,
-                    activation="tanh",
-                    name="stn_dense_3_1",
-                ),
-            ],
-            name="stn_dense1",
+        shared_model = create_mobilenet_v2(
+            input_shape=IMG_SHAPE_224, alpha=1.4, include_top=False, weights="imagenet", sub_name="shared_branch"
         )
-
-        stn_dense2 = keras.Sequential(
-            [
-                Conv2DWrapper(filters=128, kernel_size=[1, 1], activation="relu", name="stn_conv2d_2"),
-                keras.layers.Flatten(),
-                DenseWrapper(units=128, activation="tanh", name="stn_dense_128_2"),
-                keras.layers.Dropout(dropout),
-                FullyConnectedLayer(
-                    fc_num,
-                    kernel_initializer=tf.keras.initializers.TruncatedNormal(mean=0.0, stddev=0.4),
-                    normalizer_fn=tf.math.l2_normalize,
-                    activation="tanh",
-                    name="stn_dense_3_2",
-                ),
-            ],
-            name="stn_dense2",
-        )
-
-        stn_denses = [stn_dense1, stn_dense2]
 
         stn_logits = stn_base_model(processed_inputs)
-        stn_logits1 = stn_dense1(stn_logits)
-        stn_logits2 = stn_dense2(stn_logits)
-
         stn_layer = SpatialTransformerNetwork(
-            batch_size=batch_size, width=default_image_size, height=default_image_size, scales=scales
+            batch_size=batch_size, width=default_image_size, height=default_image_size
         )
 
-        stn_outputs, bound_err = stn_layer(processed_inputs, thetas=[stn_logits1, stn_logits2], training=training)
+        if step == 3 or step >= 4:
+            stn_dense_1 = keras.Sequential(
+                [
+                    Conv2DWrapper(filters=128, kernel_size=[1, 1], activation="relu", name="stn_conv2d_1"),
+                    keras.layers.Flatten(),
+                    DenseWrapper(units=128, activation="tanh", name="stn_dense_128_1"),
+                    keras.layers.Dropout(dropout),
+                    FullyConnectedLayer(
+                        stn_out_params,
+                        kernel_initializer=tf.keras.initializers.TruncatedNormal(mean=0.0, stddev=0.4),
+                        normalizer_fn=tf.math.l2_normalize,
+                        activation="tanh",
+                        name="stn_dense_{}_1".format(stn_out_params),
+                    ),
+                ],
+                name="stn_dense1",
+            )
+            stn_dense_1_output = stn_dense_1(stn_logits)
+            stn_output_1, bound_err_1 = stn_layer(
+                inputs=processed_inputs, scale=0.8, theta=stn_dense_1_output, training=training
+            )
+
+            logit_1 = shared_model(stn_output_1)
+
+            prediction_layer_1 = PredictionLayer(
+                num_classes=num_classes, dropout=dropout, activation=None, name="branch1_prediction"
+            )
+            output_1 = prediction_layer_1(logit_1)
+
+            bound_errs.append(bound_err_1)
+
+        if step == 2 or step >= 4:
+            stn_dense_2 = keras.Sequential(
+                [
+                    Conv2DWrapper(filters=128, kernel_size=[1, 1], activation="relu", name="stn_conv2d_2"),
+                    keras.layers.Flatten(),
+                    DenseWrapper(units=128, activation="tanh", name="stn_dense_128_2"),
+                    keras.layers.Dropout(dropout),
+                    FullyConnectedLayer(
+                        stn_out_params,
+                        kernel_initializer=tf.keras.initializers.TruncatedNormal(mean=0.0, stddev=0.4),
+                        normalizer_fn=tf.math.l2_normalize,
+                        activation="tanh",
+                        name="stn_dense_{}_2".format(stn_out_params),
+                    ),
+                ],
+                name="stn_dense2",
+            )
+            stn_dense_2_output = stn_dense_2(stn_logits)
+            stn_output_2, bound_err_2 = stn_layer(
+                inputs=processed_inputs, scale=0.5, theta=stn_dense_2_output, training=training
+            )
+
+            logit_2 = shared_model(stn_output_2)
+
+            prediction_layer_2 = PredictionLayer(
+                num_classes=num_classes, dropout=dropout, activation=None, name="branch2_prediction"
+            )
+            output_2 = prediction_layer_2(logit_2)
+
+            bound_errs.append(bound_err_2)
+
+        if step == 2:
+            outputs = output_2
+        if step == 3:
+            outputs = output_1
+
+        if step == 4:
+            outputs = tf.reduce_mean([output_1, output_2], axis=0)
+
+        if step == 5:
+            prediction_layer_g = PredictionLayer(
+                num_classes=num_classes, dropout=dropout, activation=None, name="global_prediction"
+            )
+            global_model = create_mobilenet_v2(
+                input_shape=IMG_SHAPE_224, alpha=1.4, include_top=False, weights="imagenet", sub_name="global_branch"
+            )
+            output_g = global_model(processed_inputs)
+            logits_g = prediction_layer_g(output_g)
+
+            estimate_block = EstimationBlock(num_classes=num_classes, batch_size=batch_size)
+            outputs = estimate_block([logits_g, output_1, output_2])
+
+        if len(bound_errs) > 1:
+            bound_err = tf.concat(bound_errs, axis=1)
+        else:
+            bound_err = bound_errs[0]
 
         if training:
             bound_std = tf.constant(np.full(bound_err.shape, 0.00, dtype=np.float32), name="bound_std_zero")
             boundary_loss = keras.Model(inputs, keras.losses.MSE(bound_err, bound_std), name="mse")
 
-        branches_block = BranchBlock(num_classes=num_classes, dropout=dropout, batch_size=batch_size)
-        branches_prediction_models = branches_block.branches_prediction_models
-
-        logits = branches_block(stn_outputs)
-
-        if train_step == TRAIN_STEP2 or train_step == TRAIN_STEP3:
-            outputs = tf.reduce_mean(logits, axis=0)
-        else:
-            estimate_block = EstimationBlock(num_classes=num_classes, batch_size=batch_size)
-            outputs = estimate_block(logits)
-
         if activation == "softmax":
             outputs = tf.keras.activations.softmax(outputs)
 
     else:
-        prediction_layer = PredictionLayer(num_classes=num_classes, dropout=dropout, activation=None)
-        branches_prediction_models.append(prediction_layer)
+        prediction_layer_g = PredictionLayer(num_classes=num_classes, dropout=dropout, activation=None)
         mobilenet_logits = stn_base_model(processed_inputs)
-        outputs = prediction_layer(mobilenet_logits)
+        outputs = prediction_layer_g(mobilenet_logits)
 
     model = Orchids52Mobilenet140STN(
         inputs,
@@ -561,10 +646,10 @@ def create_orchid_mobilenet_v2_15(num_classes, optimizer=None, loss_fn=None, **k
         optimizer=optimizer,
         loss_fn=loss_fn,
         base_model=stn_base_model,
-        stn_denses=stn_denses,
+        stn_denses=[stn_dense_1, stn_dense_2],
         estimate_block=estimate_block,
-        predict_models=branches_prediction_models,
-        branch_model=branches_block,
+        predict_models=[prediction_layer_g, prediction_layer_1, prediction_layer_2],
+        branch_model=[global_model, shared_model],
         boundary_loss=boundary_loss,
         training=training,
         step=step,
