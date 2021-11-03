@@ -21,7 +21,7 @@ def main(unused_argv):
     # tf.config.run_functions_eagerly(True)
 
     workspace_path = os.environ["WORKSPACE"] if "WORKSPACE" in os.environ else "/Users/watcharinsarachai/Documents/"
-    checkpoint_dir = os.path.join(workspace_path, "_trained_models", "model-v1", FLAGS.checkpoint_dir)
+    checkpoint_dir = os.path.join(workspace_path, "_trained_models", "orchids2019", FLAGS.checkpoint_dir)
 
     datasets = data_utils.load_dataset(flags=FLAGS, workspace_path=workspace_path, split="test", preprocessing=True)
 

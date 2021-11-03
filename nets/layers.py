@@ -11,6 +11,7 @@ from nets.const_vars import REGULARIZER_L2, default_image_size
 from nets.mobilenet_v2 import IMG_SHAPE_224
 from tensorflow.python.keras import initializers
 from tensorflow.python.keras import activations
+from nets.resnet_v2 import ResNet50V2
 
 
 @tf.function
@@ -140,6 +141,82 @@ class BranchBlock(keras.layers.Layer):
         self.shared_branch_model = nets.mobilenet_v2.create_mobilenet_v2(
             input_shape=IMG_SHAPE_224, alpha=1.4, include_top=False, weights="imagenet", sub_name="shared_branch"
         )
+        self.branches_prediction_models = [
+            PredictionLayer(num_classes=num_classes, dropout=dropout),
+            PredictionLayer(num_classes=num_classes, dropout=dropout),
+            PredictionLayer(num_classes=num_classes, dropout=dropout),
+        ]
+
+    def call(self, inputs, training=None, **kwargs):
+        if training is None:
+            training = True if K.learning_phase() == 1 else False
+
+        return [
+            self.get_prediction_layer(1, inputs[0], self.branches_prediction_models[0], training),
+            self.get_prediction_layer(2, inputs[1], self.branches_prediction_models[1], training),
+            self.get_prediction_layer(2, inputs[2], self.branches_prediction_models[2], training),
+        ]
+
+    def get_prediction_layer(self, branch, inp, prediction, training):
+        if branch == 1:
+            x = self.global_branch_model(inp, training=training)
+            x = prediction(x, training=training)
+        else:
+            x = self.shared_branch_model(inp, training=training)
+            x = prediction(x, training=training)
+        return x
+
+    def set_trainable_for_global_branch(self, trainable, fine_tune_at=100):
+        if trainable:
+            self.global_branch_model.trainable = True
+
+            if fine_tune_at:
+                # Freeze all the layers before the `fine_tune_at` layer
+                for layer in self.global_branch_model.layers[:fine_tune_at]:
+                    layer.trainable = False
+        else:
+            self.global_branch_model.trainable = False
+
+    def set_trainable_for_share_branch(self, trainable, fine_tune_at=100):
+        if trainable:
+            self.shared_branch_model.trainable = True
+
+            if fine_tune_at:
+                # Freeze all the layers before the `fine_tune_at` layer
+                for layer in self.shared_branch_model.layers[:fine_tune_at]:
+                    layer.trainable = False
+        else:
+            self.shared_branch_model.trainable = False
+
+
+class BranchBlockResnet50(keras.layers.Layer):
+    def __init__(self, num_classes, batch_size, dropout, width=default_image_size, height=default_image_size):
+        super(BranchBlockResnet50, self).__init__()
+        self.batch_size = batch_size
+        self.width = width
+        self.height = height
+        self.global_branch_model = ResNet50V2(
+            include_top=False,
+            weights="imagenet",
+            input_tensor=None,
+            input_shape=IMG_SHAPE_224,
+            pooling=None,
+            classes=1000,
+            classifier_activation="softmax",
+            sub_name="global_branch",
+        )
+
+        self.shared_branch_model = ResNet50V2(
+            include_top=False,
+            weights="imagenet",
+            input_tensor=None,
+            input_shape=IMG_SHAPE_224,
+            pooling=None,
+            classes=1000,
+            classifier_activation="softmax",
+            sub_name="shared_branch",
+        )
+
         self.branches_prediction_models = [
             PredictionLayer(num_classes=num_classes, dropout=dropout),
             PredictionLayer(num_classes=num_classes, dropout=dropout),

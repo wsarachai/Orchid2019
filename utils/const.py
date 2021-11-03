@@ -21,6 +21,8 @@ MOBILENET_V2_140_FLOWERS17 = "mobilenet_v2_140_flowers17"
 MOBILENET_V2_140_FLOWERS102 = "mobilenet_v2_140_flowers102"
 MOBILENET_V2_140_ORCHIDS52 = "mobilenet_v2_140_stn_v15"
 
+RESNET_V2_50_ORCHIDS52 = "resnet_v2_50_stn_v15"
+
 FLOWERS17 = "flowers17_data"
 FLOWERS102 = "flowers102_data"
 ORCHIDS52 = "orchids52_data"

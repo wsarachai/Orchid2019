@@ -27,6 +27,66 @@
       ]
     },
     {
+      "name": "Python: resnetv2 Train 1",
+      "type": "python",
+      "request": "launch",
+      "program": "train.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--train_step=1",
+        "--batch_size=32",
+        "--dataset_format=tf-records",
+        "--dataset=orchids52_data",
+        "--dataset_version=v1",
+        "--model=resnet_v2_50_stn_v15",
+        "--total_epochs=100",
+        "--save_model=True",
+        "--bash=False",
+        "--learning_rate_decay=exponential",
+        "--learning_rate=0.001",
+        "--fine_tune=False",
+        "--trained_dir=_trained_models/checkpoints/resnet_v2_50_224/inception_resnet_v2_2016_08_30.ckpt"
+      ]
+    },
+    {
+      "name": "Python: resnetv2 Train 2",
+      "type": "python",
+      "request": "launch",
+      "program": "train.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--train_step=2",
+        "--batch_size=32",
+        "--dataset_format=tf-records",
+        "--dataset=orchids52_data",
+        "--dataset_version=v1",
+        "--model=resnet_v2_50_stn_v15",
+        "--total_epochs=10",
+        "--save_model=True",
+        "--bash=False",
+        "--learning_rate_decay=exponential",
+        "--learning_rate=0.001",
+        "--fine_tune=False",
+        "--trained_dir=_trained_models/checkpoints/resnet_v2_50_224/pretrain1"
+      ]
+    },
+    {
+      "name": "Python: resnet_v2_50_orchids52 stn v1 Test",
+      "type": "python",
+      "request": "launch",
+      "program": "run-test-resnet.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--train_step=1",
+        "--dataset_format=tf-records",
+        "--dataset=orchids52_data",
+        "--dataset_version=v1",
+        "--batch_size=1",
+        "--model=resnet_v2_50_stn_v15",
+        "--checkpoint_dir=resnet_v2_50_stn_v15",
+      ]
+    },
+    {
       "name": "Python: Train 2",
       "type": "python",
       "request": "launch",
@@ -176,6 +236,21 @@
       "args": [
         "--dataset_format=tf-records",
         "--dataset=orchids52_data",
+        "--dataset_version=v1",
+        "--batch_size=1",
+        "--model=mobilenet_v2_140_stn_v15_v1",
+        "--checkpoint_dir=mobilenet_v2_140_stn_v15_orchids52_0002/pretrain3/model.ckpt-50000",
+      ]
+    },
+    {
+      "name": "Python: mobilenet_v2_140_orchids52 stn v1 Other data Test",
+      "type": "python",
+      "request": "launch",
+      "program": "run-test.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--dataset_format=files",
+        "--dataset=flowers17_data",
         "--dataset_version=v1",
         "--batch_size=1",
         "--model=mobilenet_v2_140_stn_v15_v1",
